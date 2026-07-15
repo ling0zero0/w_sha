@@ -1,0 +1,24 @@
+{
+  "name": "werewolf-lan",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.5.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c yellow,cyan \"corepack pnpm --filter @werewolf/server dev\" \"corepack pnpm --filter @werewolf/web dev\"",
+    "typecheck": "corepack pnpm --filter @werewolf/shared typecheck && corepack pnpm --filter @werewolf/server typecheck && corepack pnpm --filter @werewolf/web typecheck",
+    "test": "corepack pnpm --filter @werewolf/shared test && corepack pnpm --filter @werewolf/server test && corepack pnpm --filter @werewolf/web test",
+    "test:e2e": "playwright test",
+    "build": "corepack pnpm --filter @werewolf/shared build && corepack pnpm --filter @werewolf/server build && corepack pnpm --filter @werewolf/web build",
+    "check": "corepack pnpm typecheck && corepack pnpm test && corepack pnpm build",
+    "check:all": "corepack pnpm check && corepack pnpm test:e2e",
+    "clean": "node scripts/clean.cjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "concurrently": "^9.2.1",
+    "typescript": "^5.9.3"
+  }
+}
