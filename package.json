@@ -11,6 +11,7 @@
     "typecheck": "corepack pnpm --filter @werewolf/shared typecheck && corepack pnpm --filter @werewolf/server typecheck && corepack pnpm --filter @werewolf/web typecheck",
     "test": "corepack pnpm --filter @werewolf/shared test && corepack pnpm --filter @werewolf/server test && corepack pnpm --filter @werewolf/web test",
     "test:e2e": "playwright test",
+    "screenshots:readme": "playwright test --config=playwright.screenshots.config.ts",
     "build": "corepack pnpm --filter @werewolf/shared build && corepack pnpm --filter @werewolf/server build && corepack pnpm --filter @werewolf/web build",
     "package:portable": "node scripts/package-portable.cjs",
     "package:installer": "node scripts/package-installer.cjs",

@@ -2,6 +2,24 @@
 
 一款面向线下聚会的局域网狼人杀辅助系统。Windows 电脑作为房主和公共屏幕，玩家手机连接同一局域网后，通过扫描二维码在浏览器中加入，无需安装手机 App，也不依赖云服务器。
 
+## 游戏界面
+
+电脑作为房主公共屏幕，用于创建房间、展示二维码、配置身份和控制游戏流程。
+
+![房主大厅：二维码、身份配置和玩家名册](docs/screenshots/host-lobby.jpg)
+
+玩家通过手机浏览器查看自己的私密身份，并完成夜间行动、白天发言和放逐投票。
+
+<p align="center">
+  <img src="docs/screenshots/player-role.jpg" width="42%" alt="手机端狼人身份界面">
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/player-vote.jpg" width="42%" alt="手机端放逐投票界面">
+</p>
+
+对局结束后，公共屏幕统一公布胜负、全部身份和关键行动记录。
+
+![对局结算：胜负结果、玩家身份和行动记录](docs/screenshots/game-result.jpg)
+
 ## 主要功能
 
 - 房主创建房间、配置角色和阶段时间
@@ -67,6 +85,9 @@ corepack pnpm test
 
 # Playwright 端到端测试
 corepack pnpm test:e2e
+
+# 重新生成 README 游戏截图
+corepack pnpm screenshots:readme
 
 # 生产构建
 corepack pnpm build
