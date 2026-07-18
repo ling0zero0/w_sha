@@ -11,12 +11,22 @@ export default defineConfig({
   },
   server: {
     host: "0.0.0.0",
-    port: 5173,
+    port: Number(process.env.WEB_PORT ?? 5173),
     strictPort: true,
     proxy: {
-      "/api": "http://127.0.0.1:3000",
+      "/api": {
+        target: `http://127.0.0.1:${process.env.PORT ?? 3000}`,
+        configure(proxy) {
+          proxy.on("proxyReq", (proxyRequest, request) => {
+            proxyRequest.setHeader(
+              "x-werewolf-proxy-client-ip",
+              request.socket.remoteAddress ?? ""
+            );
+          });
+        }
+      },
       "/socket.io": {
-        target: "ws://127.0.0.1:3000",
+        target: `ws://127.0.0.1:${process.env.PORT ?? 3000}`,
         ws: true
       }
     }

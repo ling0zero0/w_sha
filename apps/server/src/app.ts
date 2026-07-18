@@ -1,7 +1,10 @@
-import { apiErrorSchema, serviceStatusSchema } from "@werewolf/shared";
+import { apiErrorSchema, hostBootstrapSchema, serviceStatusSchema } from "@werewolf/shared";
+import fastifyStatic from "@fastify/static";
 import Fastify, { type FastifyServerOptions } from "fastify";
+import { resolve } from "node:path";
 import { ZodError } from "zod";
 import type { ServerConfig } from "./config.js";
+import type { GameRuntime } from "./runtime.js";
 
 const serviceVersion = "0.1.0";
 
@@ -34,13 +37,68 @@ function loggerOptions(config: ServerConfig): LoggerOption {
   return { level: config.LOG_LEVEL };
 }
 
-export function buildServer(config: ServerConfig) {
+function isLoopbackBrowserSource(source: string | undefined): boolean {
+  if (!source) return false;
+  try {
+    const hostname = new URL(source).hostname;
+    return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "[::1]";
+  } catch {
+    return false;
+  }
+}
+
+function isLoopbackAddress(address: string): boolean {
+  return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1";
+}
+
+function getBrowserAddress(
+  directAddress: string,
+  proxyClientAddress: string | string[] | undefined
+): string {
+  if (!isLoopbackAddress(directAddress) || typeof proxyClientAddress !== "string") {
+    return directAddress;
+  }
+
+  return proxyClientAddress;
+}
+
+export function buildServer(config: ServerConfig, runtime?: GameRuntime) {
   const app = Fastify({ logger: loggerOptions(config) });
+
+  if (config.WEB_ROOT) {
+    void app.register(fastifyStatic, {
+      root: resolve(config.WEB_ROOT),
+      wildcard: false
+    });
+  }
 
   app.get("/health", async () => createServiceStatus());
   app.get("/api/bootstrap", async () => createServiceStatus());
+  app.get("/api/host-bootstrap", async (request, reply) => {
+    const browserSource = request.headers.origin ?? request.headers.referer;
+    const browserAddress = getBrowserAddress(
+      request.ip,
+      request.headers["x-werewolf-proxy-client-ip"]
+    );
+    if (!runtime || !isLoopbackAddress(browserAddress) || !isLoopbackBrowserSource(browserSource)) {
+      return reply.code(403).send(apiErrorSchema.parse({
+        code: "HOST_LOCAL_ONLY",
+        message: "主机控制台只能从本机打开",
+        requestId: request.id
+      }));
+    }
+
+    return hostBootstrapSchema.parse({
+      sessionToken: runtime.hostSession,
+      lobby: runtime.room.getHostView()
+    });
+  });
 
   app.setNotFoundHandler((request, reply) => {
+    if (config.WEB_ROOT && request.method === "GET" && !request.url.startsWith("/api/")) {
+      return reply.sendFile("index.html", { maxAge: 0, immutable: false });
+    }
+
     const payload = apiErrorSchema.parse({
       code: "NOT_FOUND",
       message: "请求的资源不存在",

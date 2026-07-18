@@ -12,6 +12,8 @@
     "test": "corepack pnpm --filter @werewolf/shared test && corepack pnpm --filter @werewolf/server test && corepack pnpm --filter @werewolf/web test",
     "test:e2e": "playwright test",
     "build": "corepack pnpm --filter @werewolf/shared build && corepack pnpm --filter @werewolf/server build && corepack pnpm --filter @werewolf/web build",
+    "package:portable": "node scripts/package-portable.cjs",
+    "package:installer": "node scripts/package-installer.cjs",
     "check": "corepack pnpm typecheck && corepack pnpm test && corepack pnpm build",
     "check:all": "corepack pnpm check && corepack pnpm test:e2e",
     "clean": "node scripts/clean.cjs"

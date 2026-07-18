@@ -13,12 +13,14 @@
   "dependencies": {
     "@werewolf/shared": "workspace:*",
     "lucide-react": "^0.468.0",
+    "qrcode": "^1.5.4",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.1.1",

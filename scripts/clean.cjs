@@ -2,10 +2,9 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { spawnSync } = require('node:child_process');
 
 const projectRoot = path.resolve(__dirname, '..');
-const managerScript = path.join(__dirname, 'project-manager.cjs');
+const stateFile = path.join(projectRoot, '.runtime', 'dev-process.json');
 
 const generatedPaths = [
   'apps/server/dist',
@@ -14,6 +13,7 @@ const generatedPaths = [
   'coverage',
   'playwright-report',
   'test-results',
+  'release',
   '.runtime',
   'dev-server.log',
   'dev-server-error.log',
@@ -30,13 +30,16 @@ function resolveProjectPath(relativePath) {
   return target;
 }
 
-const status = spawnSync(process.execPath, [managerScript, 'status'], {
-  cwd: projectRoot,
-  stdio: 'ignore',
-  windowsHide: true,
-});
+let running = false;
+try {
+  const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+  process.kill(state.pid, 0);
+  running = true;
+} catch {
+  running = false;
+}
 
-if (status.status === 0) {
+if (running) {
   console.error('ERROR: The project is running. Use the close script before cleaning.');
   process.exit(1);
 }
