@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Role } from "@werewolf/shared";
 import { evaluateGameOutcome, resolveNightDeaths, resolvePlurality, resolveWolfAttack } from "./rules.js";
 
 const firstId = "00000000-0000-4000-8000-000000000001";
@@ -28,10 +29,12 @@ describe("game rules", () => {
     expect(resolveNightDeaths(players, firstId, false, secondId)).toEqual([secondId, firstId]);
     expect(resolveNightDeaths(players, firstId, true, secondId)).toEqual([secondId]);
     expect(resolveNightDeaths(players, firstId, false, firstId)).toEqual([firstId]);
+    expect(resolveNightDeaths(players, firstId, false, null, firstId)).toEqual([]);
+    expect(resolveNightDeaths(players, firstId, false, firstId, firstId)).toEqual([firstId]);
   });
 
   it("evaluates the existing edge-elimination win conditions", () => {
-    const player = (role: "wolf" | "villager" | "seer" | "witch", alive = true) => ({
+    const player = (role: Role, alive = true) => ({
       role,
       alive,
       connection: "online" as const
@@ -41,5 +44,30 @@ describe("game rules", () => {
     expect(evaluateGameOutcome([player("wolf"), player("seer")])).toBe("wolf-win");
     expect(evaluateGameOutcome([player("wolf"), player("villager"), player("seer")])).toBeNull();
     expect(evaluateGameOutcome([player("wolf", false), player("villager", false)])).toBe("draw");
+  });
+
+  it.each(["guard", "hunter", "idiot"] as const)("counts %s as a god role", (role) => {
+    const player = (candidateRole: Role, alive = true) => ({
+      role: candidateRole,
+      alive,
+      connection: "online" as const
+    });
+
+    expect(evaluateGameOutcome([player("wolf"), player("villager"), player(role)])).toBeNull();
+    expect(evaluateGameOutcome([player("wolf"), player("villager"), player(role, false)])).toBe("wolf-win");
+  });
+
+  it("returns a draw when the final wolf and final god are eliminated together", () => {
+    const player = (role: Role, alive: boolean) => ({
+      role,
+      alive,
+      connection: "online" as const
+    });
+
+    expect(evaluateGameOutcome([
+      player("wolf", false),
+      player("villager", true),
+      player("hunter", false)
+    ])).toBe("draw");
   });
 });

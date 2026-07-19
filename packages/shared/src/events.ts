@@ -1,11 +1,13 @@
 import type {
   DayConfirmVoteRequest,
   DaySelectVoteRequest,
+  GuardProtectRequest,
   HostAdjustPhaseTimeRequest,
   HostCorrectPlayerLifeRequest,
   HostMovePlayerRequest,
   HostPlayerRequest,
   HostResolveTakeoverRequest,
+  HunterShootRequest,
   RoomActionAck,
   SeerInspectRequest,
   WitchSubmitActionRequest,
@@ -13,7 +15,7 @@ import type {
   WolfSelectTargetRequest,
   WolfSendMessageRequest
 } from "./actions.js";
-import type { RoleConfiguration } from "./domain.js";
+import type { RoleConfigurationInput } from "./domain.js";
 import type { PublicGameState } from "./game.js";
 import type {
   HostLobbyView,
@@ -37,7 +39,7 @@ export interface ClientToServerEvents {
   "host:depart-player": (payload: HostPlayerRequest, ack: RoomActionAck<HostLobbyView>) => void;
   "host:correct-player-life": (payload: HostCorrectPlayerLifeRequest, ack: RoomActionAck<HostLobbyView>) => void;
   "host:resolve-takeover": (payload: HostResolveTakeoverRequest, ack: RoomActionAck<HostLobbyView>) => void;
-  "host:update-role-configuration": (payload: RoleConfiguration, ack: RoomActionAck<HostLobbyView>) => void;
+  "host:update-role-configuration": (payload: RoleConfigurationInput, ack: RoomActionAck<HostLobbyView>) => void;
   "host:start-game": (ack: RoomActionAck<HostLobbyView>) => void;
   "player:confirm-role": (ack: RoomActionAck<PlayerLobbyView>) => void;
   "wolf:select-target": (payload: WolfSelectTargetRequest, ack: RoomActionAck<PlayerLobbyView>) => void;
@@ -45,6 +47,8 @@ export interface ClientToServerEvents {
   "wolf:send-message": (payload: WolfSendMessageRequest, ack: RoomActionAck<PlayerLobbyView>) => void;
   "seer:inspect": (payload: SeerInspectRequest, ack: RoomActionAck<PlayerLobbyView>) => void;
   "witch:submit-action": (payload: WitchSubmitActionRequest, ack: RoomActionAck<PlayerLobbyView>) => void;
+  "guard:protect": (payload: GuardProtectRequest, ack: RoomActionAck<PlayerLobbyView>) => void;
+  "hunter:shoot": (payload: HunterShootRequest, ack: RoomActionAck<PlayerLobbyView>) => void;
   "host:continue-from-dawn": (ack: RoomActionAck<HostLobbyView>) => void;
   "host:continue-from-exile": (ack: RoomActionAck<HostLobbyView>) => void;
   "host:play-again": (ack: RoomActionAck<HostLobbyView>) => void;

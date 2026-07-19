@@ -1,17 +1,23 @@
-import type { RoleConfiguration } from "@werewolf/shared";
+import type { Role } from "@werewolf/shared";
 
-export const roleLabels: Record<keyof RoleConfiguration, string> = {
+export const roleLabels: Record<Role, string> = {
   wolf: "狼人",
   villager: "村民",
   seer: "预言家",
-  witch: "女巫"
+  witch: "女巫",
+  guard: "守卫",
+  hunter: "猎人",
+  idiot: "白痴"
 };
 
-export const roleImages: Record<keyof RoleConfiguration, string> = {
+export const roleImages: Record<Role, string | null> = {
   wolf: "/assets/roles/wolf.png",
   villager: "/assets/roles/villager.png",
   seer: "/assets/roles/seer.png",
-  witch: "/assets/roles/witch.png"
+  witch: "/assets/roles/witch.png",
+  guard: null,
+  hunter: null,
+  idiot: null
 };
 
 export const outcomeLabels = {

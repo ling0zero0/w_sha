@@ -15,6 +15,7 @@ import {
   type ReconnectPlayerRequest,
   type Role,
   type RoleConfiguration,
+  type RoleConfigurationInput,
   type RoomActionFailure,
   type RoomActionResult,
   type TakeoverPlayerRequest,
@@ -45,6 +46,12 @@ interface InternalPlayer extends LobbyPlayer {
   alive: boolean;
   dayVoteTarget: DayVoteTarget;
   dayVoteConfirmed: boolean;
+  idiotRevealed: boolean;
+}
+
+interface PendingHunterResolution {
+  hunterId: PlayerId;
+  origin: "night" | "exile";
 }
 
 interface InternalTakeoverRequest extends TakeoverRequest {
@@ -60,7 +67,7 @@ interface RoomOptions {
   deferCompletedStages?: boolean;
 }
 
-export type TimedStage = "role-reveal" | "wolf" | "seer" | "witch" | "dawn"
+export type TimedStage = "role-reveal" | "wolf" | "seer" | "guard" | "witch" | "hunter" | "dawn"
   | "last-words" | "day-speech" | "day-vote" | "exile-result";
 
 export interface LobbyRoomSnapshot {
@@ -69,7 +76,7 @@ export interface LobbyRoomSnapshot {
   joinToken: string;
   revision: number;
   phase: HostLobbyView["phase"];
-  nightStage: "wolf" | "seer" | "witch" | "complete";
+  nightStage: "wolf" | "seer" | "guard" | "witch" | "complete";
   wolfVoteLocked: boolean;
   wolfAttackTargetId: PlayerId | null;
   witchActionSubmitted: boolean;
@@ -81,6 +88,13 @@ export interface LobbyRoomSnapshot {
   exiledPlayerId: PlayerId | null;
   currentSpeakerFinished?: boolean;
   pendingWitchAction?: { saved: boolean; poisonTargetId: PlayerId | null } | null;
+  guardTargetId?: PlayerId | null;
+  lastGuardTargetId?: PlayerId | null;
+  guardActionSubmitted?: boolean;
+  pendingHunterResolution?: PendingHunterResolution | null;
+  hunterShotPlayerId?: PlayerId | null;
+  hunterActionSubmitted?: boolean;
+  revealedIdiotId?: PlayerId | null;
   dayNumber: number;
   gameOutcome: "good-win" | "wolf-win" | "draw" | "terminated" | null;
   gameRecords: GameRecord[];
@@ -216,7 +230,7 @@ export class LobbyRoom {
   private players: InternalPlayer[] = [];
   private takeoverRequests: InternalTakeoverRequest[] = [];
   private phase: "lobby" | "role-reveal" | "first-night" | "dawn" | "last-words" | "day-speech" | "day-vote" | "exile-result" | "game-over" = "lobby";
-  private nightStage: "wolf" | "seer" | "witch" | "complete" = "wolf";
+  private nightStage: "wolf" | "seer" | "guard" | "witch" | "complete" = "wolf";
   private wolfVoteLocked = false;
   private wolfAttackTargetId: PlayerId | null = null;
   private witchActionSubmitted = false;
@@ -228,6 +242,13 @@ export class LobbyRoom {
   private exiledPlayerId: PlayerId | null = null;
   private currentSpeakerFinished = false;
   private pendingWitchAction: { saved: boolean; poisonTargetId: PlayerId | null } | null = null;
+  private guardTargetId: PlayerId | null = null;
+  private lastGuardTargetId: PlayerId | null = null;
+  private guardActionSubmitted = false;
+  private pendingHunterResolution: PendingHunterResolution | null = null;
+  private hunterShotPlayerId: PlayerId | null = null;
+  private hunterActionSubmitted = false;
+  private revealedIdiotId: PlayerId | null = null;
   private dayNumber = 1;
   private gameOutcome: "good-win" | "wolf-win" | "draw" | "terminated" | null = null;
   private gameRecords: GameRecord[] = [];
@@ -236,7 +257,10 @@ export class LobbyRoom {
     wolf: 0,
     villager: 0,
     seer: 0,
-    witch: 0
+    witch: 0,
+    guard: 0,
+    hunter: 0,
+    idiot: 0
   };
 
   constructor(options: RoomOptions) {
@@ -268,6 +292,13 @@ export class LobbyRoom {
       exiledPlayerId: this.exiledPlayerId,
       currentSpeakerFinished: this.currentSpeakerFinished,
       pendingWitchAction: this.pendingWitchAction ? { ...this.pendingWitchAction } : null,
+      guardTargetId: this.guardTargetId,
+      lastGuardTargetId: this.lastGuardTargetId,
+      guardActionSubmitted: this.guardActionSubmitted,
+      pendingHunterResolution: this.pendingHunterResolution ? { ...this.pendingHunterResolution } : null,
+      hunterShotPlayerId: this.hunterShotPlayerId,
+      hunterActionSubmitted: this.hunterActionSubmitted,
+      revealedIdiotId: this.revealedIdiotId,
       dayNumber: this.dayNumber,
       gameOutcome: this.gameOutcome,
       gameRecords: this.gameRecords.map((record) => ({ ...record })),
@@ -294,6 +325,7 @@ export class LobbyRoom {
       roomCode: this.roomCode,
       revision: this.revision,
       players: this.publicPlayers(),
+      revealedIdiotId: this.revealedIdiotId,
       joinUrl: this.getJoinUrl(),
       localAddress: this.localAddress,
       takeoverRequests: this.takeoverRequests.map(({ socketId: _socketId, ...request }) => request),
@@ -323,6 +355,7 @@ export class LobbyRoom {
       roomCode: this.roomCode,
       revision: this.revision,
       players: this.publicPlayers(),
+      revealedIdiotId: this.revealedIdiotId,
       selfId: playerId,
       privateRole: player.role ? {
         role: player.role,
@@ -368,6 +401,26 @@ export class LobbyRoom {
           .map(({ id, number, nickname }) => ({ id, number, nickname })),
         submitted: this.witchActionSubmitted
       } : null,
+      guardAction: this.phase === "first-night" && player.role === "guard" && player.alive ? {
+        active: this.nightStage === "guard",
+        candidates: this.players
+          .filter((candidate) => candidate.alive
+            && candidate.connection !== "departed"
+            && candidate.id !== this.lastGuardTargetId)
+          .map(({ id, number, nickname }) => ({ id, number, nickname })),
+        protectedPlayer: this.guardTargetId ? this.toNightCandidate(this.guardTargetId) : null,
+        submitted: this.guardActionSubmitted
+      } : null,
+      hunterAction: player.role === "hunter" ? {
+        active: this.pendingHunterResolution?.hunterId === player.id && !this.hunterActionSubmitted,
+        candidates: this.pendingHunterResolution?.hunterId === player.id && !this.hunterActionSubmitted
+          ? this.players
+            .filter((candidate) => candidate.alive && candidate.connection !== "departed" && candidate.id !== player.id)
+            .map(({ id, number, nickname }) => ({ id, number, nickname }))
+          : [],
+        shotPlayer: this.hunterShotPlayerId ? this.toNightCandidate(this.hunterShotPlayerId) : null,
+        submitted: this.hunterActionSubmitted
+      } : null,
       dawnResult: this.phase === "dawn" ? {
         deaths: this.dawnDeathIds.flatMap((id) => {
           const candidate = this.toNightCandidate(id);
@@ -376,9 +429,15 @@ export class LobbyRoom {
       } : null,
       dayState: this.getPublicDayState(),
       dayVote: this.phase === "day-vote" && player.alive ? {
-        candidates: this.players
-          .filter((candidate) => candidate.alive && candidate.connection !== "departed" && candidate.id !== player.id)
-          .map(({ id, number, nickname }) => ({ id, number, nickname })),
+        eligible: !player.idiotRevealed,
+        candidates: player.idiotRevealed
+          ? []
+          : this.players
+            .filter((candidate) => candidate.alive
+              && candidate.connection !== "departed"
+              && candidate.id !== player.id
+              && !candidate.idiotRevealed)
+            .map(({ id, number, nickname }) => ({ id, number, nickname })),
         target: player.dayVoteTarget,
         confirmed: player.dayVoteConfirmed
       } : null,
@@ -416,7 +475,8 @@ export class LobbyRoom {
       lastWolfMessageAtMs: null,
       alive: true,
       dayVoteTarget: null,
-      dayVoteConfirmed: false
+      dayVoteConfirmed: false,
+      idiotRevealed: false
     };
     this.players.push(player);
     this.revision += 1;
@@ -549,7 +609,7 @@ export class LobbyRoom {
     return { ok: true, data: this.getHostView() };
   }
 
-  updateRoleConfiguration(configuration: RoleConfiguration): RoomActionResult<HostLobbyView> {
+  updateRoleConfiguration(configuration: RoleConfigurationInput): RoomActionResult<HostLobbyView> {
     if (this.phase !== "lobby") return failures.gameAlreadyStarted();
     this.roleConfiguration = roleConfigurationSchema.parse(configuration);
     this.revision += 1;
@@ -601,6 +661,7 @@ export class LobbyRoom {
 
   correctPlayerLife(playerId: PlayerId, alive: boolean): RoomActionResult<{ view: HostLobbyView; player: LobbyPlayer }> {
     if (this.phase === "lobby" || this.phase === "game-over") return failures.invalidPhaseControl();
+    if (this.pendingHunterResolution) return failures.invalidPhaseControl();
     const player = this.players.find((candidate) => candidate.id === playerId);
     if (!player) return failures.playerNotFound();
     if (player.connection === "departed") return failures.playerAlreadyDeparted();
@@ -651,6 +712,7 @@ export class LobbyRoom {
       player.alive = true;
       player.dayVoteTarget = null;
       player.dayVoteConfirmed = false;
+      player.idiotRevealed = false;
     });
     this.takeoverRequests = [];
     this.joinToken = createJoinToken();
@@ -667,6 +729,13 @@ export class LobbyRoom {
     this.exiledPlayerId = null;
     this.currentSpeakerFinished = false;
     this.pendingWitchAction = null;
+    this.guardTargetId = null;
+    this.lastGuardTargetId = null;
+    this.guardActionSubmitted = false;
+    this.pendingHunterResolution = null;
+    this.hunterShotPlayerId = null;
+    this.hunterActionSubmitted = false;
+    this.revealedIdiotId = null;
     this.gameRecords = [];
     this.revision += 1;
     return { ok: true, data: this.getHostView() };
@@ -773,6 +842,37 @@ export class LobbyRoom {
     return { ok: true, data: this.getPlayerView(playerId)! };
   }
 
+  protectAsGuard(playerId: PlayerId, targetId: PlayerId | null): RoomActionResult<PlayerLobbyView> {
+    const player = this.players.find((candidate) => candidate.id === playerId);
+    if (
+      this.phase !== "first-night"
+      || this.nightStage !== "guard"
+      || player?.role !== "guard"
+      || !player.alive
+      || player.connection === "departed"
+    ) return failures.invalidNightAction();
+    if (this.guardActionSubmitted) return failures.nightActionLocked();
+
+    if (targetId !== null) {
+      const target = this.players.find((candidate) => candidate.id === targetId);
+      if (!target || !target.alive || target.connection === "departed") return failures.playerNotFound();
+      if (target.id === this.lastGuardTargetId) return failures.invalidNightAction();
+    }
+
+    this.guardTargetId = targetId;
+    this.guardActionSubmitted = true;
+    const target = targetId ? this.toNightCandidate(targetId) : null;
+    this.recordGameEvent(
+      "guard-action",
+      target
+        ? `${player.number} 号 ${player.nickname} 守护 ${target.number} 号 ${target.nickname}`
+        : `${player.number} 号 ${player.nickname} 选择空守`
+    );
+    if (!this.deferCompletedStages) this.advanceFromGuardStage();
+    this.revision += 1;
+    return { ok: true, data: this.getPlayerView(playerId)! };
+  }
+
   submitWitchAction(playerId: PlayerId, input: WitchSubmitActionRequest): RoomActionResult<PlayerLobbyView> {
     const player = this.players.find((candidate) => candidate.id === playerId);
     if (
@@ -824,12 +924,44 @@ export class LobbyRoom {
     return { ok: true, data: this.getPlayerView(playerId)! };
   }
 
-  getNightStage(): "wolf" | "seer" | "witch" | null {
+  shootAsHunter(playerId: PlayerId, targetId: PlayerId | null): RoomActionResult<PlayerLobbyView> {
+    const player = this.players.find((candidate) => candidate.id === playerId);
+    if (!player || this.pendingHunterResolution?.hunterId !== player.id || this.hunterActionSubmitted) {
+      return failures.invalidNightAction();
+    }
+    let target: InternalPlayer | null = null;
+    if (targetId !== null) {
+      target = this.players.find((candidate) => candidate.id === targetId) ?? null;
+      if (!target || !target.alive || target.connection === "departed" || target.id === player.id) {
+        return failures.playerNotFound();
+      }
+      target.alive = false;
+      if (this.pendingHunterResolution.origin === "night" && !this.dawnDeathIds.includes(target.id)) {
+        this.dawnDeathIds.push(target.id);
+        this.dawnDeathIds.sort((left, right) => this.players.find((item) => item.id === left)!.number
+          - this.players.find((item) => item.id === right)!.number);
+      }
+    }
+    this.hunterShotPlayerId = target?.id ?? null;
+    this.hunterActionSubmitted = true;
+    this.recordGameEvent(
+      "hunter-shot",
+      target
+        ? `${player.number} 号 ${player.nickname} 开枪带走 ${target.number} 号 ${target.nickname}`
+        : `${player.number} 号 ${player.nickname} 放弃开枪`
+    );
+    if (!this.deferCompletedStages) this.completeHunterResolution();
+    this.revision += 1;
+    return { ok: true, data: this.getPlayerView(playerId)! };
+  }
+
+  getNightStage(): "wolf" | "seer" | "guard" | "witch" | null {
     if (this.phase !== "first-night" || this.nightStage === "complete") return null;
     return this.nightStage;
   }
 
   getTimedStage(): TimedStage | null {
+    if (this.pendingHunterResolution) return "hunter";
     return this.getNightStage() ?? (["role-reveal", "dawn", "last-words", "day-speech", "day-vote", "exile-result"].includes(this.phase)
       ? this.phase as TimedStage
       : null);
@@ -863,10 +995,12 @@ export class LobbyRoom {
       );
       return !seer || seer.seerInspectedPlayerId !== null;
     }
+    if (stage === "guard") return this.guardActionSubmitted;
     if (stage === "witch") return this.witchActionSubmitted;
+    if (stage === "hunter") return this.hunterActionSubmitted;
     if (stage === "last-words" || stage === "day-speech") return this.currentSpeakerFinished;
     if (stage === "day-vote") {
-      const voters = this.onlineAlivePlayers();
+      const voters = this.onlineEligibleVoters();
       return voters.length > 0 && voters.every((player) => player.dayVoteConfirmed);
     }
     return true;
@@ -889,6 +1023,10 @@ export class LobbyRoom {
       this.advanceFromWolfStage();
     } else if (this.nightStage === "seer") {
       this.advanceFromSeerStage();
+    } else if (this.nightStage === "guard") {
+      this.guardActionSubmitted = true;
+      this.guardTargetId = null;
+      this.advanceFromGuardStage();
     } else if (this.nightStage === "witch") {
       this.witchActionSubmitted = true;
       this.settleFirstNight(false, null);
@@ -900,7 +1038,7 @@ export class LobbyRoom {
   }
 
   continueFromDawn(): RoomActionResult<HostLobbyView> {
-    if (this.phase !== "dawn") return failures.invalidPhaseControl();
+    if (this.phase !== "dawn" || this.pendingHunterResolution) return failures.invalidPhaseControl();
     const lastWords = this.dawnDeathIds.filter((id) => this.players.some(
       (player) => player.id === id && player.connection !== "departed"
     ));
@@ -926,12 +1064,14 @@ export class LobbyRoom {
 
   selectDayVote(playerId: PlayerId, target: DayVoteTarget): RoomActionResult<PlayerLobbyView> {
     const player = this.players.find((candidate) => candidate.id === playerId);
-    if (this.phase !== "day-vote" || !player?.alive || player.connection === "departed") {
+    if (this.phase !== "day-vote" || !player?.alive || player.connection === "departed" || player.idiotRevealed) {
       return failures.invalidNightAction();
     }
     if (target !== null && target !== "abstain") {
       const candidate = this.players.find((item) => item.id === target);
-      if (!candidate || !candidate.alive || candidate.connection === "departed") return failures.playerNotFound();
+      if (!candidate || !candidate.alive || candidate.connection === "departed" || candidate.idiotRevealed) {
+        return failures.playerNotFound();
+      }
       if (candidate.id === player.id) return failures.invalidNightAction();
     }
     player.dayVoteTarget = target;
@@ -942,12 +1082,12 @@ export class LobbyRoom {
 
   confirmDayVote(playerId: PlayerId, confirmed: boolean): RoomActionResult<PlayerLobbyView> {
     const player = this.players.find((candidate) => candidate.id === playerId);
-    if (this.phase !== "day-vote" || !player?.alive || player.connection === "departed") {
+    if (this.phase !== "day-vote" || !player?.alive || player.connection === "departed" || player.idiotRevealed) {
       return failures.invalidNightAction();
     }
     if (confirmed && player.dayVoteTarget === null) return failures.invalidNightAction();
     player.dayVoteConfirmed = confirmed;
-    if (!this.deferCompletedStages && this.onlineAlivePlayers().every((candidate) => candidate.dayVoteConfirmed)) {
+    if (!this.deferCompletedStages && this.onlineEligibleVoters().every((candidate) => candidate.dayVoteConfirmed)) {
       this.settleDayVote();
     }
     this.revision += 1;
@@ -967,7 +1107,7 @@ export class LobbyRoom {
   }
 
   continueFromExile(): RoomActionResult<HostLobbyView> {
-    if (this.phase !== "exile-result") return failures.invalidPhaseControl();
+    if (this.phase !== "exile-result" || this.pendingHunterResolution) return failures.invalidPhaseControl();
     if (this.exiledPlayerId) {
       this.speechOrderIds = [this.exiledPlayerId];
       this.currentSpeakerIndex = 0;
@@ -1014,6 +1154,7 @@ export class LobbyRoom {
       lastWolfMessageAtMs: _lastWolfMessageAtMs,
       dayVoteTarget: _dayVoteTarget,
       dayVoteConfirmed: _dayVoteConfirmed,
+      idiotRevealed: _idiotRevealed,
       ...player
     }) => player);
   }
@@ -1090,6 +1231,15 @@ export class LobbyRoom {
   }
 
   private advanceFromSeerStage(): void {
+    this.nightStage = "guard";
+    if (!this.players.some((player) => player.role === "guard" && player.alive && player.connection !== "departed")) {
+      this.guardActionSubmitted = true;
+      this.guardTargetId = null;
+      this.advanceFromGuardStage();
+    }
+  }
+
+  private advanceFromGuardStage(): void {
     this.nightStage = "witch";
     if (!this.players.some((player) => player.role === "witch" && player.alive && player.connection !== "departed")) {
       this.settleFirstNight(false, null);
@@ -1097,7 +1247,13 @@ export class LobbyRoom {
   }
 
   private settleFirstNight(saved: boolean, poisonTargetId: PlayerId | null): void {
-    this.dawnDeathIds = resolveNightDeaths(this.players, this.wolfAttackTargetId, saved, poisonTargetId);
+    this.dawnDeathIds = resolveNightDeaths(
+      this.players,
+      this.wolfAttackTargetId,
+      saved,
+      poisonTargetId,
+      this.guardTargetId
+    );
     const deaths = new Set(this.dawnDeathIds);
     for (const player of this.players) {
       if (deaths.has(player.id)) player.alive = false;
@@ -1113,7 +1269,14 @@ export class LobbyRoom {
     this.nightStage = "complete";
     this.pendingWitchAction = null;
     this.phase = "dawn";
-    this.evaluateWinner();
+    const hunter = this.players.find((player) => player.role === "hunter" && deaths.has(player.id));
+    if (hunter && hunter.id !== poisonTargetId && hunter.connection !== "departed") {
+      this.pendingHunterResolution = { hunterId: hunter.id, origin: "night" };
+      this.hunterActionSubmitted = false;
+      this.hunterShotPlayerId = null;
+    } else {
+      this.evaluateWinner();
+    }
   }
 
   private toNightCandidate(playerId: PlayerId): { id: PlayerId; number: number; nickname: string } | null {
@@ -1125,17 +1288,19 @@ export class LobbyRoom {
     if (!["dawn", "last-words", "day-speech", "day-vote", "exile-result"].includes(this.phase)) return null;
     const currentId = this.currentSpeakerIndex >= 0 ? this.speechOrderIds[this.currentSpeakerIndex] : null;
     const currentSpeaker = currentId ? this.toNightCandidate(currentId) : null;
-    const onlineAlive = this.onlineAlivePlayers();
+    const eligibleVoters = this.onlineEligibleVoters();
     return {
       alivePlayerIds: this.players.filter((player) => player.alive).map((player) => player.id),
+      revealedIdiot: this.revealedIdiotId ? this.toNightCandidate(this.revealedIdiotId) : null,
+      hunterPending: this.pendingHunterResolution !== null,
       currentSpeaker,
       speechOrder: this.speechOrderIds.flatMap((id) => {
         const candidate = this.toNightCandidate(id);
         return candidate ? [candidate] : [];
       }),
       voteProgress: this.phase === "day-vote" ? {
-        confirmed: onlineAlive.filter((player) => player.dayVoteConfirmed).length,
-        total: onlineAlive.length
+        confirmed: eligibleVoters.filter((player) => player.dayVoteConfirmed).length,
+        total: eligibleVoters.length
       } : null,
       voteResult: this.dayVoteResult ? {
         ballots: this.dayVoteResult.flatMap(({ voterId, targetId }) => {
@@ -1180,7 +1345,9 @@ export class LobbyRoom {
   }
 
   private settleDayVote(): void {
-    const voters = this.players.filter((player) => player.alive && player.connection !== "departed");
+    const voters = this.players.filter(
+      (player) => player.alive && player.connection !== "departed" && !player.idiotRevealed
+    );
     this.dayVoteResult = voters.map((player) => ({
       voterId: player.id,
       targetId: player.dayVoteConfirmed && player.dayVoteTarget !== "abstain" ? player.dayVoteTarget : null
@@ -1199,16 +1366,39 @@ export class LobbyRoom {
     if (this.exiledPlayerId) {
       const exiled = this.players.find((player) => player.id === this.exiledPlayerId);
       if (exiled) {
-        exiled.alive = false;
-        this.recordGameEvent("death", `${exiled.number} 号${exiled.nickname}被放逐`);
+        if (exiled.role === "idiot" && !exiled.idiotRevealed) {
+          exiled.idiotRevealed = true;
+          this.revealedIdiotId = exiled.id;
+          this.exiledPlayerId = null;
+          this.recordGameEvent("idiot-reveal", `${exiled.number} 号 ${exiled.nickname} 公开白痴身份并免于放逐`);
+        } else {
+          exiled.alive = false;
+          if (exiled.role === "hunter" && exiled.connection !== "departed") {
+            this.pendingHunterResolution = { hunterId: exiled.id, origin: "exile" };
+            this.hunterActionSubmitted = false;
+            this.hunterShotPlayerId = null;
+          }
+          this.recordGameEvent("death", `${exiled.number} 号${exiled.nickname}被放逐`);
+        }
       }
     }
     this.phase = "exile-result";
-    this.evaluateWinner();
+    if (!this.pendingHunterResolution && this.exiledPlayerId) this.evaluateWinner();
   }
 
   private onlineAlivePlayers(): InternalPlayer[] {
     return this.players.filter((player) => player.alive && player.connection === "online");
+  }
+
+  private onlineEligibleVoters(): InternalPlayer[] {
+    return this.onlineAlivePlayers().filter((player) => !player.idiotRevealed);
+  }
+
+  private completeHunterResolution(): void {
+    const resolution = this.pendingHunterResolution;
+    if (!resolution) return;
+    this.pendingHunterResolution = null;
+    this.evaluateWinner();
   }
 
   private startNextNight(): void {
@@ -1226,6 +1416,12 @@ export class LobbyRoom {
     this.exiledPlayerId = null;
     this.currentSpeakerFinished = false;
     this.pendingWitchAction = null;
+    this.lastGuardTargetId = this.guardTargetId;
+    this.guardTargetId = null;
+    this.guardActionSubmitted = false;
+    this.pendingHunterResolution = null;
+    this.hunterShotPlayerId = null;
+    this.hunterActionSubmitted = false;
     for (const player of this.players) {
       player.wolfVoteTarget = null;
       player.wolfVoteConfirmed = false;
@@ -1303,6 +1499,13 @@ export class LobbyRoom {
     this.exiledPlayerId = null;
     this.currentSpeakerFinished = false;
     this.pendingWitchAction = null;
+    this.guardTargetId = null;
+    this.lastGuardTargetId = null;
+    this.guardActionSubmitted = false;
+    this.pendingHunterResolution = null;
+    this.hunterShotPlayerId = null;
+    this.hunterActionSubmitted = false;
+    this.revealedIdiotId = null;
     this.gameOutcome = null;
     this.gameRecords = [];
     for (const player of this.players) {
@@ -1312,6 +1515,7 @@ export class LobbyRoom {
       player.lastWolfMessageAtMs = null;
       player.dayVoteTarget = null;
       player.dayVoteConfirmed = false;
+      player.idiotRevealed = false;
     }
   }
 
@@ -1335,12 +1539,22 @@ export class LobbyRoom {
     this.exiledPlayerId = snapshot.exiledPlayerId;
     this.currentSpeakerFinished = snapshot.currentSpeakerFinished ?? false;
     this.pendingWitchAction = snapshot.pendingWitchAction ? { ...snapshot.pendingWitchAction } : null;
+    this.guardTargetId = snapshot.guardTargetId ?? null;
+    this.lastGuardTargetId = snapshot.lastGuardTargetId ?? null;
+    this.guardActionSubmitted = snapshot.guardActionSubmitted ?? false;
+    this.pendingHunterResolution = snapshot.pendingHunterResolution
+      ? { ...snapshot.pendingHunterResolution }
+      : null;
+    this.hunterShotPlayerId = snapshot.hunterShotPlayerId ?? null;
+    this.hunterActionSubmitted = snapshot.hunterActionSubmitted ?? false;
+    this.revealedIdiotId = snapshot.revealedIdiotId ?? null;
     this.dayNumber = snapshot.dayNumber;
     this.gameOutcome = snapshot.gameOutcome;
     this.gameRecords = snapshot.gameRecords.map((record) => ({ ...record }));
     this.roleConfiguration = roleConfigurationSchema.parse(snapshot.roleConfiguration);
     this.players = snapshot.players.map((player) => ({
       ...player,
+      idiotRevealed: player.idiotRevealed ?? false,
       socketId: null,
       connection: player.connection === "departed" ? "departed" : "offline",
       reconnectTokenHash: Buffer.from(player.reconnectTokenHash, "base64")
@@ -1350,6 +1564,8 @@ export class LobbyRoom {
   private reconcileUnavailablePlayer(playerId: PlayerId): void {
     if (this.isCurrentSpeaker(playerId)) this.advanceSpeaker();
     if (this.phase === "first-night") {
+      const unavailablePlayer = this.players.find((player) => player.id === playerId);
+      if (unavailablePlayer?.role === "guard") this.guardTargetId = null;
       if (this.nightStage === "wolf") {
         const activeWolves = this.players.filter(
           (candidate) => candidate.role === "wolf" && candidate.alive && candidate.connection !== "departed"
@@ -1362,6 +1578,12 @@ export class LobbyRoom {
         (candidate) => candidate.role === "seer" && candidate.alive && candidate.connection !== "departed"
       )) {
         this.advanceFromSeerStage();
+      } else if (this.nightStage === "guard" && !this.players.some(
+        (candidate) => candidate.role === "guard" && candidate.alive && candidate.connection !== "departed"
+      )) {
+        this.guardActionSubmitted = true;
+        this.guardTargetId = null;
+        this.advanceFromGuardStage();
       } else if (this.nightStage === "witch" && !this.players.some(
         (candidate) => candidate.role === "witch" && candidate.alive && candidate.connection !== "departed"
       )) {
@@ -1369,7 +1591,13 @@ export class LobbyRoom {
         this.settleFirstNight(false, null);
       }
     }
-    if (!this.deferCompletedStages && this.phase === "day-vote" && this.onlineAlivePlayers().every((candidate) => candidate.dayVoteConfirmed)) {
+    if (this.pendingHunterResolution?.hunterId === playerId) {
+      this.hunterActionSubmitted = true;
+      this.hunterShotPlayerId = null;
+      this.recordGameEvent("hunter-shot", "猎人离场，视为放弃开枪");
+      this.completeHunterResolution();
+    }
+    if (!this.deferCompletedStages && this.phase === "day-vote" && this.onlineEligibleVoters().every((candidate) => candidate.dayVoteConfirmed)) {
       this.settleDayVote();
     }
   }
@@ -1385,10 +1613,19 @@ export class LobbyRoom {
       this.advanceFromWolfStage();
     } else if (stage === "seer") {
       this.advanceFromSeerStage();
+    } else if (stage === "guard") {
+      this.guardActionSubmitted = true;
+      if (skipped) this.guardTargetId = null;
+      this.advanceFromGuardStage();
     } else if (stage === "witch") {
       const action = skipped ? { saved: false, poisonTargetId: null } : this.pendingWitchAction;
       this.witchActionSubmitted = true;
       this.settleFirstNight(action?.saved ?? false, action?.poisonTargetId ?? null);
+    } else if (stage === "hunter") {
+      this.hunterActionSubmitted = true;
+      this.hunterShotPlayerId = null;
+      this.recordGameEvent("hunter-shot", "猎人放弃开枪");
+      this.completeHunterResolution();
     } else if (stage === "dawn") {
       const result = this.continueFromDawn();
       if (!result.ok) return result;

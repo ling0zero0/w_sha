@@ -32,10 +32,11 @@ export function resolveNightDeaths(
   players: readonly NumberedPlayer[],
   attackedPlayerId: PlayerId | null,
   saved: boolean,
-  poisonTargetId: PlayerId | null
+  poisonTargetId: PlayerId | null,
+  protectedPlayerId: PlayerId | null = null
 ): PlayerId[] {
   const deaths = new Set<PlayerId>();
-  if (attackedPlayerId && !saved) deaths.add(attackedPlayerId);
+  if (attackedPlayerId && !saved && attackedPlayerId !== protectedPlayerId) deaths.add(attackedPlayerId);
   if (poisonTargetId) deaths.add(poisonTargetId);
 
   return players
@@ -48,7 +49,7 @@ export function evaluateGameOutcome(players: readonly OutcomePlayer[]): GameOutc
   const alive = players.filter((player) => player.alive && player.connection !== "departed");
   const goodWin = !alive.some((player) => player.role === "wolf");
   const wolfWin = !alive.some((player) => player.role === "villager")
-    || !alive.some((player) => player.role === "seer" || player.role === "witch");
+    || !alive.some((player) => ["seer", "witch", "guard", "hunter", "idiot"].includes(player.role ?? ""));
 
   if (!goodWin && !wolfWin) return null;
   return goodWin && wolfWin ? "draw" : goodWin ? "good-win" : "wolf-win";

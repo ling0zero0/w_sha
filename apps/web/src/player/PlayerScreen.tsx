@@ -12,11 +12,12 @@ import {
 } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { GameOverPanel } from "../game/GameOverPanel";
-import { roleImages, roleLabels } from "../game/role-meta";
+import { RoleArtwork } from "../game/RoleArtwork";
+import { roleLabels } from "../game/role-meta";
 import { getJoinInvitation } from "../routing";
 import { Brand, InterventionNotices, PhaseClockDisplay } from "../shared/AppChrome";
 import { ConnectionBadge, DayFlowScreen } from "./DayFlowScreen";
-import { WitchActionPanel, WolfChatPanel } from "./NightActionPanels";
+import { GuardActionPanel, WitchActionPanel, WolfChatPanel } from "./NightActionPanels";
 import { usePlayerLobby } from "./usePlayerLobby";
 
 function InvalidInvitation() {
@@ -62,6 +63,8 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
     sendWolfMessage,
     inspectAsSeer,
     submitWitchAction,
+    protectAsGuard,
+    shootAsHunter,
     finishSpeaking,
     selectDayVote,
     confirmDayVote
@@ -93,7 +96,7 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
     if (lobby.phase === "game-over" && lobby.gameResult) {
       return <main className="player-shell day-shell"><header className="player-header"><Brand /><ConnectionBadge connected={socket === "connected"} /></header><section className="mobile-state"><GameOverPanel result={lobby.gameResult} /></section></main>;
     }
-    if (["dawn", "last-words", "day-speech", "day-vote", "exile-result"].includes(lobby.phase)) {
+    if (["dawn", "last-words", "day-speech", "day-vote", "exile-result"].includes(lobby.phase) || lobby.hunterAction?.active) {
       return <DayFlowScreen
         lobby={lobby}
         game={game}
@@ -101,6 +104,7 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
         onFinishSpeaking={finishSpeaking}
         onSelectVote={selectDayVote}
         onConfirmVote={confirmDayVote}
+        onHunterShoot={shootAsHunter}
       />;
     }
     if (lobby.privateRole) {
@@ -127,9 +131,7 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
               <div className="private-night-clock"><PhaseClockDisplay clock={game.clock} /></div>
             ) : null}
             <p className="eyebrow">{self ? `${self.number} 号 · ${self.nickname}` : `房间 ${lobby.roomCode}`}</p>
-            <div className="role-artwork">
-              <img src={roleImages[privateRole.role]} alt={`${roleLabels[privateRole.role]}身份牌`} />
-            </div>
+            <RoleArtwork role={privateRole.role} className="role-artwork" />
             <p>你的身份是</p>
             <h1 data-testid="private-role">{roleLabels[privateRole.role]}</h1>
             {privateRole.role === "wolf" ? (
@@ -202,6 +204,13 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
                 </div>
               ) : privateRole.role === "witch" && lobby.witchAction?.active ? (
                 <WitchActionPanel action={lobby.witchAction} paused={nightPaused} onSubmit={submitWitchAction} />
+              ) : privateRole.role === "guard" && (lobby.guardAction?.active || lobby.guardAction?.submitted) ? (
+                <GuardActionPanel
+                  action={lobby.guardAction}
+                  paused={nightPaused}
+                  connected={socket === "connected"}
+                  onSubmit={protectAsGuard}
+                />
               ) : (
                 <div className="role-confirmed"><RefreshCw className="slow-spin" size={18} aria-hidden="true" />夜间行动进行中</div>
               )

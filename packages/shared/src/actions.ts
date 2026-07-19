@@ -42,6 +42,12 @@ export const witchSubmitActionRequestSchema = z.discriminatedUnion("action", [
 ]);
 export type WitchSubmitActionRequest = z.infer<typeof witchSubmitActionRequestSchema>;
 
+export const guardProtectRequestSchema = z.object({ target: playerIdSchema.nullable() }).strict();
+export type GuardProtectRequest = z.infer<typeof guardProtectRequestSchema>;
+
+export const hunterShootRequestSchema = z.object({ target: playerIdSchema.nullable() }).strict();
+export type HunterShootRequest = z.infer<typeof hunterShootRequestSchema>;
+
 export const daySelectVoteRequestSchema = z.object({ target: dayVoteTargetSchema });
 export type DaySelectVoteRequest = z.infer<typeof daySelectVoteRequestSchema>;
 

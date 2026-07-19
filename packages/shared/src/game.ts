@@ -61,13 +61,38 @@ export const privateWitchActionSchema = z.object({
 });
 export type PrivateWitchAction = z.infer<typeof privateWitchActionSchema>;
 
+export const privateGuardActionSchema = z.object({
+  active: z.boolean(),
+  candidates: z.array(nightCandidateSchema),
+  protectedPlayer: nightCandidateSchema.nullable(),
+  submitted: z.boolean()
+}).strict();
+export type PrivateGuardAction = z.infer<typeof privateGuardActionSchema>;
+
+export const privateHunterActionSchema = z.object({
+  active: z.boolean(),
+  candidates: z.array(nightCandidateSchema),
+  shotPlayer: nightCandidateSchema.nullable(),
+  submitted: z.boolean()
+}).strict();
+export type PrivateHunterAction = z.infer<typeof privateHunterActionSchema>;
+
 export const dawnResultSchema = z.object({
   deaths: z.array(nightCandidateSchema)
 }).nullable();
 export type DawnResult = z.infer<typeof dawnResultSchema>;
 
 export const gameRecordSchema = z.object({
-  type: z.enum(["death", "seer-inspection", "witch-action", "day-vote", "host-intervention"]),
+  type: z.enum([
+    "death",
+    "seer-inspection",
+    "witch-action",
+    "guard-action",
+    "hunter-shot",
+    "idiot-reveal",
+    "day-vote",
+    "host-intervention"
+  ]),
   day: z.number().int().positive(),
   detail: z.string().min(1)
 });
@@ -85,6 +110,8 @@ export type GameResult = z.infer<typeof gameResultSchema>;
 
 export const publicDayStateSchema = z.object({
   alivePlayerIds: z.array(playerIdSchema),
+  revealedIdiot: nightCandidateSchema.nullable(),
+  hunterPending: z.boolean(),
   currentSpeaker: nightCandidateSchema.nullable(),
   speechOrder: z.array(nightCandidateSchema),
   voteProgress: roleConfirmationProgressSchema.nullable(),
@@ -102,6 +129,7 @@ export const dayVoteTargetSchema = z.union([playerIdSchema, z.literal("abstain")
 export type DayVoteTarget = z.infer<typeof dayVoteTargetSchema>;
 
 export const privateDayVoteSchema = z.object({
+  eligible: z.boolean(),
   candidates: z.array(nightCandidateSchema),
   target: dayVoteTargetSchema,
   confirmed: z.boolean()

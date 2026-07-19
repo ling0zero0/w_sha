@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { RoleConfigurationInput } from "@werewolf/shared";
 import { LobbyRoom } from "./room.js";
 
 const token = "abcdefghijklmnopqrstuvwxyz123456";
@@ -11,6 +12,26 @@ function createRoom(deferCompletedStages = false) {
     joinToken: token,
     deferCompletedStages
   });
+}
+
+function startConfiguredRoom(configuration: RoleConfigurationInput, nicknames: string[]) {
+  const room = createRoom();
+  const sessions = nicknames.map((nickname, index) =>
+    room.join({ roomCode: "123456", joinToken: token, nickname }, `socket-new-role-${index}`)
+  );
+  if (sessions.some((session) => !session.ok)) throw new Error("test setup failed");
+  room.updateRoleConfiguration(configuration);
+  const started = room.startGame();
+  if (!started.ok) throw new Error("test setup failed");
+  for (const session of sessions) {
+    if (!session.ok) throw new Error("test setup failed");
+    room.confirmRole(session.data.lobby.selfId);
+  }
+  const views = sessions.map((session) => {
+    if (!session.ok) throw new Error("test setup failed");
+    return room.getPlayerView(session.data.lobby.selfId)!;
+  });
+  return { room, views };
 }
 
 describe("lobby room", () => {
@@ -414,6 +435,177 @@ describe("lobby room", () => {
       [villagers[0]!.selfId, villagers[1]!.selfId].sort()
     );
     expect(JSON.stringify(dawn)).not.toMatch(/wolfAttack|poisonTarget|deathCause/);
+  });
+
+  it("lets the guard block a wolf attack, empty-protect, and not protect the same player consecutively", () => {
+    const { room, views } = startConfiguredRoom(
+      { wolf: 1, villager: 2, seer: 0, witch: 0, guard: 1 },
+      ["林野", "阿岚", "青禾", "南星"]
+    );
+    const wolf = views.find((view) => view.privateRole?.role === "wolf")!;
+    const guard = views.find((view) => view.privateRole?.role === "guard")!;
+    const victim = views.find((view) => view.privateRole?.role === "villager")!;
+
+    room.selectWolfTarget(wolf.selfId, victim.selfId);
+    room.confirmWolfVote(wolf.selfId, true);
+    expect(room.getNightStage()).toBe("guard");
+    expect(room.protectAsGuard(guard.selfId, victim.selfId)).toMatchObject({
+      ok: true,
+      data: { phase: "dawn", dawnResult: { deaths: [] } }
+    });
+    expect(JSON.stringify(room.getHostView())).not.toContain("protectedPlayer");
+
+    room.continueFromDawn();
+    while (room.getHostView().phase === "day-speech") room.skipCurrentDayStage();
+    room.skipCurrentDayStage();
+    room.continueFromExile();
+    room.selectWolfTarget(wolf.selfId, "no-kill");
+    room.confirmWolfVote(wolf.selfId, true);
+
+    expect(room.getPlayerView(guard.selfId)?.guardAction?.candidates.map((candidate) => candidate.id))
+      .not.toContain(victim.selfId);
+    expect(room.protectAsGuard(guard.selfId, victim.selfId)).toMatchObject({
+      ok: false,
+      code: "INVALID_NIGHT_ACTION"
+    });
+    expect(room.protectAsGuard(guard.selfId, null)).toMatchObject({
+      ok: true,
+      data: { phase: "dawn", dawnResult: { deaths: [] } }
+    });
+  });
+
+  it("waits for a wolf-killed hunter to shoot before evaluating the winner", () => {
+    const { room, views } = startConfiguredRoom(
+      { wolf: 1, villager: 2, seer: 0, witch: 0, hunter: 1 },
+      ["林野", "阿岚", "青禾", "南星"]
+    );
+    const wolf = views.find((view) => view.privateRole?.role === "wolf")!;
+    const hunter = views.find((view) => view.privateRole?.role === "hunter")!;
+
+    room.selectWolfTarget(wolf.selfId, hunter.selfId);
+    room.confirmWolfVote(wolf.selfId, true);
+
+    expect(room.getHostView()).toMatchObject({
+      phase: "dawn",
+      dayState: { hunterPending: true },
+      gameResult: null
+    });
+    expect(room.continueFromDawn()).toMatchObject({ ok: false, code: "INVALID_PHASE_CONTROL" });
+    expect(room.getPlayerView(hunter.selfId)?.hunterAction).toMatchObject({ active: true, submitted: false });
+    expect(room.shootAsHunter(hunter.selfId, wolf.selfId)).toMatchObject({
+      ok: true,
+      data: { phase: "game-over", gameResult: { outcome: "draw" } }
+    });
+  });
+
+  it("does not let a poisoned hunter shoot", () => {
+    const { room, views } = startConfiguredRoom(
+      { wolf: 1, villager: 2, seer: 0, witch: 1, hunter: 1 },
+      ["林野", "阿岚", "青禾", "南星", "石川"]
+    );
+    const wolf = views.find((view) => view.privateRole?.role === "wolf")!;
+    const witch = views.find((view) => view.privateRole?.role === "witch")!;
+    const hunter = views.find((view) => view.privateRole?.role === "hunter")!;
+    const victim = views.find((view) => view.privateRole?.role === "villager")!;
+
+    room.selectWolfTarget(wolf.selfId, victim.selfId);
+    room.confirmWolfVote(wolf.selfId, true);
+    room.submitWitchAction(witch.selfId, { action: "poison", target: hunter.selfId });
+
+    expect(room.getHostView()).toMatchObject({
+      phase: "dawn",
+      dayState: { hunterPending: false }
+    });
+    expect(room.getPlayerView(hunter.selfId)?.hunterAction?.active).toBe(false);
+    expect(room.shootAsHunter(hunter.selfId, wolf.selfId)).toMatchObject({
+      ok: false,
+      code: "INVALID_NIGHT_ACTION"
+    });
+  });
+
+  it("lets an exiled hunter shoot before resolving the winner", () => {
+    const { room, views } = startConfiguredRoom(
+      { wolf: 1, villager: 2, seer: 0, witch: 0, guard: 1, hunter: 1 },
+      ["林野", "阿岚", "青禾", "南星", "石川"]
+    );
+    const wolf = views.find((view) => view.privateRole?.role === "wolf")!;
+    const guard = views.find((view) => view.privateRole?.role === "guard")!;
+    const hunter = views.find((view) => view.privateRole?.role === "hunter")!;
+
+    room.selectWolfTarget(wolf.selfId, "no-kill");
+    room.confirmWolfVote(wolf.selfId, true);
+    room.protectAsGuard(guard.selfId, null);
+    room.continueFromDawn();
+    while (room.getHostView().phase === "day-speech") room.skipCurrentDayStage();
+    for (const voterId of room.getHostView().dayState!.alivePlayerIds) {
+      room.selectDayVote(voterId, voterId === hunter.selfId ? "abstain" : hunter.selfId);
+      room.confirmDayVote(voterId, true);
+    }
+
+    expect(room.getHostView()).toMatchObject({
+      phase: "exile-result",
+      dayState: { hunterPending: true, voteResult: { exiledPlayer: { id: hunter.selfId } } },
+      gameResult: null
+    });
+    expect(room.continueFromExile()).toMatchObject({ ok: false, code: "INVALID_PHASE_CONTROL" });
+    expect(room.shootAsHunter(hunter.selfId, wolf.selfId)).toMatchObject({
+      ok: true,
+      data: { phase: "game-over", gameResult: { outcome: "good-win" } }
+    });
+  });
+
+  it("reveals an exiled idiot, preserves the reveal, and removes their vote", () => {
+    const { room, views } = startConfiguredRoom(
+      { wolf: 1, villager: 2, seer: 0, witch: 0, idiot: 1 },
+      ["林野", "阿岚", "青禾", "南星"]
+    );
+    const wolf = views.find((view) => view.privateRole?.role === "wolf")!;
+    const idiot = views.find((view) => view.privateRole?.role === "idiot")!;
+
+    room.selectWolfTarget(wolf.selfId, "no-kill");
+    room.confirmWolfVote(wolf.selfId, true);
+    room.continueFromDawn();
+    while (room.getHostView().phase === "day-speech") room.skipCurrentDayStage();
+    for (const voterId of room.getHostView().dayState!.alivePlayerIds) {
+      room.selectDayVote(voterId, voterId === idiot.selfId ? "abstain" : idiot.selfId);
+      room.confirmDayVote(voterId, true);
+    }
+
+    expect(room.getHostView()).toMatchObject({
+      phase: "exile-result",
+      revealedIdiotId: idiot.selfId,
+      dayState: {
+        revealedIdiot: { id: idiot.selfId },
+        voteResult: { exiledPlayer: null }
+      }
+    });
+    expect(room.getHostView().players.find((player) => player.id === idiot.selfId)?.alive).toBe(true);
+    const idiotNickname = room.getHostView().players.find((player) => player.id === idiot.selfId)!.nickname;
+    expect(room.createSnapshot().gameRecords).not.toContainEqual(expect.objectContaining({
+      type: "death",
+      detail: expect.stringContaining(idiotNickname)
+    }));
+
+    room.continueFromExile();
+    room.selectWolfTarget(wolf.selfId, "no-kill");
+    room.confirmWolfVote(wolf.selfId, true);
+    room.continueFromDawn();
+    while (room.getHostView().phase === "day-speech") room.skipCurrentDayStage();
+
+    expect(room.getPlayerView(idiot.selfId)?.dayVote).toMatchObject({ eligible: false, candidates: [] });
+    const otherVoter = room.getHostView().dayState!.alivePlayerIds.find((id) => id !== idiot.selfId)!;
+    expect(room.getPlayerView(otherVoter)?.dayVote?.candidates.map((candidate) => candidate.id))
+      .not.toContain(idiot.selfId);
+    expect(room.selectDayVote(idiot.selfId, "abstain")).toMatchObject({ ok: false });
+    expect(room.selectDayVote(otherVoter, idiot.selfId)).toMatchObject({ ok: false, code: "PLAYER_NOT_FOUND" });
+
+    const restored = new LobbyRoom({
+      localAddress: "192.168.1.20",
+      webPort: 5173,
+      snapshot: room.createSnapshot()
+    });
+    expect(restored.getHostView().revealedIdiotId).toBe(idiot.selfId);
+    expect(restored.getPlayerView(idiot.selfId)?.dayVote).toMatchObject({ eligible: false, candidates: [] });
   });
 
   it("treats tied wolf votes as no attack before witch action", () => {

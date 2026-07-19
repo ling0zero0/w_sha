@@ -1,13 +1,28 @@
 import { Play } from "lucide-react";
-import type { RoleConfiguration, StartReadiness } from "@werewolf/shared";
-import { useState } from "react";
+import type { NormalizedRoleConfiguration, Role, RoleConfiguration, StartReadiness } from "@werewolf/shared";
+import { useEffect, useState } from "react";
 
-const roleFields: Array<{ key: keyof RoleConfiguration; label: string; max?: number }> = [
+const roleFields: Array<{ key: Role; label: string; max?: number }> = [
   { key: "wolf", label: "狼人" },
   { key: "villager", label: "村民" },
   { key: "seer", label: "预言家", max: 1 },
-  { key: "witch", label: "女巫", max: 1 }
+  { key: "witch", label: "女巫", max: 1 },
+  { key: "guard", label: "守卫", max: 1 },
+  { key: "hunter", label: "猎人", max: 1 },
+  { key: "idiot", label: "白痴", max: 1 }
 ];
+
+function normalizeConfiguration(configuration: RoleConfiguration): NormalizedRoleConfiguration {
+  return {
+    wolf: configuration.wolf,
+    villager: configuration.villager,
+    seer: configuration.seer,
+    witch: configuration.witch,
+    guard: configuration.guard ?? 0,
+    hunter: configuration.hunter ?? 0,
+    idiot: configuration.idiot ?? 0
+  };
+}
 
 export function RoleConfigurationPanel({
   configuration,
@@ -22,7 +37,11 @@ export function RoleConfigurationPanel({
   onChange: (configuration: RoleConfiguration) => void;
   onStart: () => void;
 }) {
-  const [draft, setDraft] = useState(configuration);
+  const [draft, setDraft] = useState(() => normalizeConfiguration(configuration));
+
+  useEffect(() => {
+    setDraft(normalizeConfiguration(configuration));
+  }, [configuration]);
 
   return (
     <section className="role-configuration" aria-labelledby="role-configuration-title">

@@ -224,6 +224,14 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
     if (action !== "poison") socketRef.current?.emit("witch:submit-action", { action }, applyPlayerView);
   }, [applyPlayerView]);
 
+  const protectAsGuard = useCallback((target: string | null) => {
+    socketRef.current?.emit("guard:protect", { target }, applyPlayerView);
+  }, [applyPlayerView]);
+
+  const shootAsHunter = useCallback((target: string | null) => {
+    socketRef.current?.emit("hunter:shoot", { target }, applyPlayerView);
+  }, [applyPlayerView]);
+
   const finishSpeaking = useCallback(() => {
     socketRef.current?.emit("player:finish-speaking", applyPlayerView);
   }, [applyPlayerView]);
@@ -246,6 +254,8 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
     sendWolfMessage,
     inspectAsSeer,
     submitWitchAction,
+    protectAsGuard,
+    shootAsHunter,
     finishSpeaking,
     selectDayVote,
     confirmDayVote

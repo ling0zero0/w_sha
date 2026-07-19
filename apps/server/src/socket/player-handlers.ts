@@ -1,6 +1,8 @@
 import {
   dayConfirmVoteRequestSchema,
   daySelectVoteRequestSchema,
+  guardProtectRequestSchema,
+  hunterShootRequestSchema,
   joinLobbyRequestSchema,
   reconnectPlayerRequestSchema,
   seerInspectRequestSchema,
@@ -163,6 +165,34 @@ export function registerPlayerHandlers(socket: GameSocket, context: SocketHandle
       if (paused) return paused;
       const payload = witchSubmitActionRequestSchema.parse(rawPayload);
       return runtime.room.submitWitchAction(socket.data.playerId!, payload);
+    }, () => {
+      syncPhaseClock();
+      emitLobbyViews();
+      emitPublicGameState();
+    });
+  });
+
+  socket.on("guard:protect", (rawPayload, ack) => {
+    if (typeof ack !== "function") return;
+    handlePlayerViewAction(socket.data.playerId, ack, () => {
+      const paused = nightActionPaused();
+      if (paused) return paused;
+      const payload = guardProtectRequestSchema.parse(rawPayload);
+      return runtime.room.protectAsGuard(socket.data.playerId!, payload.target);
+    }, () => {
+      syncPhaseClock();
+      emitLobbyViews();
+      emitPublicGameState();
+    });
+  });
+
+  socket.on("hunter:shoot", (rawPayload, ack) => {
+    if (typeof ack !== "function") return;
+    handlePlayerViewAction(socket.data.playerId, ack, () => {
+      const paused = nightActionPaused();
+      if (paused) return paused;
+      const payload = hunterShootRequestSchema.parse(rawPayload);
+      return runtime.room.shootAsHunter(socket.data.playerId!, payload.target);
     }, () => {
       syncPhaseClock();
       emitLobbyViews();

@@ -1,5 +1,6 @@
 import type { GameResult } from "@werewolf/shared";
-import { outcomeLabels, roleImages, roleLabels } from "./role-meta";
+import { RoleArtwork } from "./RoleArtwork";
+import { outcomeLabels, roleLabels } from "./role-meta";
 
 export function GameOverPanel({
   result,
@@ -15,7 +16,7 @@ export function GameOverPanel({
       <div className="revealed-roles">
         {result.revealedPlayers.map((player) => (
           <article key={player.id}>
-            <img src={roleImages[player.role]} alt="" />
+            <RoleArtwork role={player.role} className="revealed-role-artwork" alt="" />
             <span>{player.number} 号 · {player.nickname}</span>
             <strong>{roleLabels[player.role]}</strong>
             <small>{player.alive ? "存活" : "死亡"}</small>

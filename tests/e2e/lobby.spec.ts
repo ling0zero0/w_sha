@@ -27,6 +27,9 @@ test("host and two mobile players complete the LAN lobby workflow", async ({ bro
   await expect(page.getByTestId("phase-clock")).toHaveText("00:00");
   await expect(page.getByRole("button", { name: "暂停" })).toBeDisabled();
   await expect(page.getByTestId("start-readiness")).toHaveText("暂不可开始");
+  await expect(page.getByLabel("守卫数量")).toHaveValue("0");
+  await expect(page.getByLabel("猎人数量")).toHaveValue("0");
+  await expect(page.getByLabel("白痴数量")).toHaveValue("0");
 
   const joinUrl = await page.evaluate(async () => {
     const response = await fetch("/api/host-bootstrap");
@@ -147,6 +150,51 @@ test("host and two mobile players complete the LAN lobby workflow", async ({ bro
   }
 });
 
+test("configures a guard and renders the empty role artwork safely", async ({ browser, page }) => {
+  await page.goto("/");
+  const joinUrl = await getLocalJoinUrl(page);
+  const contexts = await Promise.all(
+    [0, 1, 2].map(() => browser.newContext({ ...devices["Pixel 7"] }))
+  );
+  const players = await Promise.all(contexts.map((context) => context.newPage()));
+
+  try {
+    for (const [index, player] of players.entries()) {
+      await joinPlayer(player, joinUrl, ["林野", "阿岚", "青禾"][index]!);
+    }
+    await page.getByLabel("狼人数量").fill("1");
+    await page.getByLabel("村民数量").fill("1");
+    await page.getByLabel("预言家数量").fill("0");
+    await page.getByLabel("女巫数量").fill("0");
+    await page.getByLabel("守卫数量").fill("1");
+    await page.getByLabel("猎人数量").fill("0");
+    await page.getByLabel("白痴数量").fill("0");
+    await expect(page.getByTestId("configured-role-count")).toHaveText("3");
+    await expect(page.getByTestId("start-readiness")).toHaveText("配置就绪");
+
+    page.on("dialog", (dialog) => dialog.accept());
+    await page.getByRole("button", { name: "开始游戏" }).click();
+    const roleLabels = await Promise.all(players.map(async (player) => {
+      await expect(player.getByText("你的身份是")).toBeVisible();
+      return player.locator("h1").textContent();
+    }));
+    expect([...roleLabels].sort()).toEqual(["守卫", "村民", "狼人"].sort());
+
+    const guard = players[roleLabels.indexOf("守卫")]!;
+    await expect(guard.getByRole("img", { name: "守卫暂无角色图片" })).toBeVisible();
+    await expect(guard.locator(".role-artwork-frame img")).toHaveCount(0);
+    await page.getByRole("button", { name: "终止对局" }).click();
+    await expect(page.getByRole("heading", { name: "对局终止" })).toBeVisible();
+    await page.getByRole("button", { name: "返回大厅调整" }).click();
+    for (const nickname of ["林野", "阿岚", "青禾"]) {
+      await page.getByTestId("host-player").filter({ hasText: nickname }).getByTitle("移除玩家").click();
+    }
+    await expect(page.getByTestId("host-player")).toHaveCount(0);
+  } finally {
+    await Promise.all(contexts.map((context) => context.close()));
+  }
+});
+
 test("three mobile players complete a full game and start a clean rematch", async ({ browser, page }) => {
   test.setTimeout(60_000);
   await page.goto("/");
@@ -163,6 +211,9 @@ test("three mobile players complete a full game and start a clean rematch", asyn
     await page.getByLabel("村民数量").fill("1");
     await page.getByLabel("预言家数量").fill("1");
     await page.getByLabel("女巫数量").fill("0");
+    await page.getByLabel("守卫数量").fill("0");
+    await page.getByLabel("猎人数量").fill("0");
+    await page.getByLabel("白痴数量").fill("0");
     await expect(page.getByTestId("start-readiness")).toHaveText("配置就绪");
 
     page.once("dialog", (dialog) => dialog.accept());

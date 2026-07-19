@@ -530,7 +530,10 @@ describe("lobby socket integration", () => {
       wolf: 1,
       villager: 1,
       seer: 1,
-      witch: 0
+      witch: 0,
+      guard: 0,
+      hunter: 0,
+      idiot: 0
     });
   });
 
@@ -552,7 +555,10 @@ describe("lobby socket integration", () => {
       wolf: 0,
       villager: 0,
       seer: 0,
-      witch: 0
+      witch: 0,
+      guard: 0,
+      hunter: 0,
+      idiot: 0
     });
   });
 
@@ -766,5 +772,99 @@ describe("lobby socket integration", () => {
     expect(runtime.room.getNightStage()).toBe("seer");
     expect(runtime.getPublicGameState().clock).toMatchObject({ status: "running" });
     expect(runtime.getPublicGameState().clock.remainingMs).toBeGreaterThan(29_000);
+  });
+
+  it("authorizes guard actions, blocks them while paused, and keeps the target private", async () => {
+    const { runtime, url } = await startRuntime();
+    const host = connect(url, { hostSession: "zyxwvutsrqponmlkjihgfedcba654321" });
+    await waitForHostState(host);
+    const players = [connect(url), connect(url), connect(url)];
+    for (const [index, player] of players.entries()) {
+      const joined = await player.emitWithAck("player:join", {
+        roomCode: "123456",
+        joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+        nickname: ["林野", "阿岚", "青禾"][index]!
+      });
+      if (!joined.ok) throw new Error("test setup failed");
+    }
+    await host.emitWithAck("host:update-role-configuration", {
+      wolf: 1,
+      villager: 1,
+      seer: 0,
+      witch: 0,
+      guard: 1
+    });
+    const roleUpdates = players.map((player) => waitForPlayerState(player));
+    await host.emitWithAck("host:start-game");
+    const roles = await Promise.all(roleUpdates);
+    for (const player of players) await player.emitWithAck("player:confirm-role");
+    const wolfIndex = roles.findIndex((view) => view.privateRole?.role === "wolf");
+    const guardIndex = roles.findIndex((view) => view.privateRole?.role === "guard");
+    const villagerIndex = roles.findIndex((view) => view.privateRole?.role === "villager");
+
+    await players[wolfIndex]!.emitWithAck("wolf:select-target", { target: "no-kill" });
+    await players[wolfIndex]!.emitWithAck("wolf:confirm-vote", { confirmed: true });
+    expect(await players[villagerIndex]!.emitWithAck("guard:protect", {
+      target: roles[guardIndex]!.selfId
+    })).toMatchObject({ ok: false, code: "INVALID_NIGHT_ACTION" });
+
+    await host.emitWithAck("host:pause-phase");
+    expect(await players[guardIndex]!.emitWithAck("guard:protect", { target: null })).toMatchObject({
+      ok: false,
+      code: "INVALID_PHASE_CONTROL"
+    });
+    await host.emitWithAck("host:resume-phase");
+    expect(await players[guardIndex]!.emitWithAck("guard:protect", {
+      target: roles[villagerIndex]!.selfId
+    })).toMatchObject({ ok: true, data: { phase: "dawn" } });
+
+    expect(JSON.stringify(runtime.room.getHostView())).not.toMatch(/guardAction|protectedPlayer|"candidates"/);
+    expect(runtime.room.getPlayerView(roles[villagerIndex]!.selfId)?.guardAction).toBeNull();
+    expect(JSON.stringify(runtime.getPublicGameState())).not.toMatch(/guard|protect|candidate/);
+  });
+
+  it("authorizes a pending hunter shot and keeps shoot candidates private", async () => {
+    const { runtime, url } = await startRuntime();
+    const host = connect(url, { hostSession: "zyxwvutsrqponmlkjihgfedcba654321" });
+    await waitForHostState(host);
+    const players = [connect(url), connect(url), connect(url)];
+    for (const [index, player] of players.entries()) {
+      const joined = await player.emitWithAck("player:join", {
+        roomCode: "123456",
+        joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+        nickname: ["林野", "阿岚", "青禾"][index]!
+      });
+      if (!joined.ok) throw new Error("test setup failed");
+    }
+    await host.emitWithAck("host:update-role-configuration", {
+      wolf: 1,
+      villager: 1,
+      seer: 0,
+      witch: 0,
+      hunter: 1
+    });
+    const roleUpdates = players.map((player) => waitForPlayerState(player));
+    await host.emitWithAck("host:start-game");
+    const roles = await Promise.all(roleUpdates);
+    for (const player of players) await player.emitWithAck("player:confirm-role");
+    const wolfIndex = roles.findIndex((view) => view.privateRole?.role === "wolf");
+    const hunterIndex = roles.findIndex((view) => view.privateRole?.role === "hunter");
+    const villagerIndex = roles.findIndex((view) => view.privateRole?.role === "villager");
+
+    await players[wolfIndex]!.emitWithAck("wolf:select-target", { target: roles[hunterIndex]!.selfId });
+    await players[wolfIndex]!.emitWithAck("wolf:confirm-vote", { confirmed: true });
+    expect(runtime.room.getHostView().dayState?.hunterPending).toBe(true);
+    expect(JSON.stringify(runtime.room.getHostView())).not.toMatch(/hunterAction|shotPlayer|"candidates"/);
+    expect(runtime.room.getPlayerView(roles[villagerIndex]!.selfId)?.hunterAction).toBeNull();
+    expect(await players[villagerIndex]!.emitWithAck("hunter:shoot", {
+      target: roles[wolfIndex]!.selfId
+    })).toMatchObject({ ok: false, code: "INVALID_NIGHT_ACTION" });
+
+    expect(await players[hunterIndex]!.emitWithAck("hunter:shoot", {
+      target: roles[wolfIndex]!.selfId
+    })).toMatchObject({
+      ok: true,
+      data: { phase: "game-over", gameResult: { outcome: "draw" } }
+    });
   });
 });

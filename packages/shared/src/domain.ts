@@ -44,7 +44,8 @@ export const lobbyViewBaseSchema = z.object({
   phase: roomPhaseSchema,
   roomCode: roomCodeSchema,
   revision: z.number().int().nonnegative(),
-  players: z.array(lobbyPlayerSchema)
+  players: z.array(lobbyPlayerSchema),
+  revealedIdiotId: playerIdSchema.nullable().default(null)
 });
 
 export const takeoverRequestSchema = z.object({
@@ -55,16 +56,21 @@ export const takeoverRequestSchema = z.object({
 });
 export type TakeoverRequest = z.infer<typeof takeoverRequestSchema>;
 
-export const roleSchema = z.enum(["wolf", "villager", "seer", "witch"]);
+export const roleSchema = z.enum(["wolf", "villager", "seer", "witch", "guard", "hunter", "idiot"]);
 export type Role = z.infer<typeof roleSchema>;
 
 export const roleConfigurationSchema = z.object({
   wolf: z.number().int().nonnegative().safe(),
   villager: z.number().int().nonnegative().safe(),
   seer: z.number().int().min(0).max(1),
-  witch: z.number().int().min(0).max(1)
+  witch: z.number().int().min(0).max(1),
+  guard: z.number().int().min(0).max(1).default(0),
+  hunter: z.number().int().min(0).max(1).default(0),
+  idiot: z.number().int().min(0).max(1).default(0)
 }).strict();
-export type RoleConfiguration = z.infer<typeof roleConfigurationSchema>;
+export type RoleConfigurationInput = z.input<typeof roleConfigurationSchema>;
+export type NormalizedRoleConfiguration = z.output<typeof roleConfigurationSchema>;
+export type RoleConfiguration = NormalizedRoleConfiguration;
 
 export const startReadinessIssueCodeSchema = z.enum([
   "WOLF_REQUIRED",

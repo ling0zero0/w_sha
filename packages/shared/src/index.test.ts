@@ -1,17 +1,38 @@
 import { describe, expect, it } from "vitest";
 import {
   clientPingSchema,
+  gameRecordSchema,
+  guardProtectRequestSchema,
   hostAdjustPhaseTimeRequestSchema,
   hostCorrectPlayerLifeRequestSchema,
   hostLobbyViewSchema,
+  hunterShootRequestSchema,
   joinLobbyRequestSchema,
   nicknameSchema,
+  playerLobbyViewSchema,
   playerCredentialsSchema,
   publicGameStateSchema,
   gameResultSchema,
   roleConfigurationSchema,
+  roleSchema,
   serviceStatusSchema
 } from "./index.js";
+import type {
+  ClientToServerEvents,
+  NormalizedRoleConfiguration,
+  RoleConfiguration,
+  RoleConfigurationInput
+} from "./index.js";
+
+const legacyRoleConfiguration: RoleConfigurationInput = {
+  wolf: 1,
+  villager: 2,
+  seer: 1,
+  witch: 0
+};
+const updateRoleConfigurationPayload: Parameters<
+  ClientToServerEvents["host:update-role-configuration"]
+>[0] = legacyRoleConfiguration;
 
 describe("shared transport schemas", () => {
   it("accepts the public service status", () => {
@@ -73,6 +94,16 @@ describe("shared transport schemas", () => {
     });
 
     expect(Object.keys(view)).not.toContain("joinToken");
+    expect(view.revealedIdiotId).toBeNull();
+    expect(view.roleConfiguration).toEqual({
+      wolf: 0,
+      villager: 0,
+      seer: 0,
+      witch: 0,
+      guard: 0,
+      hunter: 0,
+      idiot: 0
+    });
   });
 
   it("validates stable player reconnect credentials", () => {
@@ -155,21 +186,154 @@ describe("shared transport schemas", () => {
     expect(result?.records[0]?.type).toBe("seer-inspection");
   });
 
-  it("validates the fixed MVP role configuration", () => {
+  it("validates the extended role configuration", () => {
+    expect(["guard", "hunter", "idiot"].map((role) => roleSchema.parse(role))).toEqual([
+      "guard",
+      "hunter",
+      "idiot"
+    ]);
+    const normalized: NormalizedRoleConfiguration = roleConfigurationSchema.parse(
+      updateRoleConfigurationPayload
+    );
+    const configuration: RoleConfiguration = normalized;
+    expect(configuration).toEqual({
+      wolf: 1,
+      villager: 2,
+      seer: 1,
+      witch: 0,
+      guard: 0,
+      hunter: 0,
+      idiot: 0
+    });
     expect(roleConfigurationSchema.parse({ wolf: 2, villager: 3, seer: 1, witch: 1 })).toEqual({
       wolf: 2,
       villager: 3,
       seer: 1,
-      witch: 1
+      witch: 1,
+      guard: 0,
+      hunter: 0,
+      idiot: 0
     });
-    expect(() => roleConfigurationSchema.parse({ wolf: -1, villager: 3, seer: 1, witch: 0 })).toThrow();
-    expect(() => roleConfigurationSchema.parse({ wolf: 1, villager: 3, seer: 2, witch: 0 })).toThrow();
+    expect(roleConfigurationSchema.parse({
+      wolf: 2,
+      villager: 3,
+      seer: 1,
+      witch: 1,
+      guard: 1,
+      hunter: 1,
+      idiot: 1
+    })).toEqual({
+      wolf: 2,
+      villager: 3,
+      seer: 1,
+      witch: 1,
+      guard: 1,
+      hunter: 1,
+      idiot: 1
+    });
+    expect(() => roleConfigurationSchema.parse({
+      wolf: -1,
+      villager: 3,
+      seer: 1,
+      witch: 0,
+      guard: 0,
+      hunter: 0,
+      idiot: 0
+    })).toThrow();
+    for (const role of ["guard", "hunter", "idiot"] as const) {
+      expect(() => roleConfigurationSchema.parse({
+        wolf: 1,
+        villager: 3,
+        seer: 1,
+        witch: 0,
+        [role]: 2
+      })).toThrow();
+    }
     expect(() => roleConfigurationSchema.parse({
       wolf: 1,
       villager: 3,
       seer: 1,
       witch: 0,
-      hunter: 1
+      guard: 0,
+      hunter: 1,
+      idiot: 0,
+      unknown: 1
     })).toThrow();
+  });
+
+  it("validates strict guard and hunter action payloads", () => {
+    const target = "019bf178-7f24-7e40-b8dc-0c2dd948d5a7";
+
+    expect(guardProtectRequestSchema.parse({ target })).toEqual({ target });
+    expect(guardProtectRequestSchema.parse({ target: null })).toEqual({ target: null });
+    expect(hunterShootRequestSchema.parse({ target: null })).toEqual({ target: null });
+    expect(() => guardProtectRequestSchema.parse({ target, extra: true })).toThrow();
+    expect(() => hunterShootRequestSchema.parse({ target: "not-a-player-id" })).toThrow();
+    expect(() => hunterShootRequestSchema.parse({ target: null, extra: true })).toThrow();
+  });
+
+  it("validates private guard and hunter actions plus public idiot state", () => {
+    const selfId = "019bf178-7f24-7e40-b8dc-0c2dd948d5a7";
+    const candidate = {
+      id: "019bf178-7f24-7e40-b8dc-0c2dd948d5a8",
+      number: 2,
+      nickname: "Player 2"
+    };
+    const view = playerLobbyViewSchema.parse({
+      phase: "day-vote",
+      roomCode: "123456",
+      revision: 4,
+      players: [],
+      revealedIdiotId: candidate.id,
+      selfId,
+      privateRole: null,
+      roleConfirmation: { confirmed: 0, total: 0 },
+      nightProgress: null,
+      wolfAction: null,
+      seerAction: null,
+      witchAction: null,
+      guardAction: {
+        active: false,
+        candidates: [candidate],
+        protectedPlayer: candidate,
+        submitted: true
+      },
+      hunterAction: {
+        active: true,
+        candidates: [candidate],
+        shotPlayer: null,
+        submitted: false
+      },
+      dawnResult: null,
+      dayState: {
+        alivePlayerIds: [selfId, candidate.id],
+        revealedIdiot: candidate,
+        hunterPending: true,
+        currentSpeaker: null,
+        speechOrder: [],
+        voteProgress: { confirmed: 0, total: 1 },
+        voteResult: null
+      },
+      dayVote: {
+        eligible: false,
+        candidates: [],
+        target: null,
+        confirmed: false
+      },
+      gameResult: null
+    });
+
+    expect(view.guardAction?.protectedPlayer?.id).toBe(candidate.id);
+    expect(view.hunterAction?.active).toBe(true);
+    expect(view.revealedIdiotId).toBe(candidate.id);
+    expect(view.dayState?.revealedIdiot?.id).toBe(candidate.id);
+    expect(view.dayState?.hunterPending).toBe(true);
+    expect(view.dayVote?.eligible).toBe(false);
+  });
+
+  it("accepts records for every extended role action", () => {
+    for (const type of ["guard-action", "hunter-shot", "idiot-reveal"] as const) {
+      expect(gameRecordSchema.parse({ type, day: 1, detail: `${type} detail` }).type).toBe(type);
+    }
   });
 });

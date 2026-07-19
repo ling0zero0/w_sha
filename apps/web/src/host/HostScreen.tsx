@@ -158,7 +158,9 @@ export function HostScreen() {
           <section className="role-confirmation-panel" aria-live="polite">
             <div>
               <p className="eyebrow">身份已私密下发</p>
-              <h2>{lobby.phase === "dawn"
+              <h2>{lobby.dayState?.hunterPending
+                ? "等待猎人完成技能"
+                : lobby.phase === "dawn"
                 ? lobby.dawnResult?.deaths.length
                   ? `昨夜 ${lobby.dawnResult.deaths.map((player) => `${player.number} 号${player.nickname}`).join("、")} 死亡`
                   : "昨夜平安夜"
@@ -174,13 +176,13 @@ export function HostScreen() {
         ) : null}
 
         {lobby?.phase === "dawn" ? (
-          <button className="host-continue-button" type="button" onClick={continueFromDawn} disabled={socket !== "connected"}>
+          <button className="host-continue-button" type="button" onClick={continueFromDawn} disabled={socket !== "connected" || lobby.dayState?.hunterPending}>
             <ArrowRight size={18} aria-hidden="true" />进入白天流程
           </button>
         ) : null}
 
         {lobby?.phase === "exile-result" ? (
-          <button className="host-continue-button" type="button" onClick={continueFromExile} disabled={socket !== "connected"}>
+          <button className="host-continue-button" type="button" onClick={continueFromExile} disabled={socket !== "connected" || lobby.dayState?.hunterPending}>
             <ArrowRight size={18} aria-hidden="true" />{lobby.dayState?.voteResult?.exiledPlayer ? "进入放逐遗言" : "进入下一夜"}
           </button>
         ) : null}
@@ -189,7 +191,9 @@ export function HostScreen() {
           <section className="host-day-panel">
             <div>
               <p className="eyebrow">公开白天流程</p>
-              <h2>{lobby.phase === "exile-result"
+              <h2>{lobby.dayState.hunterPending
+                ? "等待猎人完成技能"
+                : lobby.phase === "exile-result"
                 ? lobby.dayState.voteResult?.exiledPlayer
                   ? `${lobby.dayState.voteResult.exiledPlayer.number} 号${lobby.dayState.voteResult.exiledPlayer.nickname}被放逐`
                   : "平票，无人放逐"

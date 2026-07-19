@@ -118,7 +118,7 @@ export class GameRuntime {
   skipDayPhase(nowMs = Date.now()): RoomActionResult<PublicGameState> {
     const status = this.phaseClock.view(nowMs).status;
     const stage = this.room.getTimedStage();
-    if ((status !== "running" && status !== "paused") || !stage || ["wolf", "seer", "witch"].includes(stage)) {
+    if ((status !== "running" && status !== "paused") || !stage || ["wolf", "seer", "guard", "witch"].includes(stage)) {
       return this.invalidPhaseControl();
     }
     const skipped = this.room.skipCurrentDayStage();
