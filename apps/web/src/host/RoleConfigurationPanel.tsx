@@ -1,5 +1,11 @@
-import { Play } from "lucide-react";
-import type { NormalizedRoleConfiguration, Role, RoleConfiguration, StartReadiness } from "@werewolf/shared";
+import { ListOrdered, MessagesSquare, Play } from "lucide-react";
+import type {
+  ChatMode,
+  NormalizedRoleConfiguration,
+  Role,
+  RoleConfiguration,
+  StartReadiness
+} from "@werewolf/shared";
 import { useEffect, useState } from "react";
 
 const roleFields: Array<{ key: Role; label: string; max?: number }> = [
@@ -26,15 +32,19 @@ function normalizeConfiguration(configuration: RoleConfiguration): NormalizedRol
 
 export function RoleConfigurationPanel({
   configuration,
+  chatMode,
   readiness,
   connected,
   onChange,
+  onChatModeChange,
   onStart
 }: {
   configuration: RoleConfiguration;
+  chatMode: ChatMode;
   readiness: StartReadiness;
   connected: boolean;
   onChange: (configuration: RoleConfiguration) => void;
+  onChatModeChange: (chatMode: ChatMode) => void;
   onStart: () => void;
 }) {
   const [draft, setDraft] = useState(() => normalizeConfiguration(configuration));
@@ -82,6 +92,36 @@ export function RoleConfigurationPanel({
       <div className="readiness-summary">
         <span>参赛人数 <strong data-testid="participant-count">{readiness.participantCount}</strong></span>
         <span>身份总数 <strong data-testid="configured-role-count">{readiness.configuredRoleCount}</strong></span>
+      </div>
+      <div className="chat-mode-setting">
+        <div>
+          <strong id="chat-mode-label">白天发言模式</strong>
+          <small>{connected ? "开局前可调整" : "连接恢复后可调整"}</small>
+        </div>
+        <div className="chat-mode-segments" role="radiogroup" aria-labelledby="chat-mode-label">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={chatMode === "ordered"}
+            className={chatMode === "ordered" ? "is-selected" : ""}
+            disabled={!connected}
+            onClick={() => onChatModeChange("ordered")}
+          >
+            <ListOrdered size={17} aria-hidden="true" />
+            <span>有序发言</span>
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={chatMode === "open"}
+            className={chatMode === "open" ? "is-selected" : ""}
+            disabled={!connected}
+            onClick={() => onChatModeChange("open")}
+          >
+            <MessagesSquare size={17} aria-hidden="true" />
+            <span>自由讨论</span>
+          </button>
+        </div>
       </div>
       {readiness.issues.length > 0 ? (
         <ul className="readiness-issues" aria-label="开局阻塞原因">

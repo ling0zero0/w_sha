@@ -1,4 +1,6 @@
 export * from "./actions.js";
+export * from "./bot.js";
+export * from "./chat.js";
 export * from "./domain.js";
 export * from "./events.js";
 export * from "./game.js";

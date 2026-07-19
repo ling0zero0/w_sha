@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { chatMessageSchema } from "./chat.js";
 import {
   lobbyPlayerSchema,
   playerIdSchema,
@@ -36,7 +37,7 @@ export const privateWolfActionSchema = z.object({
   confirmed: z.boolean(),
   locked: z.boolean(),
   chatEnabled: z.boolean(),
-  messages: z.array(wolfChatMessageSchema)
+  messages: z.array(chatMessageSchema)
 });
 export type PrivateWolfAction = z.infer<typeof privateWolfActionSchema>;
 

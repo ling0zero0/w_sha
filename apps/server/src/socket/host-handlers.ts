@@ -1,9 +1,11 @@
 import {
+  hostAddBotRequestSchema,
   hostAdjustPhaseTimeRequestSchema,
   hostCorrectPlayerLifeRequestSchema,
   hostMovePlayerRequestSchema,
   hostPlayerRequestSchema,
   hostResolveTakeoverRequestSchema,
+  hostUpdateChatModeRequestSchema,
   roleConfigurationSchema
 } from "@werewolf/shared";
 import {
@@ -23,6 +25,7 @@ export function registerHostHandlers(socket: GameSocket, context: SocketHandlerC
     emitLobbyViews,
     emitPublicGameState,
     io,
+    notifyBots,
     runtime,
     schedulePhaseTimeout,
     syncPhaseClock
@@ -118,6 +121,9 @@ export function registerHostHandlers(socket: GameSocket, context: SocketHandlerC
       if (!result.ok) return ack(result);
 
       const requestSocket = io.sockets.sockets.get(result.data.requestSocketId);
+      if (requestSocket?.data.pendingTakeoverRequestId === payload.requestId) {
+        delete requestSocket.data.pendingTakeoverRequestId;
+      }
       if (result.data.approved && result.data.session) {
         const playerId = result.data.session.lobby.selfId;
         clearOfflineTimer(playerId);
@@ -149,6 +155,22 @@ export function registerHostHandlers(socket: GameSocket, context: SocketHandlerC
       const payload = roleConfigurationSchema.parse(rawPayload);
       return runtime.room.updateRoleConfiguration(payload);
     }, emitHostLobbyView);
+  });
+
+  socket.on("host:update-chat-mode", (rawPayload, ack) => {
+    if (typeof ack !== "function") return;
+    handleHostAction(socket.data.isHost, ack, () => {
+      const payload = hostUpdateChatModeRequestSchema.parse(rawPayload);
+      return runtime.room.updateChatMode(payload.chatMode);
+    }, emitLobbyViews);
+  });
+
+  socket.on("host:add-bot", (rawPayload, ack) => {
+    if (typeof ack !== "function") return;
+    handleHostAction(socket.data.isHost, ack, () => {
+      const payload = hostAddBotRequestSchema.parse(rawPayload);
+      return runtime.room.addBot(payload.nickname, payload.botKind);
+    }, emitLobbyViews);
   });
 
   socket.on("host:start-game", (ack) => {
@@ -200,6 +222,7 @@ export function registerHostHandlers(socket: GameSocket, context: SocketHandlerC
     if (typeof ack !== "function") return;
     handleHostAction(socket.data.isHost, ack, () => runtime.pausePhase(), () => {
       clearPhaseTimer();
+      notifyBots(true);
       emitPublicGameState();
       emitLobbyViews();
     });
@@ -209,6 +232,7 @@ export function registerHostHandlers(socket: GameSocket, context: SocketHandlerC
     if (typeof ack !== "function") return;
     handleHostAction(socket.data.isHost, ack, () => runtime.resumePhase(), () => {
       schedulePhaseTimeout();
+      notifyBots(true);
       emitPublicGameState();
       emitLobbyViews();
     });

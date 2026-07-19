@@ -16,7 +16,8 @@ import { RoleArtwork } from "../game/RoleArtwork";
 import { roleLabels } from "../game/role-meta";
 import { getJoinInvitation } from "../routing";
 import { Brand, InterventionNotices, PhaseClockDisplay } from "../shared/AppChrome";
-import { ConnectionBadge, DayFlowScreen } from "./DayFlowScreen";
+import { PublicPlayerRoster } from "../shared/PublicPlayerRoster";
+import { ChatModeStatus, ConnectionBadge, DayFlowScreen } from "./DayFlowScreen";
 import { GuardActionPanel, WitchActionPanel, WolfChatPanel } from "./NightActionPanels";
 import { usePlayerLobby } from "./usePlayerLobby";
 
@@ -60,7 +61,7 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
     confirmRole,
     selectWolfTarget,
     confirmWolfVote,
-    sendWolfMessage,
+    sendChatMessage,
     inspectAsSeer,
     submitWitchAction,
     protectAsGuard,
@@ -94,7 +95,7 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
   if (lobby) {
     const self = lobby.players.find((player) => player.id === lobby.selfId);
     if (lobby.phase === "game-over" && lobby.gameResult) {
-      return <main className="player-shell day-shell"><header className="player-header"><Brand /><ConnectionBadge connected={socket === "connected"} /></header><section className="mobile-state"><GameOverPanel result={lobby.gameResult} /></section></main>;
+      return <main className="player-shell day-shell"><header className="player-header"><Brand /><ConnectionBadge connected={socket === "connected"} /></header><section className="mobile-state"><PublicPlayerRoster players={lobby.players} selfId={lobby.selfId} phase={lobby.phase} /><GameOverPanel result={lobby.gameResult} publicMessages={lobby.publicChat.messages} /></section></main>;
     }
     if (["dawn", "last-words", "day-speech", "day-vote", "exile-result"].includes(lobby.phase) || lobby.hunterAction?.active) {
       return <DayFlowScreen
@@ -102,6 +103,7 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
         game={game}
         connected={socket === "connected"}
         onFinishSpeaking={finishSpeaking}
+        onSendChat={sendChatMessage}
         onSelectVote={selectDayVote}
         onConfirmVote={confirmDayVote}
         onHunterShoot={shootAsHunter}
@@ -114,11 +116,13 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
           <main className="player-shell role-screen dead-observer-screen">
             <header className="player-header"><Brand /><ConnectionBadge connected={socket === "connected"} /></header>
             <section className="mobile-state mobile-state-centered">
+              <ChatModeStatus chatMode={lobby.chatMode} />
               <span className="large-state-icon"><X size={30} aria-hidden="true" /></span>
               <p className="eyebrow">{self.number} 号 · {self.nickname}</p>
               <h1>你已死亡</h1>
               <p>你现在只能查看公开流程，不能聊天、投票或执行角色技能。</p>
               {game ? <div className="private-night-clock"><PhaseClockDisplay clock={game.clock} /></div> : null}
+              <PublicPlayerRoster players={lobby.players} selfId={lobby.selfId} phase={lobby.phase} />
             </section>
           </main>
         );
@@ -127,6 +131,7 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
         <main className={`player-shell role-screen role-${privateRole.role}`}>
           <header className="player-header"><Brand /><ConnectionBadge connected={socket === "connected"} /></header>
           <section className="mobile-state role-reveal-state">
+            <ChatModeStatus chatMode={lobby.chatMode} />
             {lobby.phase === "first-night" && game ? (
               <div className="private-night-clock"><PhaseClockDisplay clock={game.clock} /></div>
             ) : null}
@@ -147,7 +152,7 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
             {lobby.phase === "first-night" ? (
               privateRole.role === "wolf" && lobby.wolfAction ? (
                 <div className="wolf-action-panel">
-                  <WolfChatPanel action={lobby.wolfAction} paused={nightPaused} onSend={sendWolfMessage} />
+                  <WolfChatPanel action={lobby.wolfAction} paused={nightPaused} onSend={sendChatMessage} />
                   <h2>选择今晚的目标</h2>
                   <p>可以选择自己、狼人队友或空刀。确认前可随时修改。</p>
                   <div className="night-targets">
@@ -230,6 +235,7 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
               </button>
             )}
             <small className="confirmation-count">已确认 {lobby.roleConfirmation.confirmed} / {lobby.roleConfirmation.total}</small>
+            <PublicPlayerRoster players={lobby.players} selfId={lobby.selfId} phase={lobby.phase} />
           </section>
         </main>
       );
@@ -241,6 +247,7 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
           <ConnectionBadge connected={socket === "connected"} />
         </header>
         <section className="mobile-state waiting-state">
+          {lobby.phase !== "lobby" ? <ChatModeStatus chatMode={lobby.chatMode} /> : null}
           <div className="waiting-heading">
             <span className="large-state-icon"><UsersRound size={29} aria-hidden="true" /></span>
             <p className="eyebrow">房间 {lobby.roomCode}</p>
@@ -255,20 +262,7 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
             </div>
           ) : null}
 
-          <div className="mobile-roster" aria-label="当前玩家">
-            <header><span>当前玩家</span><strong>{lobby.players.length}</strong></header>
-            {lobby.players.map((player) => (
-              <div className={player.id === lobby.selfId ? "is-self" : ""} key={player.id}>
-                <span>{String(player.number).padStart(2, "0")}</span>
-                <strong>{player.nickname}</strong>
-                <small>{
-                  player.id === lobby.selfId ? "你"
-                    : player.connection === "online" ? "在线"
-                      : player.connection === "reconnecting" ? "重连中" : "离线"
-                }</small>
-              </div>
-            ))}
-          </div>
+          <PublicPlayerRoster players={lobby.players} selfId={lobby.selfId} phase={lobby.phase} />
 
           <div className="waiting-footer">
             <RefreshCw className="slow-spin" size={18} aria-hidden="true" />

@@ -1,4 +1,5 @@
 import {
+  chatSendRequestSchema,
   dayConfirmVoteRequestSchema,
   daySelectVoteRequestSchema,
   guardProtectRequestSchema,
@@ -13,6 +14,7 @@ import {
   wolfSelectTargetRequestSchema
 } from "@werewolf/shared";
 import {
+  alreadyJoined,
   handlePlayerViewAction,
   invalidRequest,
   type GameSocket,
@@ -22,6 +24,7 @@ import {
 export function registerPlayerHandlers(socket: GameSocket, context: SocketHandlerContext): void {
   const {
     clearOfflineTimer,
+    emitChatMessage,
     emitLobbyViews,
     emitPublicGameState,
     io,
@@ -32,6 +35,7 @@ export function registerPlayerHandlers(socket: GameSocket, context: SocketHandle
 
   socket.on("player:join", (rawPayload, ack) => {
     if (typeof ack !== "function") return;
+    if (socket.data.playerId || socket.data.pendingTakeoverRequestId) return ack(alreadyJoined());
     try {
       const payload = joinLobbyRequestSchema.parse(rawPayload);
       const result = runtime.room.join(payload, socket.id);
@@ -49,6 +53,7 @@ export function registerPlayerHandlers(socket: GameSocket, context: SocketHandle
 
   socket.on("player:reconnect", (rawPayload, ack) => {
     if (typeof ack !== "function") return;
+    if (socket.data.playerId || socket.data.pendingTakeoverRequestId) return ack(alreadyJoined());
     try {
       const payload = reconnectPlayerRequestSchema.parse(rawPayload);
       const result = runtime.room.reconnect(payload, socket.id);
@@ -75,11 +80,13 @@ export function registerPlayerHandlers(socket: GameSocket, context: SocketHandle
 
   socket.on("player:request-takeover", (rawPayload, ack) => {
     if (typeof ack !== "function") return;
+    if (socket.data.playerId || socket.data.pendingTakeoverRequestId) return ack(alreadyJoined());
     try {
       const payload = takeoverPlayerRequestSchema.parse(rawPayload);
       const result = runtime.room.requestTakeover(payload, socket.id);
       ack(result);
       if (result.ok) {
+        socket.data.pendingTakeoverRequestId = result.data.requestId;
         syncPhaseClock();
         emitLobbyViews();
         emitPublicGameState();
@@ -142,6 +149,26 @@ export function registerPlayerHandlers(socket: GameSocket, context: SocketHandle
       const payload = wolfSendMessageRequestSchema.parse(rawPayload);
       return runtime.room.sendWolfMessage(socket.data.playerId!, payload);
     }, emitLobbyViews);
+  });
+
+  socket.on("chat:send", (rawPayload, ack) => {
+    if (typeof ack !== "function") return;
+    const playerId = socket.data.playerId;
+    if (!playerId) return ack({
+      ok: false,
+      code: "INVALID_RECONNECT_CREDENTIALS",
+      message: "玩家会话无效，请重新连接"
+    });
+    try {
+      const paused = nightActionPaused();
+      if (paused) return ack(paused);
+      const payload = chatSendRequestSchema.parse(rawPayload);
+      const result = runtime.room.sendChat(playerId, payload);
+      ack(result);
+      if (result.ok) emitChatMessage(result.data);
+    } catch (error) {
+      ack(invalidRequest(error));
+    }
   });
 
   socket.on("seer:inspect", (rawPayload, ack) => {

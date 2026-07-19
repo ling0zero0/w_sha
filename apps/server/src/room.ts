@@ -1,4 +1,6 @@
 import {
+  botKindSchema,
+  chatModeSchema,
   hostLobbyViewSchema,
   nicknameSchema,
   playerSessionSchema,
@@ -6,6 +8,11 @@ import {
   roleConfigurationSchema,
   roleSchema,
   roomCodeSchema,
+  type BotKind,
+  type ChatChannel,
+  type ChatMessage,
+  type ChatMode,
+  type ChatSendRequest,
   type HostLobbyView,
   type JoinLobbyRequest,
   type LobbyPlayer,
@@ -42,7 +49,7 @@ interface InternalPlayer extends LobbyPlayer {
   seerInspectedPlayerId: PlayerId | null;
   witchAntidoteAvailable: boolean;
   witchPoisonAvailable: boolean;
-  lastWolfMessageAtMs: number | null;
+  lastChatMessageAtMs: number | null;
   alive: boolean;
   dayVoteTarget: DayVoteTarget;
   dayVoteConfirmed: boolean;
@@ -65,13 +72,55 @@ interface RoomOptions {
   joinToken?: string;
   snapshot?: LobbyRoomSnapshot;
   deferCompletedStages?: boolean;
+  chatPersistence?: RoomChatPersistence;
+}
+
+export type ChatHistoryReader =
+  | { kind: "host" }
+  | { kind: "player"; playerId: PlayerId };
+
+export interface RoomChatPersistence {
+  createSession(input: {
+    id: string;
+    roomCode: string;
+    startedAt: string;
+    roleConfiguration: RoleConfiguration;
+    chatMode: ChatMode;
+  }): void;
+  getSession?(sessionId: string): {
+    id: string;
+    roomCode: string;
+    startedAt: string;
+    roleConfiguration: RoleConfiguration;
+    chatMode: ChatMode;
+  } | null;
+  finishSession(
+    sessionId: string,
+    input: {
+      endedAt: string;
+      outcome: "good-win" | "wolf-win" | "draw" | "terminated";
+    }
+  ): void;
+  appendMessage(sessionId: string, message: ChatMessage): void;
+  importMessages(sessionId: string, messages: ChatMessage[]): void;
+  loadRecentForRecovery(sessionId: string, limit?: number): ChatMessage[];
+  queryAfter(
+    sessionId: string,
+    reader: { kind: "host" } | { kind: "player"; canReadWolfPrivate: boolean },
+    afterSequence: number,
+    limit: number
+  ): {
+    messages: ChatMessage[];
+    latestSequence: number;
+    hasMore: boolean;
+  };
 }
 
 export type TimedStage = "role-reveal" | "wolf" | "seer" | "guard" | "witch" | "hunter" | "dawn"
   | "last-words" | "day-speech" | "day-vote" | "exile-result";
 
 export interface LobbyRoomSnapshot {
-  version: 1;
+  version: 1 | 2;
   roomCode: string;
   joinToken: string;
   revision: number;
@@ -81,7 +130,11 @@ export interface LobbyRoomSnapshot {
   wolfAttackTargetId: PlayerId | null;
   witchActionSubmitted: boolean;
   dawnDeathIds: PlayerId[];
-  wolfMessages: WolfChatMessage[];
+  chatMessages?: ChatMessage[];
+  chatSequence?: number;
+  gameSessionId?: string | null;
+  gameSessionStartedAt?: string | null;
+  wolfMessages?: WolfChatMessage[];
   speechOrderIds: PlayerId[];
   currentSpeakerIndex: number;
   dayVoteResult: Array<{ voterId: PlayerId; targetId: PlayerId | null }> | null;
@@ -95,11 +148,20 @@ export interface LobbyRoomSnapshot {
   hunterShotPlayerId?: PlayerId | null;
   hunterActionSubmitted?: boolean;
   revealedIdiotId?: PlayerId | null;
+  chatMode?: ChatMode;
   dayNumber: number;
   gameOutcome: "good-win" | "wolf-win" | "draw" | "terminated" | null;
   gameRecords: GameRecord[];
   roleConfiguration: RoleConfiguration;
-  players: Array<Omit<InternalPlayer, "socketId" | "reconnectTokenHash"> & { reconnectTokenHash: string }>;
+  players: Array<
+    Omit<InternalPlayer, "socketId" | "reconnectTokenHash" | "controller" | "botKind">
+    & {
+      reconnectTokenHash: string;
+      lastWolfMessageAtMs?: number | null;
+      controller?: "human" | "bot";
+      botKind?: BotKind | null;
+    }
+  >;
 }
 
 const failures = {
@@ -235,7 +297,10 @@ export class LobbyRoom {
   private wolfAttackTargetId: PlayerId | null = null;
   private witchActionSubmitted = false;
   private dawnDeathIds: PlayerId[] = [];
-  private wolfMessages: WolfChatMessage[] = [];
+  private chatMessages: ChatMessage[] = [];
+  private chatSequence = 0;
+  private gameSessionId: string | null = null;
+  private gameSessionStartedAt: string | null = null;
   private speechOrderIds: PlayerId[] = [];
   private currentSpeakerIndex = -1;
   private dayVoteResult: Array<{ voterId: PlayerId; targetId: PlayerId | null }> | null = null;
@@ -249,10 +314,12 @@ export class LobbyRoom {
   private hunterShotPlayerId: PlayerId | null = null;
   private hunterActionSubmitted = false;
   private revealedIdiotId: PlayerId | null = null;
+  private chatMode: ChatMode = "ordered";
   private dayNumber = 1;
   private gameOutcome: "good-win" | "wolf-win" | "draw" | "terminated" | null = null;
   private gameRecords: GameRecord[] = [];
   private deferCompletedStages: boolean;
+  private readonly chatPersistence: RoomChatPersistence | null;
   private roleConfiguration: RoleConfiguration = {
     wolf: 0,
     villager: 0,
@@ -267,6 +334,7 @@ export class LobbyRoom {
     this.localAddress = options.localAddress;
     this.webPort = options.webPort;
     this.deferCompletedStages = options.deferCompletedStages ?? false;
+    this.chatPersistence = options.chatPersistence ?? null;
     const snapshot = options.snapshot;
     this.roomCode = roomCodeSchema.parse(snapshot?.roomCode ?? options.roomCode ?? createRoomCode());
     this.joinToken = snapshot?.joinToken ?? options.joinToken ?? createJoinToken();
@@ -275,7 +343,7 @@ export class LobbyRoom {
 
   createSnapshot(): LobbyRoomSnapshot {
     return {
-      version: 1,
+      version: 2,
       roomCode: this.roomCode,
       joinToken: this.joinToken,
       revision: this.revision,
@@ -285,7 +353,12 @@ export class LobbyRoom {
       wolfAttackTargetId: this.wolfAttackTargetId,
       witchActionSubmitted: this.witchActionSubmitted,
       dawnDeathIds: [...this.dawnDeathIds],
-      wolfMessages: this.wolfMessages.map((message) => ({ ...message })),
+      ...(this.chatPersistence
+        ? {}
+        : { chatMessages: this.chatMessages.map((message) => ({ ...message })) }),
+      chatSequence: this.chatSequence,
+      gameSessionId: this.gameSessionId,
+      gameSessionStartedAt: this.gameSessionStartedAt,
       speechOrderIds: [...this.speechOrderIds],
       currentSpeakerIndex: this.currentSpeakerIndex,
       dayVoteResult: this.dayVoteResult?.map((ballot) => ({ ...ballot })) ?? null,
@@ -299,6 +372,7 @@ export class LobbyRoom {
       hunterShotPlayerId: this.hunterShotPlayerId,
       hunterActionSubmitted: this.hunterActionSubmitted,
       revealedIdiotId: this.revealedIdiotId,
+      chatMode: this.chatMode,
       dayNumber: this.dayNumber,
       gameOutcome: this.gameOutcome,
       gameRecords: this.gameRecords.map((record) => ({ ...record })),
@@ -319,12 +393,55 @@ export class LobbyRoom {
     return `http://${this.localAddress}:${this.webPort}/join/${this.roomCode}?t=${token}`;
   }
 
+  getGameSessionId(): string | null {
+    return this.gameSessionId;
+  }
+
+  getChatHistory(
+    reader: ChatHistoryReader,
+    afterSequence: number,
+    limit: number
+  ): RoomActionResult<{
+    sessionId: string;
+    messages: ChatMessage[];
+    latestSequence: number;
+    hasMore: boolean;
+  }> {
+    if (!this.gameSessionId) return failures.invalidPhaseControl();
+    const storeReader = reader.kind === "host"
+      ? reader
+      : {
+          kind: "player" as const,
+          canReadWolfPrivate: this.players.some(
+            (player) => player.id === reader.playerId
+              && player.role === "wolf"
+              && player.alive
+              && player.connection !== "departed"
+          )
+        };
+    if (reader.kind === "player" && !this.players.some(
+      (player) => player.id === reader.playerId && player.connection !== "departed"
+    )) return failures.playerNotFound();
+
+    const page = this.chatPersistence
+      ? this.chatPersistence.queryAfter(this.gameSessionId, storeReader, afterSequence, limit)
+      : this.queryInMemoryChatHistory(storeReader, afterSequence, limit);
+    return {
+      ok: true,
+      data: {
+        sessionId: this.gameSessionId,
+        ...page
+      }
+    };
+  }
+
   getHostView(): HostLobbyView {
     return hostLobbyViewSchema.parse({
       phase: this.phase,
       roomCode: this.roomCode,
       revision: this.revision,
       players: this.publicPlayers(),
+      chatMode: this.chatMode,
       revealedIdiotId: this.revealedIdiotId,
       joinUrl: this.getJoinUrl(),
       localAddress: this.localAddress,
@@ -343,7 +460,11 @@ export class LobbyRoom {
         })
       } : null,
       dayState: this.getPublicDayState(),
-      gameResult: this.getGameResult()
+      gameResult: this.getGameResult(),
+      publicChat: {
+        canSend: false,
+        messages: this.getPublicChatMessages()
+      }
     });
   }
 
@@ -355,6 +476,7 @@ export class LobbyRoom {
       roomCode: this.roomCode,
       revision: this.revision,
       players: this.publicPlayers(),
+      chatMode: this.chatMode,
       revealedIdiotId: this.revealedIdiotId,
       selfId: playerId,
       privateRole: player.role ? {
@@ -376,7 +498,7 @@ export class LobbyRoom {
         confirmed: player.wolfVoteConfirmed,
         locked: this.wolfVoteLocked,
         chatEnabled: this.nightStage === "wolf" && !this.wolfVoteLocked,
-        messages: this.wolfMessages
+        messages: this.getChannelMessages("wolf-private")
       } : null,
       seerAction: this.phase === "first-night" && player.role === "seer" && player.alive ? {
         active: this.nightStage === "seer",
@@ -441,7 +563,11 @@ export class LobbyRoom {
         target: player.dayVoteTarget,
         confirmed: player.dayVoteConfirmed
       } : null,
-      gameResult: this.getGameResult()
+      gameResult: this.getGameResult(),
+      publicChat: {
+        canSend: this.canSendPublicChat(player),
+        messages: this.getPublicChatMessages()
+      }
     });
   }
 
@@ -463,6 +589,8 @@ export class LobbyRoom {
       number: this.players.length + 1,
       nickname,
       connection: "online",
+      controller: "human",
+      botKind: null,
       socketId,
       reconnectTokenHash: hashReconnectToken(reconnectToken),
       role: null,
@@ -472,7 +600,7 @@ export class LobbyRoom {
       seerInspectedPlayerId: null,
       witchAntidoteAvailable: true,
       witchPoisonAvailable: true,
-      lastWolfMessageAtMs: null,
+      lastChatMessageAtMs: null,
       alive: true,
       dayVoteTarget: null,
       dayVoteConfirmed: false,
@@ -483,15 +611,53 @@ export class LobbyRoom {
     return { ok: true, data: this.createSession(player.id, reconnectToken) };
   }
 
+  addBot(nicknameInput: string, botKindInput: BotKind): RoomActionResult<HostLobbyView> {
+    if (this.phase !== "lobby") return failures.gameAlreadyStarted();
+    const nickname = nicknameSchema.parse(nicknameInput);
+    const botKind = botKindSchema.parse(botKindInput);
+    if (this.players.some((player) => player.nickname.toLocaleLowerCase() === nickname.toLocaleLowerCase())) {
+      return failures.nicknameTaken();
+    }
+
+    this.players.push({
+      id: randomUUID(),
+      number: this.players.length + 1,
+      nickname,
+      connection: "online",
+      controller: "bot",
+      botKind,
+      socketId: null,
+      reconnectTokenHash: hashReconnectToken(createReconnectToken()),
+      role: null,
+      roleConfirmed: false,
+      wolfVoteTarget: null,
+      wolfVoteConfirmed: false,
+      seerInspectedPlayerId: null,
+      witchAntidoteAvailable: true,
+      witchPoisonAvailable: true,
+      lastChatMessageAtMs: null,
+      alive: true,
+      dayVoteTarget: null,
+      dayVoteConfirmed: false,
+      idiotRevealed: false
+    });
+    this.revision += 1;
+    return { ok: true, data: this.getHostView() };
+  }
+
   reconnect(input: ReconnectPlayerRequest, socketId: string): RoomActionResult<ReconnectOutcome> {
     const player = this.players.find((candidate) => candidate.id === input.playerId);
     if (
       input.roomCode !== this.roomCode
       || !player
+      || player.controller === "bot"
       || player.connection === "departed"
       || !tokenMatches(input.reconnectToken, player.reconnectTokenHash)
     ) {
       return failures.invalidReconnectCredentials();
+    }
+    if (this.players.some((candidate) => candidate.id !== player.id && candidate.socketId === socketId)) {
+      return failures.alreadyJoined();
     }
 
     const replacedSocketId = player.socketId && player.socketId !== socketId ? player.socketId : null;
@@ -529,12 +695,18 @@ export class LobbyRoom {
     if (input.roomCode !== this.roomCode || input.joinToken !== this.joinToken) {
       return failures.invalidCredentials();
     }
+    if (
+      this.players.some((player) => player.socketId === socketId)
+      || this.takeoverRequests.some((request) => request.socketId === socketId)
+    ) return failures.alreadyJoined();
 
     const nickname = nicknameSchema.parse(input.nickname);
     const player = this.players.find(
       (candidate) => candidate.nickname.toLocaleLowerCase() === nickname.toLocaleLowerCase()
     );
-    if (!player || player.connection === "departed") return failures.playerNotFound();
+    if (!player || player.controller === "bot" || player.connection === "departed") {
+      return failures.playerNotFound();
+    }
     if (this.takeoverRequests.some((request) => request.playerId === player.id)) {
       return failures.takeoverAlreadyPending();
     }
@@ -554,6 +726,10 @@ export class LobbyRoom {
   resolveTakeover(requestId: string, approved: boolean): RoomActionResult<TakeoverResolution> {
     const index = this.takeoverRequests.findIndex((request) => request.id === requestId);
     if (index < 0) return failures.takeoverRequestNotFound();
+    const pendingRequest = this.takeoverRequests[index]!;
+    if (approved && this.players.some(
+      (candidate) => candidate.id !== pendingRequest.playerId && candidate.socketId === pendingRequest.socketId
+    )) return failures.alreadyJoined();
     const [request] = this.takeoverRequests.splice(index, 1);
     const player = this.players.find((candidate) => candidate.id === request!.playerId);
     if (!player || player.connection === "departed") return failures.playerNotFound();
@@ -612,6 +788,13 @@ export class LobbyRoom {
   updateRoleConfiguration(configuration: RoleConfigurationInput): RoomActionResult<HostLobbyView> {
     if (this.phase !== "lobby") return failures.gameAlreadyStarted();
     this.roleConfiguration = roleConfigurationSchema.parse(configuration);
+    this.revision += 1;
+    return { ok: true, data: this.getHostView() };
+  }
+
+  updateChatMode(chatMode: ChatMode): RoomActionResult<HostLobbyView> {
+    if (this.phase !== "lobby") return failures.gameAlreadyStarted();
+    this.chatMode = chatModeSchema.parse(chatMode);
     this.revision += 1;
     return { ok: true, data: this.getHostView() };
   }
@@ -688,11 +871,21 @@ export class LobbyRoom {
     return this.getHostView();
   }
 
-  startGame(): RoomActionResult<HostLobbyView> {
+  startGame(now = new Date()): RoomActionResult<HostLobbyView> {
     if (this.phase !== "lobby") return failures.gameAlreadyStarted();
     const participants = this.players.filter((player) => player.connection !== "departed");
     const readiness = evaluateStartReadiness(this.roleConfiguration, participants.length);
     if (!readiness.ready) return failures.gameNotReady();
+
+    const gameSessionId = randomUUID();
+    const gameSessionStartedAt = now.toISOString();
+    this.chatPersistence?.createSession({
+      id: gameSessionId,
+      roomCode: this.roomCode,
+      startedAt: gameSessionStartedAt,
+      roleConfiguration: { ...this.roleConfiguration },
+      chatMode: this.chatMode
+    });
 
     const roles = roleSchema.array().parse(Object.entries(this.roleConfiguration)
       .flatMap(([role, count]) => Array.from({ length: count }, () => role)));
@@ -708,7 +901,7 @@ export class LobbyRoom {
       player.seerInspectedPlayerId = null;
       player.witchAntidoteAvailable = true;
       player.witchPoisonAvailable = true;
-      player.lastWolfMessageAtMs = null;
+      player.lastChatMessageAtMs = null;
       player.alive = true;
       player.dayVoteTarget = null;
       player.dayVoteConfirmed = false;
@@ -722,7 +915,10 @@ export class LobbyRoom {
     this.wolfAttackTargetId = null;
     this.witchActionSubmitted = false;
     this.dawnDeathIds = [];
-    this.wolfMessages = [];
+    this.chatMessages = [];
+    this.chatSequence = 0;
+    this.gameSessionId = gameSessionId;
+    this.gameSessionStartedAt = gameSessionStartedAt;
     this.speechOrderIds = [];
     this.currentSpeakerIndex = -1;
     this.dayVoteResult = null;
@@ -784,38 +980,73 @@ export class LobbyRoom {
     input: WolfSendMessageRequest,
     now = new Date()
   ): RoomActionResult<PlayerLobbyView> {
-    const player = this.getActiveWolf(playerId);
-    if (!player || this.wolfVoteLocked) return failures.invalidNightAction();
-    if (player.lastWolfMessageAtMs !== null && now.getTime() - player.lastWolfMessageAtMs < 1_000) {
+    const content = input.kind === "target-suggestion"
+      ? { kind: input.kind, target: input.target } as const
+      : input;
+    const result = this.sendChat(playerId, { channel: "wolf-private", content }, now);
+    if (!result.ok) return result;
+    return { ok: true, data: this.getPlayerView(playerId)! };
+  }
+
+  sendChat(
+    playerId: PlayerId,
+    input: ChatSendRequest,
+    now = new Date()
+  ): RoomActionResult<ChatMessage> {
+    const player = this.players.find((candidate) => candidate.id === playerId);
+    if (!player || player.connection === "departed") return failures.playerNotFound();
+    if (input.channel === "wolf-private") {
+      if (!this.getActiveWolf(playerId) || this.wolfVoteLocked) return failures.invalidNightAction();
+    } else if (!this.canSendPublicChat(player)) {
+      return failures.invalidPhaseControl();
+    }
+    if (player.lastChatMessageAtMs !== null && now.getTime() - player.lastChatMessageAtMs < 1_000) {
       return failures.chatRateLimited();
     }
 
-    let text: string;
-    let target: { id: PlayerId; number: number; nickname: string } | null = null;
-    if (input.kind === "text") {
-      text = input.text;
-    } else if (input.kind === "quick") {
-      text = input.code === "agree" ? "赞同" : input.code === "disagree" ? "反对" : "建议空刀";
-    } else {
-      target = this.toNightCandidate(input.target);
+    let content: ChatMessage["content"];
+    if ("target" in input.content) {
+      const targetId = input.content.target;
+      const target = this.toNightCandidate(targetId);
       if (!target || !this.players.some(
-        (candidate) => candidate.id === input.target && candidate.connection !== "departed"
+        (candidate) => candidate.id === targetId && candidate.connection !== "departed"
       )) return failures.playerNotFound();
-      text = `建议选择 ${target.number} 号${target.nickname}`;
+      content = { kind: "target-suggestion", target };
+    } else {
+      content = input.content;
     }
 
-    this.wolfMessages.push({
+    const nextSequence = this.chatSequence + 1;
+    const message: ChatMessage = {
       id: randomUUID(),
-      sender: { id: player.id, number: player.number, nickname: player.nickname },
-      kind: input.kind,
-      text,
-      target,
+      sequence: nextSequence,
+      channel: input.channel,
+      day: this.dayNumber,
+      phase: this.phase,
+      sender: {
+        kind: "player",
+        id: player.id,
+        number: player.number,
+        nickname: player.nickname
+      },
+      content,
       createdAt: now.toISOString()
-    });
-    this.wolfMessages = this.wolfMessages.slice(-100);
-    player.lastWolfMessageAtMs = now.getTime();
+    };
+    if (!this.gameSessionId) return failures.invalidPhaseControl();
+    this.chatPersistence?.appendMessage(this.gameSessionId, message);
+    this.chatSequence = nextSequence;
+    this.chatMessages.push(message);
+    this.chatMessages = this.chatMessages.slice(-300);
+    player.lastChatMessageAtMs = now.getTime();
     this.revision += 1;
-    return { ok: true, data: this.getPlayerView(playerId)! };
+    return { ok: true, data: message };
+  }
+
+  getChatRecipientIds(channel: ChatChannel): PlayerId[] {
+    if (channel === "day-public" || channel === "system") return this.getPlayerIds();
+    return this.players
+      .filter((player) => player.role === "wolf" && player.alive && player.connection !== "departed")
+      .map((player) => player.id);
   }
 
   inspectAsSeer(playerId: PlayerId, targetId: PlayerId): RoomActionResult<PlayerLobbyView> {
@@ -981,6 +1212,13 @@ export class LobbyRoom {
       && this.speechOrderIds[this.currentSpeakerIndex] === playerId;
   }
 
+  private canSendPublicChat(player: InternalPlayer): boolean {
+    if (player.connection === "departed") return false;
+    if (this.phase === "last-words") return this.isCurrentSpeaker(player.id);
+    if (this.phase !== "day-speech" || !player.alive) return false;
+    return this.chatMode === "open" || this.isCurrentSpeaker(player.id);
+  }
+
   isTimedStageComplete(): boolean {
     const stage = this.getTimedStage();
     if (!stage) return false;
@@ -1123,12 +1361,19 @@ export class LobbyRoom {
     return this.players.map((player) => player.id);
   }
 
+  getBotSeats(): Array<{ playerId: PlayerId; botKind: BotKind }> {
+    return this.players.flatMap((player) => player.controller === "bot" && player.botKind
+      ? [{ playerId: player.id, botKind: player.botKind }]
+      : []);
+  }
+
   getSocketId(playerId: PlayerId): string | null {
     return this.players.find((player) => player.id === playerId)?.socketId ?? null;
   }
 
-  terminateGame(): RoomActionResult<HostLobbyView> {
+  terminateGame(now = new Date()): RoomActionResult<HostLobbyView> {
     if (this.phase === "lobby" || this.phase === "game-over") return failures.invalidPhaseControl();
+    this.finishCurrentSession("terminated", now);
     this.gameOutcome = "terminated";
     this.phase = "game-over";
     this.revision += 1;
@@ -1151,7 +1396,7 @@ export class LobbyRoom {
       seerInspectedPlayerId: _seerInspectedPlayerId,
       witchAntidoteAvailable: _witchAntidoteAvailable,
       witchPoisonAvailable: _witchPoisonAvailable,
-      lastWolfMessageAtMs: _lastWolfMessageAtMs,
+      lastChatMessageAtMs: _lastChatMessageAtMs,
       dayVoteTarget: _dayVoteTarget,
       dayVoteConfirmed: _dayVoteConfirmed,
       idiotRevealed: _idiotRevealed,
@@ -1284,6 +1529,37 @@ export class LobbyRoom {
     return player ? { id: player.id, number: player.number, nickname: player.nickname } : null;
   }
 
+  private getChannelMessages(channel: ChatChannel): ChatMessage[] {
+    return this.chatMessages.filter((message) => message.channel === channel).slice(-100);
+  }
+
+  private getPublicChatMessages(): ChatMessage[] {
+    return this.chatMessages
+      .filter((message) => message.channel === "day-public" || message.channel === "system")
+      .slice(-100);
+  }
+
+  private queryInMemoryChatHistory(
+    reader: { kind: "host" } | { kind: "player"; canReadWolfPrivate: boolean },
+    afterSequence: number,
+    limit: number
+  ): {
+    messages: ChatMessage[];
+    latestSequence: number;
+    hasMore: boolean;
+  } {
+    const readable = this.chatMessages.filter((message) => {
+      if (message.channel === "day-public" || message.channel === "system") return true;
+      return reader.kind === "player" && reader.canReadWolfPrivate;
+    });
+    const remaining = readable.filter((message) => message.sequence > afterSequence);
+    return {
+      messages: remaining.slice(0, limit),
+      latestSequence: this.chatSequence,
+      hasMore: remaining.length > limit
+    };
+  }
+
   private getPublicDayState() {
     if (!["dawn", "last-words", "day-speech", "day-vote", "exile-result"].includes(this.phase)) return null;
     const currentId = this.currentSpeakerIndex >= 0 ? this.speechOrderIds[this.currentSpeakerIndex] : null;
@@ -1409,7 +1685,6 @@ export class LobbyRoom {
     this.wolfAttackTargetId = null;
     this.witchActionSubmitted = false;
     this.dawnDeathIds = [];
-    this.wolfMessages = [];
     this.speechOrderIds = [];
     this.currentSpeakerIndex = -1;
     this.dayVoteResult = null;
@@ -1426,7 +1701,7 @@ export class LobbyRoom {
       player.wolfVoteTarget = null;
       player.wolfVoteConfirmed = false;
       player.seerInspectedPlayerId = null;
-      player.lastWolfMessageAtMs = null;
+      player.lastChatMessageAtMs = null;
       player.dayVoteTarget = null;
       player.dayVoteConfirmed = false;
     }
@@ -1464,10 +1739,23 @@ export class LobbyRoom {
   }
 
   private evaluateWinner(): void {
+    if (this.gameOutcome) return;
     const outcome = evaluateGameOutcome(this.players);
     if (!outcome) return;
+    this.finishCurrentSession(outcome, new Date());
     this.gameOutcome = outcome;
     this.phase = "game-over";
+  }
+
+  private finishCurrentSession(
+    outcome: "good-win" | "wolf-win" | "draw" | "terminated",
+    now: Date
+  ): void {
+    if (!this.gameSessionId) return;
+    this.chatPersistence?.finishSession(this.gameSessionId, {
+      outcome,
+      endedAt: now.toISOString()
+    });
   }
 
   private getGameResult() {
@@ -1492,7 +1780,10 @@ export class LobbyRoom {
     this.wolfAttackTargetId = null;
     this.witchActionSubmitted = false;
     this.dawnDeathIds = [];
-    this.wolfMessages = [];
+    this.chatMessages = [];
+    this.chatSequence = 0;
+    this.gameSessionId = null;
+    this.gameSessionStartedAt = null;
     this.speechOrderIds = [];
     this.currentSpeakerIndex = -1;
     this.dayVoteResult = null;
@@ -1512,7 +1803,7 @@ export class LobbyRoom {
       player.wolfVoteTarget = null;
       player.wolfVoteConfirmed = false;
       player.seerInspectedPlayerId = null;
-      player.lastWolfMessageAtMs = null;
+      player.lastChatMessageAtMs = null;
       player.dayVoteTarget = null;
       player.dayVoteConfirmed = false;
       player.idiotRevealed = false;
@@ -1524,7 +1815,7 @@ export class LobbyRoom {
   }
 
   private restoreSnapshot(snapshot: LobbyRoomSnapshot): void {
-    if (snapshot.version !== 1) throw new Error("unsupported room snapshot version");
+    if (snapshot.version !== 1 && snapshot.version !== 2) throw new Error("unsupported room snapshot version");
     this.revision = snapshot.revision;
     this.phase = snapshot.phase;
     this.nightStage = snapshot.nightStage;
@@ -1532,7 +1823,65 @@ export class LobbyRoom {
     this.wolfAttackTargetId = snapshot.wolfAttackTargetId;
     this.witchActionSubmitted = snapshot.witchActionSubmitted;
     this.dawnDeathIds = [...snapshot.dawnDeathIds];
-    this.wolfMessages = snapshot.wolfMessages.map((message) => ({ ...message }));
+    this.roleConfiguration = roleConfigurationSchema.parse(snapshot.roleConfiguration);
+    this.chatMode = chatModeSchema.parse(snapshot.chatMode);
+    const snapshotMessages = snapshot.chatMessages?.map((message) => ({ ...message })) ?? (
+      snapshot.wolfMessages?.map((message, index) => ({
+        id: message.id,
+        sequence: index + 1,
+        channel: "wolf-private" as const,
+        day: snapshot.dayNumber,
+        phase: "first-night" as const,
+        sender: { kind: "player" as const, ...message.sender },
+        content: message.kind === "target-suggestion" && message.target
+          ? { kind: "target-suggestion" as const, target: message.target }
+          : message.kind === "quick"
+            ? {
+                kind: "quick" as const,
+                code: message.text === "赞同"
+                  ? "agree" as const
+                  : message.text === "反对"
+                    ? "disagree" as const
+                    : "no-kill" as const
+              }
+            : { kind: "text" as const, text: message.text },
+        createdAt: message.createdAt
+      })) ?? []
+    );
+    this.gameSessionId = snapshot.gameSessionId
+      ?? (snapshot.phase === "lobby" ? null : randomUUID());
+    const existingSession = this.gameSessionId
+      ? this.chatPersistence?.getSession?.(this.gameSessionId) ?? null
+      : null;
+    this.gameSessionStartedAt = snapshot.gameSessionStartedAt
+      ?? existingSession?.startedAt
+      ?? snapshotMessages[0]?.createdAt
+      ?? (this.gameSessionId ? new Date().toISOString() : null);
+    if (this.chatPersistence && this.gameSessionId) {
+      this.chatPersistence.createSession({
+        id: this.gameSessionId,
+        roomCode: snapshot.roomCode,
+        startedAt: this.gameSessionStartedAt!,
+        roleConfiguration: { ...this.roleConfiguration },
+        chatMode: this.chatMode
+      });
+      if (snapshotMessages.length > 0) {
+        this.chatPersistence.importMessages(this.gameSessionId, snapshotMessages);
+      }
+      this.chatMessages = this.chatPersistence.loadRecentForRecovery(this.gameSessionId, 300);
+      if (snapshot.gameOutcome) {
+        this.chatPersistence.finishSession(this.gameSessionId, {
+          outcome: snapshot.gameOutcome,
+          endedAt: new Date().toISOString()
+        });
+      }
+    } else {
+      this.chatMessages = snapshotMessages;
+    }
+    this.chatSequence = Math.max(
+      snapshot.chatSequence ?? 0,
+      this.chatMessages.reduce((maximum, message) => Math.max(maximum, message.sequence), 0)
+    );
     this.speechOrderIds = [...snapshot.speechOrderIds];
     this.currentSpeakerIndex = snapshot.currentSpeakerIndex;
     this.dayVoteResult = snapshot.dayVoteResult?.map((ballot) => ({ ...ballot })) ?? null;
@@ -1551,14 +1900,21 @@ export class LobbyRoom {
     this.dayNumber = snapshot.dayNumber;
     this.gameOutcome = snapshot.gameOutcome;
     this.gameRecords = snapshot.gameRecords.map((record) => ({ ...record }));
-    this.roleConfiguration = roleConfigurationSchema.parse(snapshot.roleConfiguration);
-    this.players = snapshot.players.map((player) => ({
-      ...player,
-      idiotRevealed: player.idiotRevealed ?? false,
-      socketId: null,
-      connection: player.connection === "departed" ? "departed" : "offline",
-      reconnectTokenHash: Buffer.from(player.reconnectTokenHash, "base64")
-    }));
+    this.players = snapshot.players.map(({ lastWolfMessageAtMs, ...player }) => {
+      const controller = player.controller ?? "human";
+      return {
+        ...player,
+        controller,
+        botKind: controller === "bot" ? player.botKind ?? "deterministic" : null,
+        lastChatMessageAtMs: player.lastChatMessageAtMs ?? lastWolfMessageAtMs ?? null,
+        idiotRevealed: player.idiotRevealed ?? false,
+        socketId: null,
+        connection: player.connection === "departed"
+          ? "departed"
+          : controller === "bot" ? "online" : "offline",
+        reconnectTokenHash: Buffer.from(player.reconnectTokenHash, "base64")
+      };
+    });
   }
 
   private reconcileUnavailablePlayer(playerId: PlayerId): void {

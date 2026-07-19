@@ -11,7 +11,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { PhaseClock } from "./phase-clock.js";
 import { LobbyRoom } from "./room.js";
 import type { PlayerDeparture } from "./room.js";
-import type { LobbyRoomSnapshot } from "./room.js";
+import type { LobbyRoomSnapshot, RoomChatPersistence } from "./room.js";
 
 interface RuntimeOptions {
   localAddress: string;
@@ -20,10 +20,11 @@ interface RuntimeOptions {
   joinToken?: string;
   hostSession?: string;
   snapshot?: GameRuntimeSnapshot;
+  chatPersistence?: RoomChatPersistence;
 }
 
 export interface GameRuntimeSnapshot {
-  version: 1;
+  version: 1 | 2;
   room: LobbyRoomSnapshot;
   publicRevision: number;
   interventions: PublicHostIntervention[];
@@ -48,8 +49,19 @@ export class GameRuntime {
 
   constructor(options: RuntimeOptions) {
     const roomOptions = options.snapshot
-      ? { localAddress: options.localAddress, webPort: options.webPort, snapshot: options.snapshot.room }
-      : { localAddress: options.localAddress, webPort: options.webPort, ...options.roomCode ? { roomCode: options.roomCode } : {}, ...options.joinToken ? { joinToken: options.joinToken } : {} };
+      ? {
+          localAddress: options.localAddress,
+          webPort: options.webPort,
+          snapshot: options.snapshot.room,
+          ...(options.chatPersistence ? { chatPersistence: options.chatPersistence } : {})
+        }
+      : {
+          localAddress: options.localAddress,
+          webPort: options.webPort,
+          ...(options.chatPersistence ? { chatPersistence: options.chatPersistence } : {}),
+          ...options.roomCode ? { roomCode: options.roomCode } : {},
+          ...options.joinToken ? { joinToken: options.joinToken } : {}
+        };
     this.room = new LobbyRoom(roomOptions);
     this.hostSession = options.hostSession ?? randomBytes(32).toString("base64url");
     if (options.snapshot) {
@@ -63,7 +75,7 @@ export class GameRuntime {
 
   createSnapshot(nowMs = Date.now()): GameRuntimeSnapshot {
     return {
-      version: 1,
+      version: 2,
       room: this.room.createSnapshot(),
       publicRevision: this.publicRevision,
       interventions: this.getPublicInterventions(),

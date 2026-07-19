@@ -4,6 +4,7 @@ import {
   ArrowDown,
   ArrowRight,
   ArrowUp,
+  Bot,
   Check,
   CircleAlert,
   Copy,
@@ -24,6 +25,9 @@ import { RoleConfigurationPanel } from "./RoleConfigurationPanel";
 import { useHostLobby } from "./useHostLobby";
 import { Brand, HostConnectionStatus, InterventionNotices, PhaseClockDisplay } from "../shared/AppChrome";
 import { QrCode } from "../shared/QrCode";
+import { ChatTimeline } from "../shared/ChatTimeline";
+import { BotBadge } from "../shared/BotBadge";
+import { HostBotControls } from "./HostBotControls";
 
 export function HostScreen() {
   const {
@@ -35,6 +39,7 @@ export function HostScreen() {
     refreshJoin,
     movePlayer,
     removePlayer,
+    addBot,
     correctPlayerLife,
     resolveTakeover,
     pausePhase,
@@ -43,6 +48,7 @@ export function HostScreen() {
     forceEndPhase,
     skipNightPhase,
     updateRoleConfiguration,
+    updateChatMode,
     startGame,
     continueFromDawn,
     continueFromExile,
@@ -101,7 +107,14 @@ export function HostScreen() {
 
         {game ? (
           <section className="host-phase-panel" aria-label="阶段控制">
-            <PhaseClockDisplay clock={game.clock} />
+            <div className="host-phase-summary">
+              <PhaseClockDisplay clock={game.clock} />
+              {lobby ? (
+                <span className={`chat-mode-status mode-${lobby.chatMode}`}>
+                  {lobby.chatMode === "open" ? "自由讨论" : "有序发言"}
+                </span>
+              ) : null}
+            </div>
             <div className="phase-controls">
               <button type="button" onClick={pausePhase} disabled={socket !== "connected" || game.clock.status !== "running"}>
                 <Pause size={16} aria-hidden="true" />暂停
@@ -147,9 +160,11 @@ export function HostScreen() {
         {lobby?.phase === "lobby" ? (
           <RoleConfigurationPanel
             configuration={lobby.roleConfiguration}
+            chatMode={lobby.chatMode}
             readiness={lobby.startReadiness}
             connected={socket === "connected"}
             onChange={updateRoleConfiguration}
+            onChatModeChange={updateChatMode}
             onStart={startGame}
           />
         ) : null}
@@ -204,6 +219,13 @@ export function HostScreen() {
                     : "等待流程推进"}</h2>
             </div>
             {lobby.phase === "day-vote" ? <p>票型将在全员确认后统一公开</p> : null}
+            <section className="host-chat-log" aria-label="公开文字发言">
+              <header>
+                <strong>公开文字发言</strong>
+                <small>{lobby.chatMode === "open" ? "自由讨论" : "有序发言"} · {lobby.publicChat.messages.length} 条</small>
+              </header>
+              <ChatTimeline messages={lobby.publicChat.messages} emptyText="本局还没有公开文字发言。" />
+            </section>
             {lobby.phase === "exile-result" && lobby.dayState.voteResult ? (
               <div className="host-ballots">
                 {lobby.dayState.voteResult.ballots.map((ballot) => (
@@ -219,7 +241,11 @@ export function HostScreen() {
         ) : null}
 
         {lobby?.phase === "game-over" && lobby.gameResult ? (
-          <GameOverPanel result={lobby.gameResult} hostActions={{ playAgain, returnToLobby }} />
+          <GameOverPanel
+            result={lobby.gameResult}
+            publicMessages={lobby.publicChat.messages}
+            hostActions={{ playAgain, returnToLobby }}
+          />
         ) : null}
 
         {lobby ? (
@@ -282,6 +308,14 @@ export function HostScreen() {
                 </div>
               ) : null}
 
+              {lobby.phase === "lobby" ? (
+                <HostBotControls
+                  players={lobby.players}
+                  connected={socket === "connected"}
+                  onAddBot={addBot}
+                />
+              ) : null}
+
               <div className="roster-list">
                 {lobby.players.length === 0 ? (
                   <div className="empty-roster">
@@ -291,10 +325,14 @@ export function HostScreen() {
                 ) : lobby.players.map((player, index) => (
                   <article className="roster-row" key={player.id} data-testid="host-player">
                     <span className="seat-number">{String(player.number).padStart(2, "0")}</span>
-                    <span className="player-name">{player.nickname}</span>
-                    <span className={`presence presence-${player.connection}`}>
+                    <span className="player-name">
+                      <span className="player-name-text">{player.nickname}</span>
+                      {player.controller === "bot" ? <BotBadge /> : null}
+                    </span>
+                    <span className={`presence ${player.controller === "bot" ? "presence-bot" : `presence-${player.connection}`}`}>
                       <i />{
                         !player.alive ? "死亡"
+                          : player.controller === "bot" ? "自动控制"
                           : player.connection === "online" ? "在线"
                           : player.connection === "reconnecting" ? "重连中"
                             : player.connection === "departed" ? "已离场" : "离线"
@@ -329,7 +367,9 @@ export function HostScreen() {
               </div>
 
               <footer className="roster-footer">
-                <ShieldCheck size={17} aria-hidden="true" />
+                {lobby.players.some((player) => player.controller === "bot")
+                  ? <Bot size={17} aria-hidden="true" />
+                  : <ShieldCheck size={17} aria-hidden="true" />}
                 {lobby.phase === "lobby" ? "开局前不会分配或显示任何身份" : "公共屏不会显示任何玩家身份"}
               </footer>
             </section>

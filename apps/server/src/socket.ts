@@ -1,5 +1,7 @@
 import {
+  chatHistoryRequestSchema,
   clientPingSchema,
+  type ChatMessage,
   type ClientToServerEvents,
   type PlayerId,
   type RoomActionFailure,
@@ -9,9 +11,16 @@ import type { FastifyBaseLogger } from "fastify";
 import type { Server as HttpServer } from "node:http";
 import { Server } from "socket.io";
 import { createServiceStatus } from "./app.js";
+import { executeBotIntent } from "./bot-executor.js";
+import { BotManager } from "./bot-manager.js";
 import type { GameRuntime } from "./runtime.js";
 import type { TimedStage } from "./room.js";
-import type { GameSocketServer, SocketData, SocketHandlerContext } from "./socket/context.js";
+import {
+  invalidRequest,
+  type GameSocketServer,
+  type SocketData,
+  type SocketHandlerContext
+} from "./socket/context.js";
 import { registerHostHandlers } from "./socket/host-handlers.js";
 import { registerPlayerHandlers } from "./socket/player-handlers.js";
 
@@ -50,6 +59,7 @@ export function attachSocketServer(
     cors: { origin: true, credentials: false }
   });
   const offlineTimers = new Map<PlayerId, NodeJS.Timeout>();
+  let botManager: BotManager | null = null;
   let phaseTimer: NodeJS.Timeout | null = null;
   let scheduledStageKey: string | null = runtime.isPhasePaused() ? runtime.room.getTimedStageKey() : null;
 
@@ -127,6 +137,7 @@ export function attachSocketServer(
       const view = runtime.room.getPlayerView(playerId);
       if (view) io.to(`player:${playerId}`).emit("player:state", view);
     }
+    botManager?.notify();
   }
 
   function emitHostLobbyView(): void {
@@ -143,19 +154,58 @@ export function attachSocketServer(
     }
   }
 
+  function emitChatMessage(message: ChatMessage): void {
+    persistSnapshot();
+    if (message.channel === "day-public" || message.channel === "system") {
+      io.to("host").emit("chat:message", message);
+    }
+    for (const playerId of runtime.room.getChatRecipientIds(message.channel)) {
+      io.to(`player:${playerId}`).emit("chat:message", message);
+    }
+    botManager?.notify();
+  }
+
   const handlerContext: SocketHandlerContext = {
     automaticPhaseProgression,
     io,
     runtime,
     clearOfflineTimer,
     clearPhaseTimer,
+    emitChatMessage,
     emitHostLobbyView,
     emitLobbyViews,
     emitPublicGameState,
     nightActionPaused,
+    notifyBots: (force = false) => botManager?.notify(force),
     schedulePhaseTimeout,
     syncPhaseClock
   };
+
+  botManager = new BotManager({
+    room: runtime.room,
+    execute: (playerId, intent, expectedRevision) => {
+      const result = executeBotIntent(
+        runtime.room,
+        playerId,
+        intent,
+        expectedRevision,
+        runtime.isPhasePaused()
+      );
+      if (!result.accepted) return false;
+      if (result.chatMessage) emitChatMessage(result.chatMessage);
+      syncPhaseClock();
+      emitLobbyViews();
+      emitPublicGameState();
+      return true;
+    },
+    onError: (error, playerId) => {
+      logger.warn({ error, playerId }, "bot decision failed");
+    }
+  });
+  botManager.notify();
+  server.once("close", () => {
+    void botManager?.dispose();
+  });
 
   io.on("connection", (socket) => {
     socket.data.isHost = socket.handshake.auth.hostSession === runtime.hostSession;
@@ -175,6 +225,28 @@ export function attachSocketServer(
         return;
       }
       socket.emit("system:pong", { sentAt: result.data.sentAt, receivedAt: Date.now() });
+    });
+
+    socket.on("chat:history", (rawPayload, ack) => {
+      if (typeof ack !== "function") return;
+      try {
+        const payload = chatHistoryRequestSchema.parse(rawPayload);
+        const reader = socket.data.isHost
+          ? { kind: "host" as const }
+          : socket.data.playerId
+            ? { kind: "player" as const, playerId: socket.data.playerId }
+            : null;
+        if (!reader) {
+          return ack({
+            ok: false,
+            code: "INVALID_RECONNECT_CREDENTIALS",
+            message: "玩家会话无效，请重新连接"
+          });
+        }
+        ack(runtime.room.getChatHistory(reader, payload.afterSequence, payload.limit));
+      } catch (error) {
+        ack(invalidRequest(error));
+      }
     });
 
     registerPlayerHandlers(socket, handlerContext);

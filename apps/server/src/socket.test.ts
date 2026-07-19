@@ -1,4 +1,5 @@
 import {
+  type ChatMessage,
   type ClientToServerEvents,
   type HostLobbyView,
   type PlayerLobbyView,
@@ -10,6 +11,7 @@ import type { AddressInfo } from "node:net";
 import { io as createClient, type Socket } from "socket.io-client";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildServer } from "./app.js";
+import { ChatStore } from "./chat-store.js";
 import type { ServerConfig } from "./config.js";
 import { GameRuntime } from "./runtime.js";
 import { attachSocketServer } from "./socket.js";
@@ -105,12 +107,14 @@ async function startRuntime(
   automaticPhaseProgression = false,
   stageTimingOverrides: Parameters<typeof attachSocketServer>[5] = {}
 ) {
+  const chatStore = new ChatStore(":memory:");
   const runtime = new GameRuntime({
     localAddress: "192.168.1.20",
     webPort: 5173,
     roomCode: "123456",
     joinToken: "abcdefghijklmnopqrstuvwxyz123456",
-    hostSession: "zyxwvutsrqponmlkjihgfedcba654321"
+    hostSession: "zyxwvutsrqponmlkjihgfedcba654321",
+    chatPersistence: chatStore
   });
   const app = buildServer(config, runtime);
   const io = attachSocketServer(
@@ -126,6 +130,7 @@ async function startRuntime(
   cleanups.push(async () => {
     io.close();
     await app.close();
+    chatStore.close();
   });
   return { runtime, url: `http://127.0.0.1:${address.port}` };
 }
@@ -165,6 +170,120 @@ describe("lobby socket integration", () => {
     const result = await player.emitWithAck("host:refresh-join");
 
     expect(result).toMatchObject({ ok: false, code: "INVALID_HOST_SESSION" });
+  });
+
+  it("authorizes and validates chat mode updates only before the game starts", async () => {
+    const { url } = await startRuntime();
+    const host = connect(url, { hostSession: "zyxwvutsrqponmlkjihgfedcba654321" });
+    await waitForHostState(host);
+    const player = connect(url);
+    const joined = await player.emitWithAck("player:join", {
+      roomCode: "123456",
+      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+      nickname: "Chat Tester"
+    });
+    if (!joined.ok) throw new Error("test setup failed");
+
+    expect(await player.emitWithAck("host:update-chat-mode", { chatMode: "open" })).toMatchObject({
+      ok: false,
+      code: "INVALID_HOST_SESSION"
+    });
+
+    const playerUpdate = waitForPlayerState(player);
+    expect(await host.emitWithAck("host:update-chat-mode", { chatMode: "open" })).toMatchObject({
+      ok: true,
+      data: { chatMode: "open" }
+    });
+    expect(await playerUpdate).toMatchObject({ chatMode: "open" });
+
+    const unsafeHost = host as unknown as {
+      emitWithAck: (event: string, payload: unknown) => Promise<unknown>;
+    };
+    expect(await unsafeHost.emitWithAck("host:update-chat-mode", { chatMode: "free" })).toMatchObject({
+      ok: false,
+      code: "INVALID_REQUEST"
+    });
+
+    for (const nickname of ["Second", "Third"]) {
+      const extraPlayer = connect(url);
+      const extraJoin = await extraPlayer.emitWithAck("player:join", {
+        roomCode: "123456",
+        joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+        nickname
+      });
+      if (!extraJoin.ok) throw new Error("test setup failed");
+    }
+    await host.emitWithAck("host:update-role-configuration", {
+      wolf: 1,
+      villager: 1,
+      seer: 1,
+      witch: 0,
+      guard: 0,
+      hunter: 0,
+      idiot: 0
+    });
+    expect(await host.emitWithAck("host:start-game")).toMatchObject({ ok: true });
+    expect(await host.emitWithAck("host:update-chat-mode", { chatMode: "ordered" })).toMatchObject({
+      ok: false,
+      code: "GAME_ALREADY_STARTED"
+    });
+  });
+
+  it("lets only the host add validated deterministic bot seats in the lobby", async () => {
+    const { url } = await startRuntime();
+    const host = connect(url, { hostSession: "zyxwvutsrqponmlkjihgfedcba654321" });
+    await waitForHostState(host);
+    const player = connect(url);
+
+    expect(await player.emitWithAck("host:add-bot", {
+      nickname: "Unauthorized Bot",
+      botKind: "deterministic"
+    })).toMatchObject({ ok: false, code: "INVALID_HOST_SESSION" });
+
+    expect(await host.emitWithAck("host:add-bot", {
+      nickname: "Atlas",
+      botKind: "deterministic"
+    })).toMatchObject({
+      ok: true,
+      data: {
+        players: [
+          expect.objectContaining({
+            nickname: "Atlas",
+            controller: "bot",
+            botKind: "deterministic"
+          })
+        ]
+      }
+    });
+
+    const unsafeHost = host as unknown as {
+      emitWithAck: (event: string, payload: unknown) => Promise<unknown>;
+    };
+    expect(await unsafeHost.emitWithAck("host:add-bot", {
+      nickname: "Invalid Bot",
+      botKind: "remote"
+    })).toMatchObject({ ok: false, code: "INVALID_REQUEST" });
+
+    for (const nickname of ["Beacon", "Cipher"]) {
+      expect(await host.emitWithAck("host:add-bot", {
+        nickname,
+        botKind: "deterministic"
+      })).toMatchObject({ ok: true });
+    }
+    await host.emitWithAck("host:update-role-configuration", {
+      wolf: 1,
+      villager: 1,
+      seer: 1,
+      witch: 0,
+      guard: 0,
+      hunter: 0,
+      idiot: 0
+    });
+    expect(await host.emitWithAck("host:start-game")).toMatchObject({ ok: true });
+    expect(await host.emitWithAck("host:add-bot", {
+      nickname: "Late Bot",
+      botKind: "deterministic"
+    })).toMatchObject({ ok: false, code: "GAME_ALREADY_STARTED" });
   });
 
   it("ignores events without acknowledgements without mutating the room", async () => {
@@ -215,6 +334,51 @@ describe("lobby socket integration", () => {
     });
     expect(runtime.room.getHostView().players).toHaveLength(1);
     expect(runtime.room.getHostView().players[0]?.connection).toBe("online");
+  });
+
+  it("keeps each socket bound to at most one player seat", async () => {
+    const { url } = await startRuntime();
+    const firstSocket = connect(url);
+    const first = await firstSocket.emitWithAck("player:join", {
+      roomCode: "123456",
+      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+      nickname: "林野"
+    });
+    const secondSocket = connect(url);
+    const second = await secondSocket.emitWithAck("player:join", {
+      roomCode: "123456",
+      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+      nickname: "阿岚"
+    });
+    if (!first.ok || !second.ok) throw new Error("test setup failed");
+
+    expect(await firstSocket.emitWithAck("player:reconnect", second.data.credentials)).toMatchObject({
+      ok: false,
+      code: "ALREADY_JOINED"
+    });
+    expect(await firstSocket.emitWithAck("player:request-takeover", {
+      roomCode: "123456",
+      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+      nickname: "阿岚"
+    })).toMatchObject({
+      ok: false,
+      code: "ALREADY_JOINED"
+    });
+
+    const pendingSocket = connect(url);
+    expect(await pendingSocket.emitWithAck("player:request-takeover", {
+      roomCode: "123456",
+      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+      nickname: "林野"
+    })).toMatchObject({ ok: true });
+    expect(await pendingSocket.emitWithAck("player:join", {
+      roomCode: "123456",
+      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+      nickname: "青禾"
+    })).toMatchObject({
+      ok: false,
+      code: "ALREADY_JOINED"
+    });
   });
 
   it("lets the host approve a new device and revokes the old credential", async () => {
@@ -697,7 +861,7 @@ describe("lobby socket integration", () => {
     expect(JSON.stringify(publicHostView)).not.toMatch(/wolfAction|seerAction|witchAction|"target"|"candidates"/);
   });
 
-  it("broadcasts wolf chat only inside private wolf views", async () => {
+  it("routes generic wolf chat only to living wolf sockets and blocks it while paused", async () => {
     const { runtime, url } = await startRuntime();
     const host = connect(url, { hostSession: "zyxwvutsrqponmlkjihgfedcba654321" });
     await waitForHostState(host);
@@ -717,21 +881,352 @@ describe("lobby socket integration", () => {
     for (const player of players) await player.emitWithAck("player:confirm-role");
     const wolfIndexes = roles.flatMap((view, index) => view.privateRole?.role === "wolf" ? [index] : []);
     const nonWolfIndex = roles.findIndex((view) => view.privateRole?.role !== "wolf");
-
-    expect(await players[nonWolfIndex]!.emitWithAck("wolf:send-message", {
-      kind: "text",
-      text: "越权消息"
-    })).toMatchObject({ ok: false, code: "INVALID_NIGHT_ACTION" });
-    const sent = await players[wolfIndexes[0]!]!.emitWithAck("wolf:send-message", {
-      kind: "text",
-      text: "今晚统一目标"
+    const hostMessages: ChatMessage[] = [];
+    const playerMessages = players.map(() => [] as ChatMessage[]);
+    host.on("chat:message", (message) => hostMessages.push(message));
+    players.forEach((player, index) => {
+      player.on("chat:message", (message) => playerMessages[index]!.push(message));
     });
-    expect(sent).toMatchObject({ ok: true, data: { wolfAction: { messages: [
-      expect.objectContaining({ text: "今晚统一目标" })
-    ] } } });
+
+    expect(await players[nonWolfIndex]!.emitWithAck("chat:send", {
+      channel: "wolf-private",
+      content: { kind: "text", text: "越权消息" }
+    })).toMatchObject({ ok: false, code: "INVALID_NIGHT_ACTION" });
+    await host.emitWithAck("host:pause-phase");
+    expect(await players[wolfIndexes[0]!]!.emitWithAck("chat:send", {
+      channel: "wolf-private",
+      content: { kind: "text", text: "暂停期间消息" }
+    })).toMatchObject({ ok: false, code: "INVALID_PHASE_CONTROL" });
+    await host.emitWithAck("host:resume-phase");
+
+    const sent = await players[wolfIndexes[0]!]!.emitWithAck("chat:send", {
+      channel: "wolf-private",
+      content: { kind: "text", text: "今晚统一目标" }
+    });
+    expect(sent).toMatchObject({
+      ok: true,
+      data: {
+        channel: "wolf-private",
+        content: { kind: "text", text: "今晚统一目标" }
+      }
+    });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(hostMessages).toEqual([]);
+    expect(playerMessages[nonWolfIndex]).toEqual([]);
+    for (const wolfIndex of wolfIndexes) {
+      expect(playerMessages[wolfIndex]).toContainEqual(expect.objectContaining({
+        channel: "wolf-private",
+        content: { kind: "text", text: "今晚统一目标" }
+      }));
+    }
     expect(JSON.stringify(runtime.room.getHostView())).not.toContain("今晚统一目标");
     expect(JSON.stringify(runtime.room.getPlayerView(roles[nonWolfIndex]!.selfId))).not.toContain("今晚统一目标");
     expect(JSON.stringify(runtime.room.getPlayerView(roles[wolfIndexes[1]!]!.selfId))).toContain("今晚统一目标");
+  });
+
+  it("rejects dead wolf chat and isolates wolf-private delivery from the dead wolf socket", async () => {
+    const { url } = await startRuntime();
+    const host = connect(url, { hostSession: "zyxwvutsrqponmlkjihgfedcba654321" });
+    await waitForHostState(host);
+    const players = [connect(url), connect(url), connect(url), connect(url), connect(url)];
+    for (const [index, player] of players.entries()) {
+      const joined = await player.emitWithAck("player:join", {
+        roomCode: "123456",
+        joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+        nickname: ["林野", "阿岚", "青禾", "南星", "石川"][index]!
+      });
+      if (!joined.ok) throw new Error("test setup failed");
+    }
+    await host.emitWithAck("host:update-role-configuration", {
+      wolf: 2,
+      villager: 2,
+      seer: 1,
+      witch: 0
+    });
+    const roleUpdates = players.map((player) => waitForPlayerState(player));
+    await host.emitWithAck("host:start-game");
+    const roles = await Promise.all(roleUpdates);
+    for (const player of players) await player.emitWithAck("player:confirm-role");
+
+    const wolfIndexes = roles.flatMap((view, index) => view.privateRole?.role === "wolf" ? [index] : []);
+    const deadWolfIndex = wolfIndexes[0]!;
+    const livingWolfIndex = wolfIndexes[1]!;
+    expect(wolfIndexes).toHaveLength(2);
+    expect(await host.emitWithAck("host:correct-player-life", {
+      playerId: roles[deadWolfIndex]!.selfId,
+      alive: false
+    })).toMatchObject({
+      ok: true,
+      data: {
+        phase: "first-night",
+        players: expect.arrayContaining([
+          expect.objectContaining({ id: roles[deadWolfIndex]!.selfId, alive: false })
+        ])
+      }
+    });
+
+    const hostMessages: ChatMessage[] = [];
+    const playerMessages = players.map(() => [] as ChatMessage[]);
+    host.on("chat:message", (message) => hostMessages.push(message));
+    players.forEach((player, index) => {
+      player.on("chat:message", (message) => playerMessages[index]!.push(message));
+    });
+
+    expect(await players[deadWolfIndex]!.emitWithAck("chat:send", {
+      channel: "wolf-private",
+      content: { kind: "text", text: "死亡狼人不应发送" }
+    })).toMatchObject({ ok: false, code: "INVALID_NIGHT_ACTION" });
+    expect(await players[livingWolfIndex]!.emitWithAck("chat:send", {
+      channel: "wolf-private",
+      content: { kind: "text", text: "仅存活狼人可见" }
+    })).toMatchObject({
+      ok: true,
+      data: {
+        channel: "wolf-private",
+        sender: { id: roles[livingWolfIndex]!.selfId },
+        content: { kind: "text", text: "仅存活狼人可见" }
+      }
+    });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    expect(hostMessages).toEqual([]);
+    expect(playerMessages[deadWolfIndex]).toEqual([]);
+    expect(playerMessages[livingWolfIndex]).toContainEqual(expect.objectContaining({
+      channel: "wolf-private",
+      content: { kind: "text", text: "仅存活狼人可见" }
+    }));
+    for (const [index, messages] of playerMessages.entries()) {
+      if (index !== livingWolfIndex && index !== deadWolfIndex) expect(messages).toEqual([]);
+    }
+  });
+
+  it("authorizes chat history by current reader state and paginates without leaking wolf chat", async () => {
+    const { runtime, url } = await startRuntime();
+    const host = connect(url, { hostSession: "zyxwvutsrqponmlkjihgfedcba654321" });
+    await waitForHostState(host);
+    const players = [connect(url), connect(url), connect(url), connect(url), connect(url)];
+    const sessions: PlayerSession[] = [];
+    for (const [index, player] of players.entries()) {
+      const joined = await player.emitWithAck("player:join", {
+        roomCode: "123456",
+        joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+        nickname: ["林野", "阿岚", "青禾", "南星", "石川"][index]!
+      });
+      if (!joined.ok) throw new Error("test setup failed");
+      sessions.push(joined.data);
+    }
+    await host.emitWithAck("host:update-role-configuration", {
+      wolf: 2,
+      villager: 2,
+      seer: 1,
+      witch: 0
+    });
+    const roleUpdates = players.map((player) => waitForPlayerState(player));
+    await host.emitWithAck("host:start-game");
+    const roles = await Promise.all(roleUpdates);
+    for (const player of players) await player.emitWithAck("player:confirm-role");
+    const wolfIndexes = roles.flatMap((view, index) => view.privateRole?.role === "wolf" ? [index] : []);
+    expect(wolfIndexes).toHaveLength(2);
+
+    for (const [index, text] of ["私聊一", "私聊二", "私聊三"].entries()) {
+      expect(runtime.room.sendChat(
+        roles[wolfIndexes[index % wolfIndexes.length]!]!.selfId,
+        { channel: "wolf-private", content: { kind: "text", text } },
+        new Date(`2026-07-19T10:00:0${index + 1}.000Z`)
+      )).toMatchObject({ ok: true, data: { sequence: index + 1 } });
+    }
+    expect(runtime.room.skipCurrentNightStage()).toMatchObject({ ok: true });
+    expect(runtime.room.skipCurrentNightStage()).toMatchObject({ ok: true, data: { phase: "dawn" } });
+    expect(runtime.room.continueFromDawn()).toMatchObject({ ok: true, data: { phase: "day-speech" } });
+    const speakerId = runtime.room.getHostView().dayState?.currentSpeaker?.id;
+    if (!speakerId) throw new Error("test setup failed");
+    expect(runtime.room.sendChat(
+      speakerId,
+      { channel: "day-public", content: { kind: "text", text: "公开记录" } },
+      new Date("2026-07-19T10:00:10.000Z")
+    )).toMatchObject({ ok: true, data: { sequence: 4 } });
+
+    const hostHistory = await host.emitWithAck("chat:history", {
+      afterSequence: 0,
+      limit: 100
+    });
+    expect(hostHistory).toMatchObject({
+      ok: true,
+      data: {
+        messages: [{
+          sequence: 4,
+          channel: "day-public",
+          content: { kind: "text", text: "公开记录" }
+        }],
+        latestSequence: 4,
+        hasMore: false
+      }
+    });
+    expect(JSON.stringify(hostHistory)).not.toContain("私聊");
+
+    const livingWolfIndex = wolfIndexes[1]!;
+    const firstPage = await players[livingWolfIndex]!.emitWithAck("chat:history", {
+      afterSequence: 0,
+      limit: 2
+    });
+    expect(firstPage).toMatchObject({
+      ok: true,
+      data: {
+        messages: [
+          { sequence: 1, channel: "wolf-private" },
+          { sequence: 2, channel: "wolf-private" }
+        ],
+        latestSequence: 2,
+        hasMore: true
+      }
+    });
+    const secondPage = await players[livingWolfIndex]!.emitWithAck("chat:history", {
+      afterSequence: 2,
+      limit: 2
+    });
+    expect(secondPage).toMatchObject({
+      ok: true,
+      data: {
+        messages: [
+          { sequence: 3, channel: "wolf-private" },
+          { sequence: 4, channel: "day-public" }
+        ],
+        latestSequence: 4,
+        hasMore: false
+      }
+    });
+
+    const deadWolfIndex = wolfIndexes[0]!;
+    expect(runtime.room.correctPlayerLife(roles[deadWolfIndex]!.selfId, false)).toMatchObject({
+      ok: true,
+      data: { player: { alive: false } }
+    });
+    const deadWolfHistory = await players[deadWolfIndex]!.emitWithAck("chat:history", {
+      afterSequence: 0,
+      limit: 100
+    });
+    expect(deadWolfHistory).toMatchObject({
+      ok: true,
+      data: {
+        messages: [{ sequence: 4, channel: "day-public" }],
+        latestSequence: 4,
+        hasMore: false
+      }
+    });
+    expect(JSON.stringify(deadWolfHistory)).not.toContain("私聊");
+    expect(sessions[deadWolfIndex]!.lobby.selfId).toBe(roles[deadWolfIndex]!.selfId);
+  });
+
+  it("rejects anonymous and malformed chat history requests", async () => {
+    const { url } = await startRuntime();
+    const anonymous = connect(url);
+    expect(await anonymous.emitWithAck("chat:history", {
+      afterSequence: 0,
+      limit: 100
+    })).toMatchObject({
+      ok: false,
+      code: "INVALID_RECONNECT_CREDENTIALS"
+    });
+
+    const host = connect(url, { hostSession: "zyxwvutsrqponmlkjihgfedcba654321" });
+    await waitForHostState(host);
+    expect(await host.emitWithAck("chat:history", {
+      afterSequence: -1,
+      limit: 101
+    } as never)).toMatchObject({
+      ok: false,
+      code: "INVALID_REQUEST"
+    });
+  });
+
+  it("accepts public chat only from the current speaker and broadcasts it to every participant", async () => {
+    const { runtime, url } = await startRuntime();
+    const host = connect(url, { hostSession: "zyxwvutsrqponmlkjihgfedcba654321" });
+    await waitForHostState(host);
+    const players = [connect(url), connect(url), connect(url)];
+    const sessions: PlayerSession[] = [];
+    for (const [index, player] of players.entries()) {
+      const joined = await player.emitWithAck("player:join", {
+        roomCode: "123456",
+        joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+        nickname: ["林野", "阿岚", "青禾"][index]!
+      });
+      if (!joined.ok) throw new Error("test setup failed");
+      sessions.push(joined.data);
+    }
+    expect(await host.emitWithAck("host:update-role-configuration", {
+      wolf: 1,
+      villager: 1,
+      seer: 0,
+      witch: 0,
+      hunter: 1
+    })).toMatchObject({ ok: true });
+    expect(await host.emitWithAck("host:start-game")).toMatchObject({ ok: true });
+    for (const player of players) {
+      expect(await player.emitWithAck("player:confirm-role")).toMatchObject({ ok: true });
+    }
+    expect(runtime.room.getHostView()).toMatchObject({
+      phase: "first-night",
+      roleConfirmation: { confirmed: 3, total: 3 }
+    });
+    expect(runtime.room.skipCurrentNightStage()).toMatchObject({
+      ok: true,
+      data: { phase: "dawn" }
+    });
+    expect(runtime.room.continueFromDawn()).toMatchObject({
+      ok: true,
+      data: {
+        phase: "day-speech",
+        dayState: {
+          currentSpeaker: expect.objectContaining({ id: expect.any(String) })
+        }
+      }
+    });
+
+    const currentSpeakerId = runtime.room.getHostView().dayState?.currentSpeaker?.id;
+    const currentIndex = sessions.findIndex((session) => session.lobby.selfId === currentSpeakerId);
+    const otherIndex = sessions.findIndex((_, index) => index !== currentIndex);
+    if (currentIndex < 0 || otherIndex < 0) throw new Error("test setup failed");
+
+    const hostMessages: ChatMessage[] = [];
+    const playerMessages = players.map(() => [] as ChatMessage[]);
+    host.on("chat:message", (message) => hostMessages.push(message));
+    players.forEach((player, index) => {
+      player.on("chat:message", (message) => playerMessages[index]!.push(message));
+    });
+
+    expect(await players[otherIndex]!.emitWithAck("chat:send", {
+      channel: "day-public",
+      content: { kind: "text", text: "抢先发言" }
+    })).toMatchObject({ ok: false, code: "INVALID_PHASE_CONTROL" });
+    expect(await players[currentIndex]!.emitWithAck("chat:send", {
+      channel: "day-public",
+      content: { kind: "text", text: "我的公开发言" }
+    })).toMatchObject({
+      ok: true,
+      data: {
+        channel: "day-public",
+        content: { kind: "text", text: "我的公开发言" }
+      }
+    });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    expect(hostMessages).toContainEqual(expect.objectContaining({
+      channel: "day-public",
+      content: { kind: "text", text: "我的公开发言" }
+    }));
+    for (const messages of playerMessages) {
+      expect(messages).toContainEqual(expect.objectContaining({
+        channel: "day-public",
+        content: { kind: "text", text: "我的公开发言" }
+      }));
+    }
+
+    await players[currentIndex]!.emitWithAck("player:finish-speaking");
+    expect(await players[currentIndex]!.emitWithAck("chat:send", {
+      channel: "day-public",
+      content: { kind: "text", text: "过期发言" }
+    })).toMatchObject({ ok: false, code: "INVALID_PHASE_CONTROL" });
   });
 
   it("starts the night clock, blocks paused actions, and lets the host skip", async () => {

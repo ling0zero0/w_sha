@@ -195,6 +195,76 @@ test("configures a guard and renders the empty role artwork safely", async ({ br
   }
 });
 
+test("host adds deterministic bots that complete a game through the public UI", async ({ page }) => {
+  test.setTimeout(30_000);
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "等待玩家加入" })).toBeVisible();
+
+  const botNickname = page.getByLabel("机器人昵称");
+  for (let index = 1; index <= 5; index += 1) {
+    await expect(botNickname).toHaveValue(`机器人 ${index}`);
+    await page.getByRole("button", { name: "添加", exact: true }).click();
+    await expect(page.getByTestId("host-player")).toHaveCount(index);
+  }
+
+  await expect(page.locator(".controller-badge")).toHaveCount(5);
+  for (const row of await page.getByTestId("host-player").all()) {
+    await expect(row).toContainText("自动控制");
+  }
+
+  await page.getByLabel("狼人数").fill("1");
+  await page.getByLabel("村民数量").fill("2");
+  await page.getByLabel("预言家数量").fill("1");
+  await page.getByLabel("女巫数量").fill("1");
+  await page.getByLabel("守卫数量").fill("0");
+  await page.getByLabel("猎人数量").fill("0");
+  await page.getByLabel("白痴数量").fill("0");
+  await expect(page.getByTestId("start-readiness")).toHaveText("配置就绪");
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "开始游戏" }).click();
+  await expect(page.getByRole("heading", { name: "玩家确认身份" })).toBeVisible();
+
+  for (const row of await page.getByTestId("host-player").all()) {
+    await expect(row).not.toContainText(/狼人|村民|预言家|女巫/);
+  }
+
+  let sawDawn = false;
+  const deadline = Date.now() + 20_000;
+  while (Date.now() < deadline) {
+    if (await page.locator(".game-over-panel").isVisible().catch(() => false)) break;
+
+    const dawnButton = page.getByRole("button", { name: "进入白天流程" });
+    if (await dawnButton.isVisible().catch(() => false)) {
+      sawDawn = true;
+      await dawnButton.click({ force: true, timeout: 500 }).catch(() => undefined);
+      continue;
+    }
+
+    const exileButton = page.getByRole("button", { name: /进入放逐遗言|进入下一夜/ });
+    if (await exileButton.isVisible().catch(() => false)) {
+      await exileButton.click({ force: true, timeout: 500 }).catch(() => undefined);
+      continue;
+    }
+
+    await page.waitForTimeout(50);
+  }
+
+  await expect(page.locator(".game-over-panel")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /好人胜利|狼人胜利/ })).toBeVisible();
+  await expect(page.locator(".revealed-roles article")).toHaveCount(5);
+  await expect(page.getByRole("heading", { name: "公开聊天复盘" })).toBeVisible();
+  await expect(page.getByText("我会根据当前公开信息参与讨论。", { exact: true }).first()).toBeVisible();
+  expect(sawDawn).toBe(true);
+
+  await page.getByRole("button", { name: "返回大厅调整" }).click();
+  await expect(page.getByRole("heading", { name: "等待玩家加入" })).toBeVisible();
+  for (let remaining = 5; remaining > 0; remaining -= 1) {
+    await page.getByTestId("host-player").last().getByTitle("移除玩家").click();
+    await expect(page.getByTestId("host-player")).toHaveCount(remaining - 1);
+  }
+});
+
 test("three mobile players complete a full game and start a clean rematch", async ({ browser, page }) => {
   test.setTimeout(60_000);
   await page.goto("/");
@@ -215,6 +285,8 @@ test("three mobile players complete a full game and start a clean rematch", asyn
     await page.getByLabel("猎人数量").fill("0");
     await page.getByLabel("白痴数量").fill("0");
     await expect(page.getByTestId("start-readiness")).toHaveText("配置就绪");
+    await page.getByRole("radio", { name: "自由讨论" }).click();
+    await expect(page.getByRole("radio", { name: "自由讨论" })).toHaveAttribute("aria-checked", "true");
 
     page.once("dialog", (dialog) => dialog.accept());
     await page.getByRole("button", { name: "开始游戏" }).click();
@@ -251,6 +323,7 @@ test("three mobile players complete a full game and start a clean rematch", asyn
     await villager.getByRole("button", { name: "收起身份" }).click();
     await expect(villager.getByAltText("身份牌背面")).toBeVisible();
     await expect(villager.getByAltText("村民身份牌")).toHaveCount(0);
+    const publicChatTexts = ["首位玩家的公开文字发言", "另一位玩家同时参与讨论"];
     for (let index = 0; index < players.length; index += 1) {
       const currentHeading = page.locator(".host-day-panel h2");
       await expect(currentHeading).toContainText("当前：");
@@ -258,8 +331,41 @@ test("three mobile players complete a full game and start a clean rematch", asyn
       const nickname = ["林野", "阿岚", "青禾"].find((name) => currentText?.includes(name));
       if (!nickname) throw new Error("无法识别当前发言玩家");
       const speaker = playerByNickname.get(nickname)!;
+
+      for (const player of players) {
+        await expect(player.getByLabel("公开发言内容")).toBeVisible();
+        if (player !== speaker) {
+          await expect(player.getByRole("button", { name: "结束我的发言" })).toHaveCount(0);
+        }
+      }
+      if (index === 0) {
+        const otherSpeaker = players.find((player) => player !== speaker)!;
+        await speaker.getByLabel("公开发言内容").fill(publicChatTexts[0]!);
+        await speaker.getByTitle("发送公开发言").click();
+        await otherSpeaker.getByLabel("公开发言内容").fill(publicChatTexts[1]!);
+        await otherSpeaker.getByTitle("发送公开发言").click();
+        await expect(page.getByLabel("公开文字发言").locator(".chat-message")).toHaveCount(2);
+        await expect(page.getByLabel("公开文字发言").locator(".chat-message").nth(0)).toContainText(publicChatTexts[0]!);
+        await expect(page.getByLabel("公开文字发言").locator(".chat-message").nth(1)).toContainText(publicChatTexts[1]!);
+        for (const player of players) {
+          for (const text of publicChatTexts) {
+            await expect(player.getByLabel("白天公开聊天").getByText(text, { exact: true })).toBeVisible();
+          }
+        }
+
+        await speaker.reload();
+        await expect(speaker.getByLabel("公开发言内容")).toBeVisible();
+        for (const text of publicChatTexts) {
+          await expect(speaker.getByLabel("白天公开聊天").getByText(text, { exact: true })).toBeVisible();
+        }
+      }
+
       await speaker.getByRole("button", { name: "结束我的发言" }).click();
-      if (index < players.length - 1) await expect(currentHeading).not.toHaveText(currentText ?? "");
+      await expect(speaker.getByLabel("公开发言内容")).toBeVisible();
+      await expect(speaker.getByRole("button", { name: "结束我的发言" })).toHaveCount(0);
+      if (index < players.length - 1) {
+        await expect(currentHeading).not.toHaveText(currentText ?? "");
+      }
     }
 
     await expect(page.getByRole("heading", { name: "放逐投票" })).toBeVisible();
@@ -277,9 +383,23 @@ test("three mobile players complete a full game and start a clean rematch", asyn
       await expect(client.getByRole("heading", { name: "好人胜利" })).toBeVisible();
       await expect(client.locator(".revealed-roles article")).toHaveCount(3);
       await expect(client.getByRole("heading", { name: "对局记录" })).toBeVisible();
+      await expect(client.getByRole("heading", { name: "公开聊天复盘" })).toBeVisible();
+      for (const text of publicChatTexts) {
+        await expect(client.getByText(text, { exact: true })).toBeVisible();
+      }
     }
-    await expect(villager.locator(".game-records")).toContainText("查验");
+    await expect(
+      villager.getByRole("heading", { name: "对局记录" }).locator("..")
+    ).toContainText("查验");
     await expect(wolf.getByRole("button", { name: "确认本次选择" })).toHaveCount(0);
+
+    await Promise.all([page.reload(), villager.reload()]);
+    await expect(page.getByRole("heading", { name: "公开聊天复盘" })).toBeVisible();
+    await expect(villager.getByRole("heading", { name: "公开聊天复盘" })).toBeVisible();
+    for (const text of publicChatTexts) {
+      await expect(page.getByText(text, { exact: true })).toBeVisible();
+      await expect(villager.getByText(text, { exact: true })).toBeVisible();
+    }
 
     await page.getByRole("button", { name: "再来一局" }).click();
     await expect(page.getByRole("heading", { name: "玩家确认身份" })).toBeVisible();

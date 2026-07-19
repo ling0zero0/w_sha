@@ -1,6 +1,7 @@
 import type {
   DayConfirmVoteRequest,
   DaySelectVoteRequest,
+  ChatSendRequest,
   GuardProtectRequest,
   HostAdjustPhaseTimeRequest,
   HostCorrectPlayerLifeRequest,
@@ -15,10 +16,17 @@ import type {
   WolfSelectTargetRequest,
   WolfSendMessageRequest
 } from "./actions.js";
+import type {
+  ChatHistoryPage,
+  ChatHistoryRequest,
+  ChatMessage
+} from "./chat.js";
+import type { HostAddBotRequest } from "./bot.js";
 import type { RoleConfigurationInput } from "./domain.js";
 import type { PublicGameState } from "./game.js";
 import type {
   HostLobbyView,
+  HostUpdateChatModeRequest,
   JoinLobbyRequest,
   PlayerLobbyView,
   PlayerSession,
@@ -34,17 +42,21 @@ export interface ClientToServerEvents {
   "player:reconnect": (payload: ReconnectPlayerRequest, ack: RoomActionAck<PlayerSession>) => void;
   "player:request-takeover": (payload: TakeoverPlayerRequest, ack: RoomActionAck<TakeoverReceipt>) => void;
   "host:refresh-join": (ack: RoomActionAck<HostLobbyView>) => void;
+  "host:add-bot": (payload: HostAddBotRequest, ack: RoomActionAck<HostLobbyView>) => void;
   "host:move-player": (payload: HostMovePlayerRequest, ack: RoomActionAck<HostLobbyView>) => void;
   "host:remove-player": (payload: HostPlayerRequest, ack: RoomActionAck<HostLobbyView>) => void;
   "host:depart-player": (payload: HostPlayerRequest, ack: RoomActionAck<HostLobbyView>) => void;
   "host:correct-player-life": (payload: HostCorrectPlayerLifeRequest, ack: RoomActionAck<HostLobbyView>) => void;
   "host:resolve-takeover": (payload: HostResolveTakeoverRequest, ack: RoomActionAck<HostLobbyView>) => void;
   "host:update-role-configuration": (payload: RoleConfigurationInput, ack: RoomActionAck<HostLobbyView>) => void;
+  "host:update-chat-mode": (payload: HostUpdateChatModeRequest, ack: RoomActionAck<HostLobbyView>) => void;
   "host:start-game": (ack: RoomActionAck<HostLobbyView>) => void;
   "player:confirm-role": (ack: RoomActionAck<PlayerLobbyView>) => void;
   "wolf:select-target": (payload: WolfSelectTargetRequest, ack: RoomActionAck<PlayerLobbyView>) => void;
   "wolf:confirm-vote": (payload: WolfConfirmVoteRequest, ack: RoomActionAck<PlayerLobbyView>) => void;
   "wolf:send-message": (payload: WolfSendMessageRequest, ack: RoomActionAck<PlayerLobbyView>) => void;
+  "chat:send": (payload: ChatSendRequest, ack: RoomActionAck<ChatMessage>) => void;
+  "chat:history": (payload: ChatHistoryRequest, ack: RoomActionAck<ChatHistoryPage>) => void;
   "seer:inspect": (payload: SeerInspectRequest, ack: RoomActionAck<PlayerLobbyView>) => void;
   "witch:submit-action": (payload: WitchSubmitActionRequest, ack: RoomActionAck<PlayerLobbyView>) => void;
   "guard:protect": (payload: GuardProtectRequest, ack: RoomActionAck<PlayerLobbyView>) => void;
@@ -70,6 +82,7 @@ export interface ServerToClientEvents {
   "host:state": (payload: HostLobbyView) => void;
   "player:state": (payload: PlayerLobbyView) => void;
   "game:public-state": (payload: PublicGameState) => void;
+  "chat:message": (payload: ChatMessage) => void;
   "player:removed": (payload: { message: string }) => void;
   "player:departed": (payload: { message: string }) => void;
   "player:session-replaced": (payload: { message: string }) => void;

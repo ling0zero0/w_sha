@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  chatHistoryPageSchema,
+  chatHistoryRequestSchema,
+  chatModeSchema,
+  chatMessageSchema,
+  chatSendRequestSchema,
   clientPingSchema,
+  gameSessionIdSchema,
   gameRecordSchema,
   guardProtectRequestSchema,
   hostAdjustPhaseTimeRequestSchema,
   hostCorrectPlayerLifeRequestSchema,
   hostLobbyViewSchema,
+  hostUpdateChatModeRequestSchema,
   hunterShootRequestSchema,
   joinLobbyRequestSchema,
   nicknameSchema,
@@ -33,6 +40,9 @@ const legacyRoleConfiguration: RoleConfigurationInput = {
 const updateRoleConfigurationPayload: Parameters<
   ClientToServerEvents["host:update-role-configuration"]
 >[0] = legacyRoleConfiguration;
+const updateChatModePayload: Parameters<
+  ClientToServerEvents["host:update-chat-mode"]
+>[0] = { chatMode: "open" };
 
 describe("shared transport schemas", () => {
   it("accepts the public service status", () => {
@@ -94,6 +104,7 @@ describe("shared transport schemas", () => {
     });
 
     expect(Object.keys(view)).not.toContain("joinToken");
+    expect(view.chatMode).toBe("ordered");
     expect(view.revealedIdiotId).toBeNull();
     expect(view.roleConfiguration).toEqual({
       wolf: 0,
@@ -104,6 +115,20 @@ describe("shared transport schemas", () => {
       hunter: 0,
       idiot: 0
     });
+  });
+
+  it("defaults chat mode and validates strict host updates", () => {
+    expect(chatModeSchema.parse(undefined)).toBe("ordered");
+    expect(chatModeSchema.parse("open")).toBe("open");
+    expect(hostUpdateChatModeRequestSchema.parse(updateChatModePayload)).toEqual({
+      chatMode: "open"
+    });
+    expect(hostUpdateChatModeRequestSchema.safeParse({}).success).toBe(false);
+    expect(hostUpdateChatModeRequestSchema.safeParse({
+      chatMode: "ordered",
+      extra: true
+    }).success).toBe(false);
+    expect(hostUpdateChatModeRequestSchema.safeParse({ chatMode: "free" }).success).toBe(false);
   });
 
   it("validates stable player reconnect credentials", () => {
@@ -284,6 +309,7 @@ describe("shared transport schemas", () => {
       roomCode: "123456",
       revision: 4,
       players: [],
+      chatMode: "open",
       revealedIdiotId: candidate.id,
       selfId,
       privateRole: null,
@@ -329,11 +355,245 @@ describe("shared transport schemas", () => {
     expect(view.dayState?.revealedIdiot?.id).toBe(candidate.id);
     expect(view.dayState?.hunterPending).toBe(true);
     expect(view.dayVote?.eligible).toBe(false);
+    expect(view.chatMode).toBe("open");
   });
 
   it("accepts records for every extended role action", () => {
     for (const type of ["guard-action", "hunter-shot", "idiot-reveal"] as const) {
       expect(gameRecordSchema.parse({ type, day: 1, detail: `${type} detail` }).type).toBe(type);
     }
+  });
+});
+
+describe("shared chat schemas", () => {
+  const playerId = "019bf178-7f24-7e40-b8dc-0c2dd948d5a7";
+  const targetId = "019bf178-7f24-7e40-b8dc-0c2dd948d5a8";
+  const sessionId = "019bf178-7f24-7e40-b8dc-0c2dd948d5aa";
+  const messageBase = {
+    id: "019bf178-7f24-7e40-b8dc-0c2dd948d5a9",
+    sequence: 1,
+    day: 1,
+    phase: "day-vote",
+    createdAt: "2026-07-19T04:00:00.000Z"
+  };
+
+  it("parses every chat channel, sender kind, and content kind", () => {
+    const messages = [
+      {
+        ...messageBase,
+        channel: "day-public",
+        sender: {
+          kind: "player",
+          id: playerId,
+          number: 1,
+          nickname: "Player 1"
+        },
+        content: { kind: "text", text: "  Public claim  " }
+      },
+      {
+        ...messageBase,
+        sequence: 2,
+        channel: "wolf-private",
+        sender: {
+          kind: "bot",
+          id: targetId,
+          number: 2,
+          nickname: "Bot 2"
+        },
+        content: { kind: "quick", code: "agree" }
+      },
+      {
+        ...messageBase,
+        sequence: 3,
+        channel: "wolf-private",
+        sender: {
+          kind: "player",
+          id: playerId,
+          number: 1,
+          nickname: "Player 1"
+        },
+        content: {
+          kind: "target-suggestion",
+          target: {
+            id: targetId,
+            number: 2,
+            nickname: "Player 2"
+          }
+        }
+      },
+      {
+        ...messageBase,
+        sequence: 4,
+        channel: "system",
+        sender: {
+          kind: "system",
+          label: "Moderator"
+        },
+        content: { kind: "system", text: "  Discussion started  " }
+      }
+    ];
+
+    const parsed = messages.map((message) => chatMessageSchema.parse(message));
+
+    expect(parsed.map((message) => [
+      message.channel,
+      message.sender.kind,
+      message.content.kind
+    ])).toEqual([
+      ["day-public", "player", "text"],
+      ["wolf-private", "bot", "quick"],
+      ["wolf-private", "player", "target-suggestion"],
+      ["system", "system", "system"]
+    ]);
+    expect(parsed[0]?.content).toEqual({ kind: "text", text: "Public claim" });
+    expect(parsed[3]?.content).toEqual({ kind: "system", text: "Discussion started" });
+  });
+
+  it("accepts only text content for day-public client messages", () => {
+    expect(chatSendRequestSchema.parse({
+      channel: "day-public",
+      content: { kind: "text", text: "  I am the seer  " }
+    })).toEqual({
+      channel: "day-public",
+      content: { kind: "text", text: "I am the seer" }
+    });
+
+    for (const content of [
+      { kind: "quick", code: "agree" },
+      { kind: "target-suggestion", target: targetId },
+      { kind: "system", text: "Injected notice" }
+    ]) {
+      expect(chatSendRequestSchema.safeParse({
+        channel: "day-public",
+        content
+      }).success).toBe(false);
+    }
+  });
+
+  it("accepts wolf-private text, quick replies, and target suggestions", () => {
+    expect(chatSendRequestSchema.parse({
+      channel: "wolf-private",
+      content: { kind: "text", text: ` ${"x".repeat(80)} ` }
+    }).content).toEqual({ kind: "text", text: "x".repeat(80) });
+
+    for (const code of ["agree", "disagree", "no-kill"] as const) {
+      expect(chatSendRequestSchema.parse({
+        channel: "wolf-private",
+        content: { kind: "quick", code }
+      }).content).toEqual({ kind: "quick", code });
+    }
+
+    expect(chatSendRequestSchema.parse({
+      channel: "wolf-private",
+      content: { kind: "target-suggestion", target: targetId }
+    }).content).toEqual({ kind: "target-suggestion", target: targetId });
+  });
+
+  it("rejects system client messages and invalid text boundaries", () => {
+    expect(chatSendRequestSchema.safeParse({
+      channel: "system",
+      content: { kind: "system", text: "Forged system message" }
+    }).success).toBe(false);
+
+    for (const request of [
+      { channel: "day-public", content: { kind: "text", text: "   " } },
+      { channel: "day-public", content: { kind: "text", text: "x".repeat(201) } },
+      { channel: "wolf-private", content: { kind: "text", text: "\t\n" } },
+      { channel: "wolf-private", content: { kind: "text", text: "x".repeat(81) } }
+    ]) {
+      expect(chatSendRequestSchema.safeParse(request).success).toBe(false);
+    }
+  });
+
+  it("rejects invalid wolf target suggestions", () => {
+    for (const target of [
+      "not-a-player-id",
+      null,
+      {
+        id: targetId,
+        number: 2,
+        nickname: "Player 2"
+      }
+    ]) {
+      expect(chatSendRequestSchema.safeParse({
+        channel: "wolf-private",
+        content: { kind: "target-suggestion", target }
+      }).success).toBe(false);
+    }
+  });
+
+  it("defaults chat history pagination without accepting authorization fields", () => {
+    expect(chatHistoryRequestSchema.parse({})).toEqual({
+      afterSequence: 0,
+      limit: 100
+    });
+
+    for (const request of [
+      { sessionId },
+      { channels: ["day-public"] },
+      { afterSequence: 0, limit: 100, extra: true }
+    ]) {
+      expect(chatHistoryRequestSchema.safeParse(request).success).toBe(false);
+    }
+  });
+
+  it("validates chat history pagination boundaries", () => {
+    expect(chatHistoryRequestSchema.parse({
+      afterSequence: 0,
+      limit: 1
+    })).toEqual({
+      afterSequence: 0,
+      limit: 1
+    });
+    expect(chatHistoryRequestSchema.parse({
+      afterSequence: Number.MAX_SAFE_INTEGER,
+      limit: 100
+    })).toEqual({
+      afterSequence: Number.MAX_SAFE_INTEGER,
+      limit: 100
+    });
+
+    for (const request of [
+      { afterSequence: -1 },
+      { afterSequence: 0.5 },
+      { limit: 0 },
+      { limit: 101 },
+      { limit: 1.5 }
+    ]) {
+      expect(chatHistoryRequestSchema.safeParse(request).success).toBe(false);
+    }
+  });
+
+  it("parses strict chat history pages", () => {
+    expect(gameSessionIdSchema.parse(sessionId)).toBe(sessionId);
+    expect(() => gameSessionIdSchema.parse("not-a-session-id")).toThrow();
+
+    const message = chatMessageSchema.parse({
+      ...messageBase,
+      channel: "day-public",
+      sender: {
+        kind: "player",
+        id: playerId,
+        number: 1,
+        nickname: "Player 1"
+      },
+      content: { kind: "text", text: "History message" }
+    });
+    const page = {
+      sessionId,
+      messages: [message],
+      latestSequence: 1,
+      hasMore: false
+    };
+
+    expect(chatHistoryPageSchema.parse(page)).toEqual(page);
+    expect(chatHistoryPageSchema.safeParse({
+      ...page,
+      latestSequence: -1
+    }).success).toBe(false);
+    expect(chatHistoryPageSchema.safeParse({
+      ...page,
+      extra: true
+    }).success).toBe(false);
   });
 });

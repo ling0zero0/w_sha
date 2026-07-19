@@ -6,8 +6,9 @@ import type {
   PrivateHunterAction,
   PrivateWitchAction,
   PrivateWolfAction,
-  WolfSendMessageRequest
+  ChatSendRequest
 } from "@werewolf/shared";
+import { ChatTimeline } from "../shared/ChatTimeline";
 
 export function GuardActionPanel({
   action,
@@ -184,7 +185,7 @@ export function WolfChatPanel({
 }: {
   action: PrivateWolfAction;
   paused: boolean;
-  onSend: (payload: WolfSendMessageRequest) => void;
+  onSend: (payload: ChatSendRequest) => void;
 }) {
   const [message, setMessage] = useState("");
 
@@ -192,29 +193,25 @@ export function WolfChatPanel({
     event.preventDefault();
     const text = message.trim();
     if (!text) return;
-    onSend({ kind: "text", text });
+    onSend({ channel: "wolf-private", content: { kind: "text", text } });
     setMessage("");
   }
 
   return (
     <section className="wolf-chat" aria-label="狼人私密聊天">
       <header><span>狼人私密协作</span><small>{paused ? "阶段已暂停" : action.chatEnabled ? "仅狼人可见" : "本夜聊天已关闭"}</small></header>
-      <div className="wolf-messages" aria-live="polite">
-        {action.messages.length === 0 ? <p>还没有消息，可以先发送快捷建议。</p> : action.messages.map((item) => (
-          <article key={item.id}>
-            <span>{item.sender.number} 号 · {item.sender.nickname}</span>
-            <p>{item.text}</p>
-          </article>
-        ))}
-      </div>
+      <ChatTimeline messages={action.messages} emptyText="还没有消息，可以先发送快捷建议。" className="wolf-messages" />
       <div className="wolf-quick-messages">
-        <button type="button" disabled={paused || !action.chatEnabled} onClick={() => onSend({ kind: "quick", code: "agree" })}>赞同</button>
-        <button type="button" disabled={paused || !action.chatEnabled} onClick={() => onSend({ kind: "quick", code: "disagree" })}>反对</button>
-        <button type="button" disabled={paused || !action.chatEnabled} onClick={() => onSend({ kind: "quick", code: "no-kill" })}>建议空刀</button>
+        <button type="button" disabled={paused || !action.chatEnabled} onClick={() => onSend({ channel: "wolf-private", content: { kind: "quick", code: "agree" } })}>赞同</button>
+        <button type="button" disabled={paused || !action.chatEnabled} onClick={() => onSend({ channel: "wolf-private", content: { kind: "quick", code: "disagree" } })}>反对</button>
+        <button type="button" disabled={paused || !action.chatEnabled} onClick={() => onSend({ channel: "wolf-private", content: { kind: "quick", code: "no-kill" } })}>建议空刀</button>
         <button
           type="button"
           disabled={paused || !action.chatEnabled || !action.target || action.target === "no-kill"}
-          onClick={() => action.target && action.target !== "no-kill" && onSend({ kind: "target-suggestion", target: action.target })}
+          onClick={() => action.target && action.target !== "no-kill" && onSend({
+            channel: "wolf-private",
+            content: { kind: "target-suggestion", target: action.target }
+          })}
         >建议当前目标</button>
       </div>
       <form className="wolf-chat-form" onSubmit={submit}>

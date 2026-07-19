@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  chatQuickContentSchema,
+  chatTargetSuggestionContentSchema,
+  chatTextContentSchema
+} from "./chat.js";
 import { playerIdSchema, wolfVoteTargetSchema } from "./domain.js";
 import { dayVoteTargetSchema } from "./game.js";
 
@@ -19,10 +24,10 @@ export const hostAdjustPhaseTimeRequestSchema = z.object({
 });
 export type HostAdjustPhaseTimeRequest = z.infer<typeof hostAdjustPhaseTimeRequestSchema>;
 
-export const wolfSelectTargetRequestSchema = z.object({ target: wolfVoteTargetSchema });
+export const wolfSelectTargetRequestSchema = z.object({ target: wolfVoteTargetSchema }).strict();
 export type WolfSelectTargetRequest = z.infer<typeof wolfSelectTargetRequestSchema>;
 
-export const wolfConfirmVoteRequestSchema = z.object({ confirmed: z.boolean() });
+export const wolfConfirmVoteRequestSchema = z.object({ confirmed: z.boolean() }).strict();
 export type WolfConfirmVoteRequest = z.infer<typeof wolfConfirmVoteRequestSchema>;
 
 export const wolfSendMessageRequestSchema = z.discriminatedUnion("kind", [
@@ -32,13 +37,29 @@ export const wolfSendMessageRequestSchema = z.discriminatedUnion("kind", [
 ]);
 export type WolfSendMessageRequest = z.infer<typeof wolfSendMessageRequestSchema>;
 
-export const seerInspectRequestSchema = z.object({ target: playerIdSchema });
+export const chatSendRequestSchema = z.discriminatedUnion("channel", [
+  z.object({
+    channel: z.literal("day-public"),
+    content: chatTextContentSchema
+  }).strict(),
+  z.object({
+    channel: z.literal("wolf-private"),
+    content: z.union([
+      chatTextContentSchema.extend({ text: z.string().trim().min(1).max(80) }),
+      chatQuickContentSchema,
+      chatTargetSuggestionContentSchema.pick({ kind: true }).extend({ target: playerIdSchema })
+    ])
+  }).strict()
+]);
+export type ChatSendRequest = z.infer<typeof chatSendRequestSchema>;
+
+export const seerInspectRequestSchema = z.object({ target: playerIdSchema }).strict();
 export type SeerInspectRequest = z.infer<typeof seerInspectRequestSchema>;
 
 export const witchSubmitActionRequestSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("none") }),
-  z.object({ action: z.literal("save") }),
-  z.object({ action: z.literal("poison"), target: playerIdSchema })
+  z.object({ action: z.literal("none") }).strict(),
+  z.object({ action: z.literal("save") }).strict(),
+  z.object({ action: z.literal("poison"), target: playerIdSchema }).strict()
 ]);
 export type WitchSubmitActionRequest = z.infer<typeof witchSubmitActionRequestSchema>;
 
@@ -48,10 +69,10 @@ export type GuardProtectRequest = z.infer<typeof guardProtectRequestSchema>;
 export const hunterShootRequestSchema = z.object({ target: playerIdSchema.nullable() }).strict();
 export type HunterShootRequest = z.infer<typeof hunterShootRequestSchema>;
 
-export const daySelectVoteRequestSchema = z.object({ target: dayVoteTargetSchema });
+export const daySelectVoteRequestSchema = z.object({ target: dayVoteTargetSchema }).strict();
 export type DaySelectVoteRequest = z.infer<typeof daySelectVoteRequestSchema>;
 
-export const dayConfirmVoteRequestSchema = z.object({ confirmed: z.boolean() });
+export const dayConfirmVoteRequestSchema = z.object({ confirmed: z.boolean() }).strict();
 export type DayConfirmVoteRequest = z.infer<typeof dayConfirmVoteRequestSchema>;
 
 export const roomErrorCodeSchema = z.enum([

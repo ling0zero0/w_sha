@@ -1,5 +1,7 @@
 import {
   playerCredentialsSchema,
+  type ChatMessage,
+  type ChatSendRequest,
   type ClientToServerEvents,
   type JoinLobbyRequest,
   type PlayerCredentials,
@@ -62,14 +64,175 @@ function clearCredentials(roomCode: string): void {
   window.localStorage.removeItem(storageKey(roomCode));
 }
 
+function appendMessage(messages: ChatMessage[], message: ChatMessage): ChatMessage[] {
+  return mergeMessages(messages, [message]);
+}
+
+function mergeMessages(current: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] {
+  const messages = new Map(current.map((message) => [message.id, message]));
+  for (const message of incoming) {
+    if (!messages.has(message.id)) messages.set(message.id, message);
+  }
+  return [...messages.values()].sort((left, right) => left.sequence - right.sequence);
+}
+
+function lastLobbySequence(lobby: PlayerLobbyView): number {
+  return [...lobby.publicChat.messages, ...(lobby.wolfAction?.messages ?? [])]
+    .reduce((latest, message) => Math.max(latest, message.sequence), 0);
+}
+
+function appendChatMessage(lobby: PlayerLobbyView, message: ChatMessage): PlayerLobbyView {
+  if (message.channel === "day-public" || message.channel === "system") {
+    return {
+      ...lobby,
+      publicChat: {
+        ...lobby.publicChat,
+        messages: appendMessage(lobby.publicChat.messages, message)
+      }
+    };
+  }
+  if (message.channel === "wolf-private" && lobby.wolfAction) {
+    return {
+      ...lobby,
+      wolfAction: {
+        ...lobby.wolfAction,
+        messages: appendMessage(lobby.wolfAction.messages, message)
+      }
+    };
+  }
+  return lobby;
+}
+
 export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | null) {
   const [state, setState] = useState(initialState);
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
   const credentialsRef = useRef<PlayerCredentials | null>(invitation ? loadCredentials(invitation.roomCode) : null);
   const lastNicknameRef = useRef("");
+  const chatSessionRef = useRef<string | null>(null);
+  const chatCursorRef = useRef(0);
+  const replayLoadedRef = useRef(false);
 
   useEffect(() => {
     if (!invitation) return;
+
+    const resetChatHistory = () => {
+      chatSessionRef.current = null;
+      chatCursorRef.current = 0;
+      replayLoadedRef.current = false;
+    };
+
+    const mergeHistory = (messages: ChatMessage[], clearExisting: boolean) => {
+      setState((current) => {
+        if (!current.lobby) return current;
+        const publicMessages = messages.filter(
+          (message) => message.channel === "day-public" || message.channel === "system"
+        );
+        const wolfMessages = messages.filter((message) => message.channel === "wolf-private");
+        return {
+          ...current,
+          lobby: {
+            ...current.lobby,
+            publicChat: {
+              ...current.lobby.publicChat,
+              messages: mergeMessages(
+                clearExisting ? [] : current.lobby.publicChat.messages,
+                publicMessages
+              )
+            },
+            wolfAction: current.lobby.wolfAction
+              ? {
+                  ...current.lobby.wolfAction,
+                  messages: mergeMessages(
+                    clearExisting ? [] : current.lobby.wolfAction.messages,
+                    wolfMessages
+                  )
+                }
+              : null
+          }
+        };
+      });
+    };
+
+    const requestHistory = (
+      socket: Socket<ServerToClientEvents, ClientToServerEvents>,
+      view: PlayerLobbyView,
+      fromStart = false
+    ) => {
+      if (view.phase === "lobby" || (fromStart && replayLoadedRef.current)) return;
+      const initialAfterSequence = fromStart
+        ? 0
+        : Math.max(chatCursorRef.current, lastLobbySequence(view));
+
+      const requestPage = (afterSequence: number, clearExisting: boolean) => {
+        socket.emit("chat:history", { afterSequence, limit: 100 }, (result) => {
+          if (!result.ok) {
+            setState((current) => ({ ...current, error: result.message }));
+            return;
+          }
+
+          const sessionChanged = chatSessionRef.current !== null
+            && chatSessionRef.current !== result.data.sessionId;
+          chatSessionRef.current = result.data.sessionId;
+          if (sessionChanged && afterSequence > 0) {
+            chatCursorRef.current = 0;
+            replayLoadedRef.current = false;
+            mergeHistory([], true);
+            requestPage(0, true);
+            return;
+          }
+
+          mergeHistory(result.data.messages, clearExisting || sessionChanged);
+          const pageCursor = result.data.messages.at(-1)?.sequence ?? afterSequence;
+          chatCursorRef.current = result.data.hasMore
+            ? pageCursor
+            : Math.max(pageCursor, result.data.latestSequence);
+
+          if (result.data.hasMore) {
+            requestPage(pageCursor, false);
+          } else if (fromStart) {
+            replayLoadedRef.current = true;
+          }
+        });
+      };
+
+      requestPage(initialAfterSequence, fromStart);
+    };
+
+    const applyLobbyView = (
+      socket: Socket<ServerToClientEvents, ClientToServerEvents>,
+      lobby: PlayerLobbyView
+    ) => {
+      setState((current) => {
+        const startsNewView = lobby.phase === "lobby"
+          || (current.lobby?.phase === "game-over" && lobby.phase !== "game-over");
+        if (startsNewView) resetChatHistory();
+        return {
+          ...current,
+          lobby: startsNewView || !current.lobby
+            ? lobby
+            : {
+                ...lobby,
+                publicChat: {
+                  ...lobby.publicChat,
+                  messages: mergeMessages(
+                    current.lobby.publicChat.messages,
+                    lobby.publicChat.messages
+                  )
+                },
+                wolfAction: lobby.wolfAction
+                  ? {
+                      ...lobby.wolfAction,
+                      messages: mergeMessages(
+                        current.lobby.wolfAction?.messages ?? [],
+                        lobby.wolfAction.messages
+                      )
+                    }
+                  : null
+              }
+        };
+      });
+      requestHistory(socket, lobby, lobby.phase === "game-over");
+    };
 
     const applySession = (session: PlayerSession) => {
       credentialsRef.current = session.credentials;
@@ -85,6 +248,8 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
         replaced: false,
         error: ""
       }));
+      const activeSocket = socketRef.current;
+      if (activeSocket) requestHistory(activeSocket, session.lobby, session.lobby.phase === "game-over");
     };
 
     const restore = (socket: Socket<ServerToClientEvents, ClientToServerEvents>) => {
@@ -117,8 +282,15 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
     });
     socket.on("connect_error", () => setState((current) => ({ ...current, socket: "disconnected" })));
     socket.on("disconnect", () => setState((current) => ({ ...current, socket: "disconnected" })));
-    socket.on("player:state", (lobby) => setState((current) => ({ ...current, lobby })));
+    socket.on("player:state", (lobby) => applyLobbyView(socket, lobby));
     socket.on("game:public-state", (game) => setState((current) => ({ ...current, game })));
+    socket.on("chat:message", (message) => {
+      chatCursorRef.current = Math.max(chatCursorRef.current, message.sequence);
+      setState((current) => ({
+        ...current,
+        lobby: current.lobby ? appendChatMessage(current.lobby, message) : null
+      }));
+    });
     socket.on("player:removed", ({ message }) => {
       clearCredentials(invitation.roomCode);
       credentialsRef.current = null;
@@ -194,7 +366,35 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
 
   const applyPlayerView = useCallback((result: RoomActionResult<PlayerLobbyView>) => {
     if (result.ok) {
-      setState((current) => ({ ...current, lobby: result.data, error: "" }));
+      setState((current) => {
+        const startsNewView = result.data.phase === "lobby"
+          || (current.lobby?.phase === "game-over" && result.data.phase !== "game-over");
+        return {
+          ...current,
+          lobby: startsNewView || !current.lobby
+            ? result.data
+            : {
+                ...result.data,
+                publicChat: {
+                  ...result.data.publicChat,
+                  messages: mergeMessages(
+                    current.lobby.publicChat.messages,
+                    result.data.publicChat.messages
+                  )
+                },
+                wolfAction: result.data.wolfAction
+                  ? {
+                      ...result.data.wolfAction,
+                      messages: mergeMessages(
+                        current.lobby.wolfAction?.messages ?? [],
+                        result.data.wolfAction.messages
+                      )
+                    }
+                  : null
+              },
+          error: ""
+        };
+      });
     } else {
       setState((current) => ({ ...current, error: result.message }));
     }
@@ -208,9 +408,11 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
     socketRef.current?.emit("wolf:confirm-vote", { confirmed }, applyPlayerView);
   }, [applyPlayerView]);
 
-  const sendWolfMessage = useCallback((payload: Parameters<ClientToServerEvents["wolf:send-message"]>[0]) => {
-    socketRef.current?.emit("wolf:send-message", payload, applyPlayerView);
-  }, [applyPlayerView]);
+  const sendChatMessage = useCallback((payload: ChatSendRequest) => {
+    socketRef.current?.emit("chat:send", payload, (result) => {
+      if (!result.ok) setState((current) => ({ ...current, error: result.message }));
+    });
+  }, []);
 
   const inspectAsSeer = useCallback((target: string) => {
     socketRef.current?.emit("seer:inspect", { target }, applyPlayerView);
@@ -251,7 +453,7 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
     confirmRole,
     selectWolfTarget,
     confirmWolfVote,
-    sendWolfMessage,
+    sendChatMessage,
     inspectAsSeer,
     submitWitchAction,
     protectAsGuard,

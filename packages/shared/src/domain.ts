@@ -15,6 +15,15 @@ export type Nickname = z.infer<typeof nicknameSchema>;
 export const playerConnectionSchema = z.enum(["online", "reconnecting", "offline", "departed"]);
 export type PlayerConnection = z.infer<typeof playerConnectionSchema>;
 
+export const playerControllerSchema = z.enum(["human", "bot"]).default("human");
+export type PlayerController = z.infer<typeof playerControllerSchema>;
+
+export const botKindSchema = z.literal("deterministic");
+export type BotKind = z.infer<typeof botKindSchema>;
+
+export const chatModeSchema = z.enum(["ordered", "open"]).default("ordered");
+export type ChatMode = z.infer<typeof chatModeSchema>;
+
 export const reconnectTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{32,128}$/);
 export type ReconnectToken = z.infer<typeof reconnectTokenSchema>;
 
@@ -23,7 +32,9 @@ export const lobbyPlayerSchema = z.object({
   number: z.number().int().positive(),
   nickname: nicknameSchema,
   connection: playerConnectionSchema,
-  alive: z.boolean().default(true)
+  alive: z.boolean().default(true),
+  controller: playerControllerSchema,
+  botKind: botKindSchema.nullable().default(null)
 });
 export type LobbyPlayer = z.infer<typeof lobbyPlayerSchema>;
 
@@ -45,6 +56,7 @@ export const lobbyViewBaseSchema = z.object({
   roomCode: roomCodeSchema,
   revision: z.number().int().nonnegative(),
   players: z.array(lobbyPlayerSchema),
+  chatMode: chatModeSchema,
   revealedIdiotId: playerIdSchema.nullable().default(null)
 });
 

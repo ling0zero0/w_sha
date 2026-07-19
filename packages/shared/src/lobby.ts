@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { chatViewSchema } from "./chat.js";
 import {
   lobbyPlayerSchema,
   lobbyViewBaseSchema,
@@ -37,7 +38,8 @@ export const hostLobbyViewSchema = lobbyViewBaseSchema.extend({
     deaths: z.array(lobbyPlayerSchema.pick({ id: true, number: true, nickname: true }))
   }).nullable(),
   dayState: publicDayStateSchema,
-  gameResult: gameResultSchema
+  gameResult: gameResultSchema,
+  publicChat: chatViewSchema.default({ canSend: false, messages: [] })
 });
 export type HostLobbyView = z.infer<typeof hostLobbyViewSchema>;
 
@@ -60,7 +62,8 @@ export const playerLobbyViewSchema = lobbyViewBaseSchema.extend({
   dawnResult: dawnResultSchema,
   dayState: publicDayStateSchema,
   dayVote: privateDayVoteSchema,
-  gameResult: gameResultSchema
+  gameResult: gameResultSchema,
+  publicChat: chatViewSchema.default({ canSend: false, messages: [] })
 });
 export type PlayerLobbyView = z.infer<typeof playerLobbyViewSchema>;
 
@@ -99,3 +102,8 @@ export const takeoverReceiptSchema = z.object({
   nickname: nicknameSchema
 });
 export type TakeoverReceipt = z.infer<typeof takeoverReceiptSchema>;
+
+export const hostUpdateChatModeRequestSchema = z.object({
+  chatMode: z.enum(["ordered", "open"])
+}).strict();
+export type HostUpdateChatModeRequest = z.infer<typeof hostUpdateChatModeRequestSchema>;

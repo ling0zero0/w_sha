@@ -1,16 +1,21 @@
 import { describe, expect, it } from "vitest";
 import type { RoleConfigurationInput } from "@werewolf/shared";
 import { LobbyRoom } from "./room.js";
+import type { RoomChatPersistence } from "./room.js";
 
 const token = "abcdefghijklmnopqrstuvwxyz123456";
 
-function createRoom(deferCompletedStages = false) {
+function createRoom(
+  deferCompletedStages = false,
+  chatPersistence?: RoomChatPersistence
+) {
   return new LobbyRoom({
     localAddress: "192.168.1.20",
     webPort: 5173,
     roomCode: "123456",
     joinToken: token,
-    deferCompletedStages
+    deferCompletedStages,
+    ...(chatPersistence ? { chatPersistence } : {})
   });
 }
 
@@ -112,6 +117,26 @@ describe("lobby room", () => {
     });
     expect(room.getHostView().players).toHaveLength(1);
     expect(JSON.stringify(room.getHostView())).not.toContain(joined.data.credentials.reconnectToken);
+  });
+
+  it("prevents one socket from binding or taking over multiple player seats", () => {
+    const room = createRoom();
+    const first = room.join({ roomCode: "123456", joinToken: token, nickname: "林野" }, "socket-a");
+    const second = room.join({ roomCode: "123456", joinToken: token, nickname: "阿岚" }, "socket-b");
+    if (!first.ok || !second.ok) throw new Error("test setup failed");
+
+    expect(room.reconnect(second.data.credentials, "socket-a")).toMatchObject({
+      ok: false,
+      code: "ALREADY_JOINED"
+    });
+    expect(room.requestTakeover(
+      { roomCode: "123456", joinToken: token, nickname: "阿岚" },
+      "socket-a"
+    )).toMatchObject({
+      ok: false,
+      code: "ALREADY_JOINED"
+    });
+    expect(room.setReconnecting("socket-a")).toBe(first.data.lobby.selfId);
   });
 
   it("requires host approval for takeover and invalidates the old credential", () => {
@@ -672,7 +697,9 @@ describe("lobby room", () => {
       wolves[0]!.selfId,
       { kind: "text", text: "先观察票型" },
       new Date("2026-07-15T12:00:00.000Z")
-    )).toMatchObject({ ok: true, data: { wolfAction: { messages: [expect.objectContaining({ text: "先观察票型" })] } } });
+    )).toMatchObject({ ok: true, data: { wolfAction: { messages: [
+      expect.objectContaining({ content: { kind: "text", text: "先观察票型" } })
+    ] } } });
     expect(room.sendWolfMessage(
       wolves[0]!.selfId,
       { kind: "quick", code: "agree" },
@@ -686,8 +713,10 @@ describe("lobby room", () => {
     expect(suggestion).toMatchObject({ ok: true });
     if (!suggestion.ok) throw new Error("test setup failed");
     expect(suggestion.data.wolfAction?.messages).toContainEqual(expect.objectContaining({
-      kind: "target-suggestion",
-      target: expect.objectContaining({ id: nonWolf.selfId })
+      content: expect.objectContaining({
+        kind: "target-suggestion",
+        target: expect.objectContaining({ id: nonWolf.selfId })
+      })
     }));
     expect(JSON.stringify(room.getHostView())).not.toContain("先观察票型");
     expect(JSON.stringify(room.getPlayerView(nonWolf.selfId))).not.toContain("先观察票型");
@@ -697,7 +726,9 @@ describe("lobby room", () => {
     const restored = room.reconnect(firstWolfSession.data.credentials, "restored-wolf");
     expect(restored).toMatchObject({ ok: true });
     if (!restored.ok) throw new Error("test setup failed");
-    expect(restored.data.session.lobby.wolfAction?.messages.map((message) => message.text)).toContain("先观察票型");
+    expect(restored.data.session.lobby.wolfAction?.messages).toContainEqual(expect.objectContaining({
+      content: { kind: "text", text: "先观察票型" }
+    }));
 
     room.selectWolfTarget(wolves[0]!.selfId, "no-kill");
     room.confirmWolfVote(wolves[0]!.selfId, true);
@@ -708,6 +739,229 @@ describe("lobby room", () => {
       { kind: "quick", code: "agree" },
       new Date("2026-07-15T12:00:02.000Z")
     )).toMatchObject({ ok: false, code: "INVALID_NIGHT_ACTION" });
+  });
+
+  it("increments chat sequence only for accepted messages and rate-limits each sender", () => {
+    const { room, views } = startConfiguredRoom(
+      { wolf: 2, villager: 1, seer: 1, witch: 0 },
+      ["林野", "阿岚", "青禾", "南星"]
+    );
+    const wolves = views.filter((view) => view.privateRole?.role === "wolf");
+    expect(wolves).toHaveLength(2);
+
+    const first = room.sendChat(
+      wolves[0]!.selfId,
+      { channel: "wolf-private", content: { kind: "text", text: "第一条" } },
+      new Date("2026-07-15T12:00:00.000Z")
+    );
+    const rateLimited = room.sendChat(
+      wolves[0]!.selfId,
+      { channel: "wolf-private", content: { kind: "quick", code: "agree" } },
+      new Date("2026-07-15T12:00:00.999Z")
+    );
+    const second = room.sendChat(
+      wolves[1]!.selfId,
+      { channel: "wolf-private", content: { kind: "text", text: "第二条" } },
+      new Date("2026-07-15T12:00:00.999Z")
+    );
+    const third = room.sendChat(
+      wolves[0]!.selfId,
+      { channel: "wolf-private", content: { kind: "quick", code: "agree" } },
+      new Date("2026-07-15T12:00:01.000Z")
+    );
+
+    expect(first).toMatchObject({ ok: true, data: { sequence: 1 } });
+    expect(rateLimited).toMatchObject({ ok: false, code: "CHAT_RATE_LIMITED" });
+    expect(second).toMatchObject({ ok: true, data: { sequence: 2 } });
+    expect(third).toMatchObject({ ok: true, data: { sequence: 3 } });
+    expect(room.getPlayerView(wolves[0]!.selfId)?.wolfAction?.messages.map((message) => message.sequence))
+      .toEqual([1, 2, 3]);
+  });
+
+  it("does not advance chat sequence or commit memory when persistence fails", () => {
+    let rejectAppend = true;
+    const persistedMessages: Parameters<RoomChatPersistence["appendMessage"]>[1][] = [];
+    const chatPersistence: RoomChatPersistence = {
+      createSession: () => undefined,
+      finishSession: () => undefined,
+      appendMessage: (_sessionId, message) => {
+        if (rejectAppend) throw new Error("database unavailable");
+        persistedMessages.push(message);
+      },
+      importMessages: () => undefined,
+      loadRecentForRecovery: () => [],
+      queryAfter: (_sessionId, _reader, afterSequence) => ({
+        messages: persistedMessages.filter((message) => message.sequence > afterSequence),
+        latestSequence: persistedMessages.at(-1)?.sequence ?? afterSequence,
+        hasMore: false
+      })
+    };
+    const room = createRoom(false, chatPersistence);
+    const sessions = ["林野", "阿岚", "青禾"].map((nickname, index) =>
+      room.join({ roomCode: "123456", joinToken: token, nickname }, `socket-persist-${index}`)
+    );
+    if (sessions.some((session) => !session.ok)) throw new Error("test setup failed");
+    room.updateRoleConfiguration({ wolf: 1, villager: 1, seer: 1, witch: 0 });
+    room.startGame();
+    const wolf = sessions
+      .map((session) => {
+        if (!session.ok) throw new Error("test setup failed");
+        room.confirmRole(session.data.lobby.selfId);
+        return room.getPlayerView(session.data.lobby.selfId)!;
+      })
+      .find((view) => view.privateRole?.role === "wolf")!;
+
+    expect(() => room.sendChat(
+      wolf.selfId,
+      { channel: "wolf-private", content: { kind: "text", text: "不应提交" } },
+      new Date("2026-07-19T08:00:00.000Z")
+    )).toThrow("database unavailable");
+    expect(room.getPlayerView(wolf.selfId)?.wolfAction?.messages).toEqual([]);
+    expect(persistedMessages).toEqual([]);
+
+    rejectAppend = false;
+    expect(room.sendChat(
+      wolf.selfId,
+      { channel: "wolf-private", content: { kind: "text", text: "持久化成功" } },
+      new Date("2026-07-19T08:00:00.000Z")
+    )).toMatchObject({
+      ok: true,
+      data: {
+        sequence: 1,
+        content: { kind: "text", text: "持久化成功" }
+      }
+    });
+    expect(persistedMessages).toHaveLength(1);
+    expect(room.getPlayerView(wolf.selfId)?.wolfAction?.messages).toEqual([
+      expect.objectContaining({
+        sequence: 1,
+        content: { kind: "text", text: "持久化成功" }
+      })
+    ]);
+  });
+
+  it("allows a dead player to send public chat only during their own last words", () => {
+    const { room, views } = startConfiguredRoom(
+      { wolf: 1, villager: 2, seer: 1, witch: 1 },
+      ["林野", "阿岚", "青禾", "南星", "石川"]
+    );
+    const wolf = views.find((view) => view.privateRole?.role === "wolf")!;
+    const seer = views.find((view) => view.privateRole?.role === "seer")!;
+    const witch = views.find((view) => view.privateRole?.role === "witch")!;
+    const victim = views.find((view) => view.privateRole?.role === "villager")!;
+
+    room.selectWolfTarget(wolf.selfId, victim.selfId);
+    room.confirmWolfVote(wolf.selfId, true);
+    room.inspectAsSeer(seer.selfId, wolf.selfId);
+    room.submitWitchAction(witch.selfId, { action: "none" });
+    expect(room.getHostView()).toMatchObject({
+      phase: "dawn",
+      players: expect.arrayContaining([expect.objectContaining({ id: victim.selfId, alive: false })])
+    });
+    expect(room.sendChat(
+      victim.selfId,
+      { channel: "day-public", content: { kind: "text", text: "黎明阶段不能发言" } },
+      new Date("2026-07-15T12:00:00.000Z")
+    )).toMatchObject({ ok: false, code: "INVALID_PHASE_CONTROL" });
+
+    expect(room.continueFromDawn()).toMatchObject({
+      ok: true,
+      data: { phase: "last-words", dayState: { currentSpeaker: { id: victim.selfId } } }
+    });
+    expect(room.getPlayerView(victim.selfId)?.publicChat.canSend).toBe(true);
+    expect(room.sendChat(
+      wolf.selfId,
+      { channel: "day-public", content: { kind: "text", text: "插话" } },
+      new Date("2026-07-15T12:00:01.000Z")
+    )).toMatchObject({ ok: false, code: "INVALID_PHASE_CONTROL" });
+    expect(room.sendChat(
+      victim.selfId,
+      { channel: "day-public", content: { kind: "text", text: "这是我的遗言" } },
+      new Date("2026-07-15T12:00:01.000Z")
+    )).toMatchObject({
+      ok: true,
+      data: {
+        phase: "last-words",
+        sender: { id: victim.selfId },
+        content: { kind: "text", text: "这是我的遗言" }
+      }
+    });
+
+    expect(room.finishSpeaking(victim.selfId)).toMatchObject({ ok: true });
+    expect(room.getPlayerView(victim.selfId)?.publicChat.canSend).toBe(false);
+    expect(room.sendChat(
+      victim.selfId,
+      { channel: "day-public", content: { kind: "text", text: "遗言轮次已经结束" } },
+      new Date("2026-07-15T12:00:02.000Z")
+    )).toMatchObject({ ok: false, code: "INVALID_PHASE_CONTROL" });
+
+    while (room.getHostView().phase === "day-speech") room.skipCurrentDayStage();
+    expect(room.getHostView().phase).toBe("day-vote");
+    expect(room.sendChat(
+      wolf.selfId,
+      { channel: "day-public", content: { kind: "text", text: "投票阶段不能公开聊天" } },
+      new Date("2026-07-15T12:00:03.000Z")
+    )).toMatchObject({ ok: false, code: "INVALID_PHASE_CONTROL" });
+    expect(room.getHostView().publicChat.messages).toContainEqual(expect.objectContaining({
+      sender: { kind: "player", id: victim.selfId, number: victim.players.find(
+        (player) => player.id === victim.selfId
+      )!.number, nickname: victim.players.find((player) => player.id === victim.selfId)!.nickname },
+      content: { kind: "text", text: "这是我的遗言" }
+    }));
+  });
+
+  it("restores public chat history when the current speaker reconnects", () => {
+    const room = createRoom();
+    const sessions = ["林野", "阿岚", "青禾"].map((nickname, index) =>
+      room.join({ roomCode: "123456", joinToken: token, nickname }, `socket-history-${index}`)
+    );
+    if (sessions.some((session) => !session.ok)) throw new Error("test setup failed");
+    room.updateRoleConfiguration({ wolf: 1, villager: 1, seer: 0, witch: 0, hunter: 1 });
+    room.startGame();
+    for (const session of sessions) {
+      if (!session.ok) throw new Error("test setup failed");
+      room.confirmRole(session.data.lobby.selfId);
+    }
+    room.skipCurrentNightStage();
+    room.continueFromDawn();
+
+    const speakerId = room.getHostView().dayState?.currentSpeaker?.id;
+    const speakerIndex = sessions.findIndex(
+      (session) => session.ok && session.data.lobby.selfId === speakerId
+    );
+    const speakerSession = sessions[speakerIndex];
+    if (speakerIndex < 0 || !speakerSession?.ok) throw new Error("test setup failed");
+
+    const sent = room.sendChat(
+      speakerSession.data.lobby.selfId,
+      { channel: "day-public", content: { kind: "text", text: "重连前的公开发言" } },
+      new Date("2026-07-15T12:00:00.000Z")
+    );
+    expect(sent).toMatchObject({ ok: true, data: { sequence: 1 } });
+    room.setReconnecting(`socket-history-${speakerIndex}`);
+    room.setOffline(speakerSession.data.lobby.selfId, `socket-history-${speakerIndex}`);
+
+    const restored = room.reconnect(speakerSession.data.credentials, "socket-history-restored");
+    expect(restored).toMatchObject({
+      ok: true,
+      data: {
+        session: {
+          lobby: {
+            selfId: speakerSession.data.lobby.selfId,
+            publicChat: {
+              canSend: true,
+              messages: [
+                expect.objectContaining({
+                  sequence: 1,
+                  channel: "day-public",
+                  content: { kind: "text", text: "重连前的公开发言" }
+                })
+              ]
+            }
+          }
+        }
+      }
+    });
   });
 
   it("runs first-night last words, day speech, and a private exile vote", () => {

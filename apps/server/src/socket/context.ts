@@ -1,4 +1,5 @@
 import type {
+  ChatMessage,
   ClientToServerEvents,
   PlayerId,
   RoomActionAck,
@@ -12,6 +13,7 @@ import type { GameRuntime } from "../runtime.js";
 export interface SocketData {
   isHost: boolean;
   playerId?: PlayerId;
+  pendingTakeoverRequestId?: string;
 }
 
 export type GameSocketServer = Server<
@@ -35,9 +37,11 @@ export interface SocketHandlerContext {
   clearOfflineTimer: (playerId: PlayerId) => void;
   clearPhaseTimer: () => void;
   emitHostLobbyView: () => void;
+  emitChatMessage: (message: ChatMessage) => void;
   emitLobbyViews: () => void;
   emitPublicGameState: () => void;
   nightActionPaused: () => RoomActionFailure | null;
+  notifyBots: (force?: boolean) => void;
   schedulePhaseTimeout: () => void;
   syncPhaseClock: () => void;
 }
@@ -55,6 +59,14 @@ export function invalidHostSession(): RoomActionFailure {
     ok: false,
     code: "INVALID_HOST_SESSION",
     message: "主机控制会话无效"
+  };
+}
+
+export function alreadyJoined(): RoomActionFailure {
+  return {
+    ok: false,
+    code: "ALREADY_JOINED",
+    message: "此连接已经绑定玩家或正在申请接管"
   };
 }
 
