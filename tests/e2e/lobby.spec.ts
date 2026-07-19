@@ -150,7 +150,7 @@ test("host and two mobile players complete the LAN lobby workflow", async ({ bro
   }
 });
 
-test("configures a guard and renders the empty role artwork safely", async ({ browser, page }) => {
+test("configures a guard and renders its role artwork", async ({ browser, page }) => {
   await page.goto("/");
   const joinUrl = await getLocalJoinUrl(page);
   const contexts = await Promise.all(
@@ -181,8 +181,8 @@ test("configures a guard and renders the empty role artwork safely", async ({ br
     expect([...roleLabels].sort()).toEqual(["守卫", "村民", "狼人"].sort());
 
     const guard = players[roleLabels.indexOf("守卫")]!;
-    await expect(guard.getByRole("img", { name: "守卫暂无角色图片" })).toBeVisible();
-    await expect(guard.locator(".role-artwork-frame img")).toHaveCount(0);
+    await expect(guard.getByRole("img", { name: "守卫身份牌" })).toBeVisible();
+    await expect(guard.locator(".role-artwork-frame img")).toHaveAttribute("src", "/assets/roles/guard.png");
     await page.getByRole("button", { name: "终止对局" }).click();
     await expect(page.getByRole("heading", { name: "对局终止" })).toBeVisible();
     await page.getByRole("button", { name: "返回大厅调整" }).click();

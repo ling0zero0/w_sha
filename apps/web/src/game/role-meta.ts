@@ -15,9 +15,9 @@ export const roleImages: Record<Role, string | null> = {
   villager: "/assets/roles/villager.png",
   seer: "/assets/roles/seer.png",
   witch: "/assets/roles/witch.png",
-  guard: null,
-  hunter: null,
-  idiot: null
+  guard: "/assets/roles/guard.png",
+  hunter: "/assets/roles/hunter.png",
+  idiot: "/assets/roles/idiot.png"
 };
 
 export const outcomeLabels = {
