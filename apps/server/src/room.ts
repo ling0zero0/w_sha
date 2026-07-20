@@ -1,6 +1,7 @@
 import {
   botKindSchema,
   chatModeSchema,
+  hostAddBotRequestSchema,
   hostLobbyViewSchema,
   nicknameSchema,
   playerSessionSchema,
@@ -9,6 +10,7 @@ import {
   roleSchema,
   roomCodeSchema,
   type BotKind,
+  type HostAddBotRequest,
   type ChatChannel,
   type ChatMessage,
   type ChatMode,
@@ -120,7 +122,7 @@ export type TimedStage = "role-reveal" | "wolf" | "seer" | "guard" | "witch" | "
   | "last-words" | "day-speech" | "day-vote" | "exile-result";
 
 export interface LobbyRoomSnapshot {
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   roomCode: string;
   joinToken: string;
   revision: number;
@@ -154,12 +156,13 @@ export interface LobbyRoomSnapshot {
   gameRecords: GameRecord[];
   roleConfiguration: RoleConfiguration;
   players: Array<
-    Omit<InternalPlayer, "socketId" | "reconnectTokenHash" | "controller" | "botKind">
+    Omit<InternalPlayer, "socketId" | "reconnectTokenHash" | "controller" | "botKind" | "botProfileId">
     & {
       reconnectTokenHash: string;
       lastWolfMessageAtMs?: number | null;
       controller?: "human" | "bot";
       botKind?: BotKind | null;
+      botProfileId?: LobbyPlayer["botProfileId"];
     }
   >;
 }
@@ -343,7 +346,7 @@ export class LobbyRoom {
 
   createSnapshot(): LobbyRoomSnapshot {
     return {
-      version: 2,
+      version: 3,
       roomCode: this.roomCode,
       joinToken: this.joinToken,
       revision: this.revision,
@@ -591,6 +594,7 @@ export class LobbyRoom {
       connection: "online",
       controller: "human",
       botKind: null,
+      botProfileId: null,
       socketId,
       reconnectTokenHash: hashReconnectToken(reconnectToken),
       role: null,
@@ -611,10 +615,20 @@ export class LobbyRoom {
     return { ok: true, data: this.createSession(player.id, reconnectToken) };
   }
 
-  addBot(nicknameInput: string, botKindInput: BotKind): RoomActionResult<HostLobbyView> {
+  addBot(request: HostAddBotRequest): RoomActionResult<HostLobbyView>;
+  addBot(nickname: string, botKind: "deterministic"): RoomActionResult<HostLobbyView>;
+  addBot(
+    requestOrNickname: HostAddBotRequest | string,
+    legacyBotKind?: "deterministic"
+  ): RoomActionResult<HostLobbyView> {
     if (this.phase !== "lobby") return failures.gameAlreadyStarted();
-    const nickname = nicknameSchema.parse(nicknameInput);
-    const botKind = botKindSchema.parse(botKindInput);
+    const request = hostAddBotRequestSchema.parse(
+      typeof requestOrNickname === "string"
+        ? { nickname: requestOrNickname, botKind: legacyBotKind }
+        : requestOrNickname
+    );
+    const nickname = nicknameSchema.parse(request.nickname);
+    const botKind = botKindSchema.parse(request.botKind);
     if (this.players.some((player) => player.nickname.toLocaleLowerCase() === nickname.toLocaleLowerCase())) {
       return failures.nicknameTaken();
     }
@@ -626,6 +640,7 @@ export class LobbyRoom {
       connection: "online",
       controller: "bot",
       botKind,
+      botProfileId: request.botKind === "llm" ? request.botProfileId : null,
       socketId: null,
       reconnectTokenHash: hashReconnectToken(createReconnectToken()),
       role: null,
@@ -1361,9 +1376,17 @@ export class LobbyRoom {
     return this.players.map((player) => player.id);
   }
 
-  getBotSeats(): Array<{ playerId: PlayerId; botKind: BotKind }> {
+  getBotSeats(): Array<{
+    playerId: PlayerId;
+    botKind: BotKind;
+    botProfileId: LobbyPlayer["botProfileId"];
+  }> {
     return this.players.flatMap((player) => player.controller === "bot" && player.botKind
-      ? [{ playerId: player.id, botKind: player.botKind }]
+      ? [{
+          playerId: player.id,
+          botKind: player.botKind,
+          botProfileId: player.botProfileId
+        }]
       : []);
   }
 
@@ -1815,7 +1838,7 @@ export class LobbyRoom {
   }
 
   private restoreSnapshot(snapshot: LobbyRoomSnapshot): void {
-    if (snapshot.version !== 1 && snapshot.version !== 2) throw new Error("unsupported room snapshot version");
+    if (![1, 2, 3].includes(snapshot.version)) throw new Error("unsupported room snapshot version");
     this.revision = snapshot.revision;
     this.phase = snapshot.phase;
     this.nightStage = snapshot.nightStage;
@@ -1906,6 +1929,9 @@ export class LobbyRoom {
         ...player,
         controller,
         botKind: controller === "bot" ? player.botKind ?? "deterministic" : null,
+        botProfileId: controller === "bot" && player.botKind === "llm"
+          ? player.botProfileId ?? null
+          : null,
         lastChatMessageAtMs: player.lastChatMessageAtMs ?? lastWolfMessageAtMs ?? null,
         idiotRevealed: player.idiotRevealed ?? false,
         socketId: null,

@@ -8,6 +8,7 @@ const environmentSchema = z.object({
   OPEN_BROWSER: z.enum(["0", "1"]).transform((value) => value === "1").default(false),
   PUBLIC_ADDRESS: z.string().min(1).optional(),
   DATABASE_PATH: z.string().min(1).default(".runtime/werewolf.sqlite"),
+  AI_MASTER_KEY: z.string().min(1).optional(),
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),

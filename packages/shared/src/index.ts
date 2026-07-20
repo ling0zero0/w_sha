@@ -1,4 +1,5 @@
 export * from "./actions.js";
+export * from "./ai.js";
 export * from "./bot.js";
 export * from "./chat.js";
 export * from "./domain.js";

@@ -8,24 +8,29 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const stateHarness = vi.hoisted(() => ({
-  value: undefined as unknown
+  values: [] as unknown[],
+  index: 0
 }));
 
 vi.mock("react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react")>();
   return {
     ...actual,
+    useEffect() {
+      return undefined;
+    },
     useState(initial: unknown) {
-      if (stateHarness.value === undefined) {
-        stateHarness.value = typeof initial === "function"
+      const index = stateHarness.index++;
+      if (!(index in stateHarness.values)) {
+        stateHarness.values[index] = typeof initial === "function"
           ? (initial as () => unknown)()
           : initial;
       }
       return [
-        stateHarness.value,
+        stateHarness.values[index],
         (next: unknown) => {
-          stateHarness.value = typeof next === "function"
-            ? (next as (current: unknown) => unknown)(stateHarness.value)
+          stateHarness.values[index] = typeof next === "function"
+            ? (next as (current: unknown) => unknown)(stateHarness.values[index])
             : next;
         }
       ];
@@ -42,7 +47,8 @@ const existingBot = {
   connection: "offline",
   alive: true,
   controller: "bot",
-  botKind: "deterministic"
+  botKind: "deterministic",
+  botProfileId: null
 } satisfies LobbyPlayer;
 
 function findElement(
@@ -62,7 +68,8 @@ function findElement(
 
 describe("HostBotControls", () => {
   beforeEach(() => {
-    stateHarness.value = undefined;
+    stateHarness.values = [];
+    stateHarness.index = 0;
   });
 
   it("chooses the first available convenient nickname", () => {
@@ -75,6 +82,7 @@ describe("HostBotControls", () => {
 
   it("submits a trimmed deterministic HostAddBotRequest", () => {
     const onAddBot = vi.fn();
+    stateHarness.index = 0;
     let controls = HostBotControls({
       players: [existingBot],
       connected: true,
@@ -86,6 +94,7 @@ describe("HostBotControls", () => {
     (input?.props as { onChange: (event: { target: { value: string } }) => void })
       .onChange({ target: { value: "  小灰  " } });
 
+    stateHarness.index = 0;
     controls = HostBotControls({
       players: [existingBot],
       connected: true,

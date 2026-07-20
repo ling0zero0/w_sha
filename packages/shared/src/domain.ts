@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { aiBotProfileIdSchema } from "./ai.js";
 
 export const roomCodeSchema = z.string().regex(/^\d{6}$/);
 export type RoomCode = z.infer<typeof roomCodeSchema>;
@@ -18,8 +19,27 @@ export type PlayerConnection = z.infer<typeof playerConnectionSchema>;
 export const playerControllerSchema = z.enum(["human", "bot"]).default("human");
 export type PlayerController = z.infer<typeof playerControllerSchema>;
 
-export const botKindSchema = z.literal("deterministic");
+export const botKindSchema = z.enum(["deterministic", "llm"]);
 export type BotKind = z.infer<typeof botKindSchema>;
+
+export const botConfigurationSchema = z.union([
+  z.object({
+    controller: z.literal("human"),
+    botKind: z.null(),
+    botProfileId: z.null()
+  }).strict(),
+  z.object({
+    controller: z.literal("bot"),
+    botKind: z.literal("deterministic"),
+    botProfileId: z.null()
+  }).strict(),
+  z.object({
+    controller: z.literal("bot"),
+    botKind: z.literal("llm"),
+    botProfileId: aiBotProfileIdSchema
+  }).strict()
+]);
+export type BotConfiguration = z.infer<typeof botConfigurationSchema>;
 
 export const chatModeSchema = z.enum(["ordered", "open"]).default("ordered");
 export type ChatMode = z.infer<typeof chatModeSchema>;
@@ -27,15 +47,32 @@ export type ChatMode = z.infer<typeof chatModeSchema>;
 export const reconnectTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{32,128}$/);
 export type ReconnectToken = z.infer<typeof reconnectTokenSchema>;
 
-export const lobbyPlayerSchema = z.object({
+const lobbyPlayerBaseSchema = z.object({
   id: playerIdSchema,
   number: z.number().int().positive(),
   nickname: nicknameSchema,
   connection: playerConnectionSchema,
   alive: z.boolean().default(true),
   controller: playerControllerSchema,
-  botKind: botKindSchema.nullable().default(null)
+  botKind: botKindSchema.nullable().default(null),
+  botProfileId: aiBotProfileIdSchema.nullable().default(null)
 });
+
+export const lobbyPlayerSchema = lobbyPlayerBaseSchema.superRefine((player, context) => {
+  const configuration = {
+    controller: player.controller,
+    botKind: player.botKind,
+    botProfileId: player.botProfileId
+  };
+  if (!botConfigurationSchema.safeParse(configuration).success) {
+    context.addIssue({
+      code: "custom",
+      path: ["botProfileId"],
+      message: "controller, botKind, and botProfileId must describe a valid player controller"
+    });
+  }
+});
+lobbyPlayerSchema.pick = lobbyPlayerBaseSchema.pick.bind(lobbyPlayerBaseSchema);
 export type LobbyPlayer = z.infer<typeof lobbyPlayerSchema>;
 
 export const roomPhaseSchema = z.enum([

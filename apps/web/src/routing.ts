@@ -1,7 +1,12 @@
-import { joinTokenSchema, roomCodeSchema, type AppSurface, type JoinLobbyRequest } from "@werewolf/shared";
+import { joinTokenSchema, roomCodeSchema, type JoinLobbyRequest } from "@werewolf/shared";
+
+export type AppSurface = "host" | "player" | "ai" | "not-found";
 
 export function getSurface(pathname: string): AppSurface {
-  return pathname === "/join" || pathname.startsWith("/join/") ? "player" : "host";
+  if (pathname === "/") return "host";
+  if (pathname === "/ai" || pathname.startsWith("/ai/")) return "ai";
+  if (pathname === "/join" || pathname.startsWith("/join/")) return "player";
+  return "not-found";
 }
 
 export function getJoinInvitation(location: Pick<Location, "pathname" | "search">): Omit<JoinLobbyRequest, "nickname"> | null {

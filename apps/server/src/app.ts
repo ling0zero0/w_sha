@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { ZodError } from "zod";
 import type { ServerConfig } from "./config.js";
 import type { GameRuntime } from "./runtime.js";
+import { registerAiAdminRoutes, type AiAdminServices } from "./ai/admin-ai-routes.js";
 
 const serviceVersion = "0.1.0";
 
@@ -62,7 +63,11 @@ function getBrowserAddress(
   return proxyClientAddress;
 }
 
-export function buildServer(config: ServerConfig, runtime?: GameRuntime) {
+export function buildServer(
+  config: ServerConfig,
+  runtime?: GameRuntime,
+  aiServices?: AiAdminServices
+) {
   const app = Fastify({ logger: loggerOptions(config) });
 
   if (config.WEB_ROOT) {
@@ -93,6 +98,10 @@ export function buildServer(config: ServerConfig, runtime?: GameRuntime) {
       lobby: runtime.room.getHostView()
     });
   });
+
+  if (runtime && aiServices) {
+    registerAiAdminRoutes(app, runtime, aiServices);
+  }
 
   app.setNotFoundHandler((request, reply) => {
     if (config.WEB_ROOT && request.method === "GET" && !request.url.startsWith("/api/")) {

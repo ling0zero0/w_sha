@@ -12,7 +12,8 @@ const human = {
   connection: "online",
   alive: true,
   controller: "human",
-  botKind: null
+  botKind: null,
+  botProfileId: null
 } satisfies LobbyPlayer;
 
 const bot = {
@@ -22,7 +23,8 @@ const bot = {
   connection: "reconnecting",
   alive: true,
   controller: "bot",
-  botKind: "deterministic"
+  botKind: "deterministic",
+  botProfileId: null
 } satisfies LobbyPlayer;
 
 const otherHuman = {
@@ -32,7 +34,8 @@ const otherHuman = {
   connection: "offline",
   alive: true,
   controller: "human",
-  botKind: null
+  botKind: null,
+  botProfileId: null
 } satisfies LobbyPlayer;
 
 describe("PublicPlayerRoster", () => {

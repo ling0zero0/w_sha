@@ -10,12 +10,20 @@ import {
   wolfConfirmVoteRequestSchema,
   wolfSelectTargetRequestSchema
 } from "./actions.js";
-import { botKindSchema, nicknameSchema } from "./domain.js";
+import { aiBotProfileIdSchema } from "./ai.js";
+import { nicknameSchema } from "./domain.js";
 
-export const hostAddBotRequestSchema = z.object({
-  nickname: nicknameSchema,
-  botKind: botKindSchema
-}).strict();
+export const hostAddBotRequestSchema = z.discriminatedUnion("botKind", [
+  z.object({
+    nickname: nicknameSchema,
+    botKind: z.literal("deterministic")
+  }).strict(),
+  z.object({
+    nickname: nicknameSchema,
+    botKind: z.literal("llm"),
+    botProfileId: aiBotProfileIdSchema
+  }).strict()
+]);
 export type HostAddBotRequest = z.infer<typeof hostAddBotRequestSchema>;
 
 export const botIntentSchema = z.discriminatedUnion("type", [

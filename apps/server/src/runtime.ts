@@ -24,7 +24,7 @@ interface RuntimeOptions {
 }
 
 export interface GameRuntimeSnapshot {
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   room: LobbyRoomSnapshot;
   publicRevision: number;
   interventions: PublicHostIntervention[];
@@ -75,7 +75,7 @@ export class GameRuntime {
 
   createSnapshot(nowMs = Date.now()): GameRuntimeSnapshot {
     return {
-      version: 2,
+      version: 3,
       room: this.room.createSnapshot(),
       publicRevision: this.publicRevision,
       interventions: this.getPublicInterventions(),

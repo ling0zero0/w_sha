@@ -10,6 +10,15 @@ describe("surface routing", () => {
     expect(getSurface("/join/ABC123")).toBe("player");
   });
 
+  it("uses the AI management surface explicitly", () => {
+    expect(getSurface("/ai")).toBe("ai");
+    expect(getSurface("/ai/providers")).toBe("ai");
+  });
+
+  it("does not route unknown paths to the host surface", () => {
+    expect(getSurface("/settings")).toBe("not-found");
+  });
+
   it("reads a validated invitation from the URL", () => {
     expect(getJoinInvitation({
       pathname: "/join/123456",

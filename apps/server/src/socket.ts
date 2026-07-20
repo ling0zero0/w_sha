@@ -14,6 +14,10 @@ import { createServiceStatus } from "./app.js";
 import { executeBotIntent } from "./bot-executor.js";
 import { BotManager } from "./bot-manager.js";
 import type { GameRuntime } from "./runtime.js";
+import type { AiConfigStore } from "./ai/ai-config-store.js";
+import type { ProviderRegistry } from "./ai/provider-registry.js";
+import { LlmBotAdapter } from "./ai/llm-bot-adapter.js";
+import { DeterministicBotAdapter } from "./bot-manager.js";
 import type { TimedStage } from "./room.js";
 import {
   invalidRequest,
@@ -46,7 +50,8 @@ export function attachSocketServer(
   runtime: GameRuntime,
   persistSnapshot: () => void = () => undefined,
   automaticPhaseProgression = false,
-  stageTimingOverrides: Partial<Record<TimedStage, { minimumMs: number; maximumMs: number }>> = {}
+  stageTimingOverrides: Partial<Record<TimedStage, { minimumMs: number; maximumMs: number }>> = {},
+  aiServices?: { store: AiConfigStore; providers: ProviderRegistry }
 ) {
   if (automaticPhaseProgression) runtime.room.enableDeferredStageAdvancement();
   const activeStageTiming = { ...stageTiming, ...stageTimingOverrides };
@@ -197,6 +202,22 @@ export function attachSocketServer(
       emitLobbyViews();
       emitPublicGameState();
       return true;
+    },
+    adapterFactory: (kind, playerId, botProfileId) => {
+      if (kind !== "llm" || !botProfileId || !aiServices) {
+        return new DeterministicBotAdapter(kind);
+      }
+      return new LlmBotAdapter({
+        playerId,
+        botProfileId,
+        gameId: () => runtime.room.getGameSessionId() ?? runtime.room.roomCode,
+        store: aiServices.store,
+        providers: aiServices.providers,
+        onFallback: (reason, modelErrorCode) => logger.warn(
+          { playerId, reason, modelErrorCode },
+          "LLM bot used deterministic fallback"
+        )
+      });
     },
     onError: (error, playerId) => {
       logger.warn({ error, playerId }, "bot decision failed");

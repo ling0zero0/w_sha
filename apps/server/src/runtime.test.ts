@@ -147,7 +147,7 @@ describe("game runtime host control framework", () => {
     });
   });
 
-  it("restores v2 chat from SQLite when the snapshot omits message bodies", () => {
+  it("restores current chat from SQLite when the snapshot omits message bodies", () => {
     const store = createChatStore();
     const runtime = new GameRuntime({
       localAddress: "192.168.1.20",
@@ -179,9 +179,9 @@ describe("game runtime host control framework", () => {
 
     const snapshot = runtime.createSnapshot(2_000);
     expect(snapshot).toMatchObject({
-      version: 2,
+      version: 3,
       room: {
-        version: 2,
+        version: 3,
         chatSequence: 1,
         gameSessionId: expect.any(String)
       }

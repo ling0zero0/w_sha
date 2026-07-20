@@ -16,11 +16,16 @@ export interface BotTurnContext {
 
 export interface BotAdapter {
   readonly kind: BotKind;
+  readonly turnTimeoutMs?: number;
   onView(view: PlayerLobbyView, context: BotTurnContext): Promise<BotIntent | null>;
   dispose(): Promise<void>;
 }
 
-export type BotAdapterFactory = (kind: BotKind, playerId: PlayerId) => BotAdapter;
+export type BotAdapterFactory = (
+  kind: BotKind,
+  playerId: PlayerId,
+  botProfileId: string | null
+) => BotAdapter;
 
 interface ManagedBot {
   adapter: BotAdapter;
@@ -85,19 +90,19 @@ export class BotManager {
   }
 
   private reconcileBots(): void {
-    const seats = new Map(this.room.getBotSeats().map((seat) => [seat.playerId, seat.botKind]));
+    const seats = new Map(this.room.getBotSeats().map((seat) => [seat.playerId, seat]));
     for (const [playerId, bot] of this.bots) {
-      const currentKind = seats.get(playerId);
-      if (currentKind === bot.kind) continue;
+      const currentSeat = seats.get(playerId);
+      if (currentSeat?.botKind === bot.kind) continue;
       bot.task?.controller.abort();
       void bot.adapter.dispose().catch((error) => this.onError(error, playerId));
       this.bots.delete(playerId);
     }
-    for (const [playerId, kind] of seats) {
+    for (const [playerId, seat] of seats) {
       if (this.bots.has(playerId)) continue;
       this.bots.set(playerId, {
-        adapter: this.adapterFactory(kind, playerId),
-        kind,
+        adapter: this.adapterFactory(seat.botKind, playerId, seat.botProfileId),
+        kind: seat.botKind,
         lastAttemptedRevision: null,
         task: null,
         generation: 0
@@ -133,17 +138,18 @@ export class BotManager {
   ): Promise<void> {
     let timeout: NodeJS.Timeout | null = null;
     try {
+      const turnTimeoutMs = bot.adapter.turnTimeoutMs ?? this.timeoutMs;
       const decision = Promise.resolve(bot.adapter.onView(view, {
         playerId,
         signal: controller.signal,
         revision: view.revision,
-        deadlineAt: new Date(Date.now() + this.timeoutMs).toISOString()
+        deadlineAt: new Date(Date.now() + turnTimeoutMs).toISOString()
       })).then(
         (intent) => ({ kind: "decision" as const, intent }),
         (error) => ({ kind: "error" as const, error })
       );
       const timedOut = new Promise<{ kind: "timeout" }>((resolve) => {
-        timeout = setTimeout(() => resolve({ kind: "timeout" }), this.timeoutMs);
+        timeout = setTimeout(() => resolve({ kind: "timeout" }), turnTimeoutMs);
         timeout.unref();
       });
       const result = await Promise.race([decision, timedOut]);

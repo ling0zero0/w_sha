@@ -217,6 +217,32 @@ describe("BotManager", () => {
     await timeoutManager.dispose();
   });
 
+  it("honors an adapter-specific turn timeout", async () => {
+    const room = createRoom();
+    const [playerId] = addBots(room, 1);
+    const executed = vi.fn(() => true);
+    const manager = new BotManager({
+      room,
+      timeoutMs: 10,
+      adapterFactory: () => ({
+        kind: "llm",
+        turnTimeoutMs: 100,
+        async onView() {
+          await new Promise((resolve) => setTimeout(resolve, 30));
+          return { type: "confirm-role" };
+        },
+        async dispose() {}
+      }),
+      execute: executed
+    });
+
+    manager.notify();
+    await waitFor(() => executed.mock.calls.length === 1);
+
+    expect(executed).toHaveBeenCalledWith(playerId, { type: "confirm-role" }, 1);
+    await manager.dispose();
+  });
+
   it("contains adapter errors and keeps processing after the next room revision", async () => {
     const room = createRoom();
     const playerIds = addBots(room, 3);

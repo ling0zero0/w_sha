@@ -169,7 +169,7 @@ export function registerHostHandlers(socket: GameSocket, context: SocketHandlerC
     if (typeof ack !== "function") return;
     handleHostAction(socket.data.isHost, ack, () => {
       const payload = hostAddBotRequestSchema.parse(rawPayload);
-      return runtime.room.addBot(payload.nickname, payload.botKind);
+      return runtime.room.addBot(payload);
     }, emitLobbyViews);
   });
 

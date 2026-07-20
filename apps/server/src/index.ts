@@ -6,11 +6,19 @@ import { openBrowser } from "./open-browser.js";
 import { GameRuntime } from "./runtime.js";
 import { attachSocketServer } from "./socket.js";
 import { SnapshotStore } from "./snapshot-store.js";
+import { AiConfigStore } from "./ai/ai-config-store.js";
+import { loadOrCreateSecretBox } from "./ai/master-key.js";
+import { ProviderRegistry } from "./ai/provider-registry.js";
+import { createOpenAiCompatibleProvider } from "./ai/providers/openai-compatible.js";
 
 const config = loadConfig();
 const localAddress = config.PUBLIC_ADDRESS ?? selectLanAddress();
 const snapshotStore = new SnapshotStore(config.DATABASE_PATH);
 const chatStore = new ChatStore(config.DATABASE_PATH);
+const secretBox = loadOrCreateSecretBox(config.DATABASE_PATH, config.AI_MASTER_KEY);
+const aiConfigStore = new AiConfigStore(config.DATABASE_PATH, secretBox);
+const providerRegistry = new ProviderRegistry();
+providerRegistry.register("openai-compatible-chat", createOpenAiCompatibleProvider);
 let snapshot = null;
 try {
   snapshot = snapshotStore.load();
@@ -22,7 +30,10 @@ try {
 const runtime = new GameRuntime(snapshot
   ? { localAddress, webPort: config.WEB_PORT, snapshot, chatPersistence: chatStore }
   : { localAddress, webPort: config.WEB_PORT, chatPersistence: chatStore });
-const app = buildServer(config, runtime);
+const app = buildServer(config, runtime, {
+  store: aiConfigStore,
+  providers: providerRegistry
+});
 const persistSnapshot = () => snapshotStore.save(runtime.createSnapshot());
 const testStageTiming = config.NODE_ENV === "test" ? {
   "role-reveal": { minimumMs: 50, maximumMs: 500 },
@@ -37,7 +48,15 @@ const testStageTiming = config.NODE_ENV === "test" ? {
   "day-vote": { minimumMs: 50, maximumMs: 500 },
   "exile-result": { minimumMs: 50, maximumMs: 500 }
 } as const : {};
-const io = attachSocketServer(app.server, app.log, runtime, persistSnapshot, true, testStageTiming);
+const io = attachSocketServer(
+  app.server,
+  app.log,
+  runtime,
+  persistSnapshot,
+  true,
+  testStageTiming,
+  { store: aiConfigStore, providers: providerRegistry }
+);
 
 async function shutdown(signal: string) {
   app.log.info({ signal }, "shutting down");
@@ -46,6 +65,7 @@ async function shutdown(signal: string) {
   await app.close();
   snapshotStore.close();
   chatStore.close();
+  aiConfigStore.close();
 }
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
@@ -68,5 +88,6 @@ try {
   app.log.fatal({ err: error }, "server failed to start");
   snapshotStore.close();
   chatStore.close();
+  aiConfigStore.close();
   process.exit(1);
 }

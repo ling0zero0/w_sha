@@ -5,6 +5,7 @@ playwright-report/
 test-results/
 release/
 .runtime/
+ai-master-key
 .env
 .env.*
 !.env.example

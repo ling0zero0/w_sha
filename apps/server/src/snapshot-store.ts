@@ -33,9 +33,9 @@ export class SnapshotStore {
     if (!row) return null;
     const snapshot = JSON.parse(row.payload) as GameRuntimeSnapshot;
     if (
-      ![1, 2].includes(snapshot.version)
+      ![1, 2, 3].includes(snapshot.version)
       || !snapshot.room
-      || ![1, 2].includes(snapshot.room.version)
+      || ![1, 2, 3].includes(snapshot.room.version)
     ) throw new Error("unsupported snapshot version");
     return snapshot;
   }

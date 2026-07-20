@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  botConfigurationSchema,
   botIntentSchema,
   hostAddBotRequestSchema,
   lobbyPlayerSchema
@@ -12,6 +13,7 @@ import type {
 
 const playerId = "019bf178-7f24-7e40-b8dc-0c2dd948d5a7";
 const targetId = "019bf178-7f24-7e40-b8dc-0c2dd948d5a8";
+const botProfileId = "019bf178-7f24-7e40-b8dc-0c2dd948d5a9";
 
 const addBotPayload: Parameters<ClientToServerEvents["host:add-bot"]>[0] = {
   nickname: "Bot 1",
@@ -34,11 +36,22 @@ describe("shared bot schemas", () => {
       connection: "online"
     })).toMatchObject({
       controller: "human",
-      botKind: null
+      botKind: null,
+      botProfileId: null
     });
   });
 
-  it("identifies deterministic bots and rejects unknown bot kinds", () => {
+  it("enforces human, deterministic bot, and LLM bot field consistency", () => {
+    expect(botConfigurationSchema.parse({
+      controller: "bot",
+      botKind: "llm",
+      botProfileId
+    })).toEqual({
+      controller: "bot",
+      botKind: "llm",
+      botProfileId
+    });
+
     expect(lobbyPlayerSchema.parse({
       id: playerId,
       number: 1,
@@ -48,23 +61,63 @@ describe("shared bot schemas", () => {
       botKind: "deterministic"
     })).toMatchObject({
       controller: "bot",
-      botKind: "deterministic"
+      botKind: "deterministic",
+      botProfileId: null
     });
 
-    expect(lobbyPlayerSchema.safeParse({
+    expect(lobbyPlayerSchema.parse({
       id: playerId,
       number: 1,
       nickname: "Bot 1",
       connection: "online",
       controller: "bot",
-      botKind: "random"
-    }).success).toBe(false);
+      botKind: "llm",
+      botProfileId
+    })).toMatchObject({
+      controller: "bot",
+      botKind: "llm",
+      botProfileId
+    });
+
+    for (const invalidConfiguration of [
+      { controller: "human", botKind: "deterministic", botProfileId: null },
+      { controller: "human", botKind: null, botProfileId },
+      { controller: "bot", botKind: null, botProfileId: null },
+      { controller: "bot", botKind: "deterministic", botProfileId },
+      { controller: "bot", botKind: "llm", botProfileId: null },
+      { controller: "bot", botKind: "random", botProfileId: null }
+    ]) {
+      expect(lobbyPlayerSchema.safeParse({
+        id: playerId,
+        number: 1,
+        nickname: "Bot 1",
+        connection: "online",
+        ...invalidConfiguration
+      }).success).toBe(false);
+    }
   });
 
-  it("validates strict deterministic host add-bot requests and event typing", () => {
+  it("preserves deterministic add-bot payloads and accepts strict LLM payloads", () => {
     const request: HostAddBotRequest = addBotPayload;
 
     expect(hostAddBotRequestSchema.parse(request)).toEqual(request);
+    expect(hostAddBotRequestSchema.parse({
+      nickname: "LLM Bot",
+      botKind: "llm",
+      botProfileId
+    })).toEqual({
+      nickname: "LLM Bot",
+      botKind: "llm",
+      botProfileId
+    });
+    expect(hostAddBotRequestSchema.safeParse({
+      nickname: "LLM Bot",
+      botKind: "llm"
+    }).success).toBe(false);
+    expect(hostAddBotRequestSchema.safeParse({
+      ...request,
+      botProfileId
+    }).success).toBe(false);
     expect(hostAddBotRequestSchema.safeParse({
       nickname: "Bot 1",
       botKind: "random"
