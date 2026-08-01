@@ -4,6 +4,7 @@ import { OpenAiCompatibleProvider } from "./openai-compatible.js";
 
 const model: AiModelProfile = {
   id: "019bf178-7f24-7e40-b8dc-0c2dd948d5a8",
+  revision: 1,
   providerId: "019bf178-7f24-7e40-b8dc-0c2dd948d5a7",
   name: "Test model",
   model: "test-model",
@@ -217,6 +218,14 @@ describe("OpenAI-compatible model provider", () => {
       ok: false,
       error: { code: "INVALID_RESPONSE" }
     });
+  });
+
+  it("rejects metadata and link-local provider endpoints before making a request", () => {
+    expect(() => new OpenAiCompatibleProvider({
+      baseUrl: "http://169.254.169.254/latest/meta-data",
+      apiKey: null,
+      fetch: vi.fn<typeof fetch>()
+    })).toThrow(/blocked metadata or link-local/);
   });
 });
 

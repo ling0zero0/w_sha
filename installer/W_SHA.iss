@@ -35,8 +35,8 @@ Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: 
 
 [Run]
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""W_SHA 局域网狼人杀"""; Flags: runhidden
-Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""W_SHA 局域网狼人杀"" dir=in action=allow program=""{app}\node.exe"" enable=yes profile=private"; Flags: runhidden
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""W_SHA 局域网狼人杀"" dir=in action=allow program=""{app}\node.exe"" enable=yes profile=any protocol=tcp localport=35173 remoteip=localsubnet"; Flags: runhidden
 Filename: "{cmd}"; Parameters: "/c ""{app}\{#MyAppExeName}"""; WorkingDir: "{app}"; Description: "启动 {#MyAppName}"; Flags: postinstall nowait skipifsilent
 
 [UninstallRun]
-Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""W_SHA 局域网狼人杀"""; Flags: runhidden
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""W_SHA 局域网狼人杀"""; Flags: runhidden; RunOnceId: "RemoveWshaFirewallRule"

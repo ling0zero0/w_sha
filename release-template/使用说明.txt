@@ -6,4 +6,4 @@ W_SHA 局域网狼人杀
 4. 游戏期间不要关闭命令窗口，关闭窗口即停止服务。
 
 数据保存在：%LOCALAPPDATA%\W_SHA\werewolf.sqlite
-如 Windows 防火墙弹出提示，请允许“专用网络”访问。
+如 Windows 防火墙弹出提示，请允许当前可信局域网（专用或公用网络）访问。

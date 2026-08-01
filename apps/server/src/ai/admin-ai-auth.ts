@@ -32,7 +32,9 @@ export function isLoopbackAddress(address: string): boolean {
 export function isLoopbackBrowserSource(source: string | undefined): boolean {
   if (!source) return false;
   try {
-    const hostname = new URL(source).hostname;
+    const url = new URL(source);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+    const hostname = url.hostname;
     return hostname === "127.0.0.1"
       || hostname === "localhost"
       || hostname === "[::1]";

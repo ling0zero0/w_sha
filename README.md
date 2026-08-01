@@ -50,8 +50,8 @@
 
 ## 局域网与数据
 
-- 安装版会自动添加 Windows 专用网络防火墙规则。
-- 便携版首次启动时如出现防火墙提示，请允许“专用网络”访问。
+- 安装版会自动添加仅允许本地子网访问的 Windows 防火墙规则，覆盖专用和公用网络配置。
+- 便携版首次启动时如出现防火墙提示，请允许当前可信局域网（专用或公用网络）访问。
 - 手机和主机必须处于允许设备互访的同一局域网。
 - 生产版默认使用端口 `35173`。
 - 游戏数据保存在 `%LOCALAPPDATA%\W_SHA\werewolf.sqlite`。
@@ -75,6 +75,8 @@ corepack pnpm dev
 
 开发模式会同时启动 Fastify 服务端和 Vite 前端。
 首次保存 AI 凭据时无需手动配置密钥；服务端会在数据库目录自动生成 `ai-master-key`。无界面部署也可以通过 `AI_MASTER_KEY` 显式提供 Base64 编码的 32 字节密钥。
+
+AI 多座位共用房间级 token 上限可通过 `AI_GAME_TOKEN_BUDGET` 配置，默认值为 `100000`；单模型/单座位仍受模型档案中的 `gameTokenBudget` 限制。调用失败、预算耗尽或配置版本不一致时，机器人会回退到确定性策略，审计记录可由主持人本机的 `/api/admin/ai/usage` 查看。
 
 ## 常用命令
 
@@ -128,6 +130,31 @@ corepack pnpm package:installer
 ```
 
 安装包构建需要本机安装 [Inno Setup 6](https://jrsoftware.org/isinfo.php)。生成结果位于 `release/`，该目录属于构建产物，不应提交到 Git。
+
+## 发布前局域网烟测
+
+便携版生成后，可在 Windows 主机上运行生产服务的局域网烟测。它会验证 LAN 主页、加入链接、Socket 来源白名单、主机接口隔离、跨 Socket 生命周期 action 重放、快照重启恢复和玩家重连；这不能替代 Android、iPhone 或微信浏览器的实机完整对局：
+
+```powershell
+corepack pnpm verify:lan
+```
+
+烟测默认使用生产固定端口 `35173`，因此能覆盖安装版启动脚本和防火墙规则对应的端口。若开发机上的 `35173` 已被占用，可临时使用动态端口，但这不能替代固定端口验证：
+
+```powershell
+$env:RELEASE_PORT = "0"
+corepack pnpm verify:lan
+Remove-Item Env:RELEASE_PORT
+```
+
+如果主机有多个网卡，可显式指定二维码应公布的 IPv4 地址：
+
+```powershell
+$env:LAN_ADDRESS = "192.168.1.20"
+corepack pnpm verify:lan
+```
+
+真实设备验收请按 [docs/release-acceptance.md](docs/release-acceptance.md) 记录结果。
 
 ## 项目结构
 

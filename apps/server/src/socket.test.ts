@@ -103,6 +103,19 @@ function connect(url: string, auth?: Record<string, string>): TestSocket {
   return socket;
 }
 
+function connectWithOrigin(url: string, origin: string): TestSocket {
+  const socket: TestSocket = createClient(url, {
+    transports: ["websocket"],
+    transportOptions: {
+      websocket: {
+        extraHeaders: { origin }
+      }
+    }
+  });
+  clients.push(socket);
+  return socket;
+}
+
 async function startRuntime(
   automaticPhaseProgression = false,
   stageTimingOverrides: Parameters<typeof attachSocketServer>[5] = {}
@@ -136,6 +149,35 @@ async function startRuntime(
 }
 
 describe("lobby socket integration", () => {
+  it("enforces the browser origin allowlist at the handshake", async () => {
+    const { url } = await startRuntime();
+    const allowed = connectWithOrigin(url, "http://192.168.1.20:5173");
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("allowed socket did not connect")), 2_000);
+      allowed.once("connect", () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+      allowed.once("connect_error", (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+    });
+
+    const blocked = connectWithOrigin(url, "http://unexpected.example:5173");
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("blocked socket connected")), 2_000);
+      blocked.once("connect_error", () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+      blocked.once("connect", () => {
+        clearTimeout(timeout);
+        reject(new Error("blocked socket connected"));
+      });
+    });
+  });
+
   it("synchronizes two joined players to host and private player views", async () => {
     const { url } = await startRuntime();
     const host = connect(url, { hostSession: "zyxwvutsrqponmlkjihgfedcba654321" });
@@ -336,6 +378,191 @@ describe("lobby socket integration", () => {
     expect(runtime.room.getHostView().players[0]?.connection).toBe("online");
   });
 
+  it("replays a join action on the same socket and across a replacement socket", async () => {
+    const { runtime, url } = await startRuntime();
+    const actionId = "11111111-1111-4111-8111-111111111111";
+    const firstSocket = connect(url);
+    const payload = {
+      roomCode: "123456",
+      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+      nickname: "幂等加入",
+      actionId
+    };
+
+    const first = await firstSocket.emitWithAck("player:join", payload);
+    const sameSocketReplay = await firstSocket.emitWithAck("player:join", payload);
+    expect(sameSocketReplay).toEqual(first);
+
+    const replacementSocket = connect(url);
+    const crossSocketReplay = await replacementSocket.emitWithAck("player:join", payload);
+    expect(crossSocketReplay).toEqual(first);
+    expect(runtime.room.getHostView().players).toHaveLength(1);
+    expect(runtime.room.getHostView().players[0]?.connection).toBe("online");
+  });
+
+  it("replays a reconnect action across sockets and rejects lifecycle action conflicts", async () => {
+    const { runtime, url } = await startRuntime();
+    const firstSocket = connect(url);
+    const joined = await firstSocket.emitWithAck("player:join", {
+      roomCode: "123456",
+      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+      nickname: "幂等重连"
+    });
+    if (!joined.ok) throw new Error("test setup failed");
+
+    const reconnectActionId = "22222222-2222-4222-8222-222222222222";
+    firstSocket.disconnect();
+    const reconnectSocket = connect(url);
+    const reconnectPayload = { ...joined.data.credentials, actionId: reconnectActionId };
+    const firstReconnect = await reconnectSocket.emitWithAck("player:reconnect", reconnectPayload);
+
+    const replacementSocket = connect(url);
+    const replay = await replacementSocket.emitWithAck("player:reconnect", reconnectPayload);
+    expect(replay).toEqual(firstReconnect);
+    expect(runtime.room.getHostView().players).toHaveLength(1);
+    expect(runtime.room.getHostView().players[0]?.connection).toBe("online");
+
+    expect(await replacementSocket.emitWithAck("player:join", {
+      roomCode: "123456",
+      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+      nickname: "另一个昵称",
+      actionId: reconnectActionId
+    })).toMatchObject({ ok: false, code: "ACTION_ID_CONFLICT" });
+  });
+
+  it("reattaches an idempotent takeover request after the requester changes sockets", async () => {
+    const { runtime, url } = await startRuntime();
+    const host = connect(url, { hostSession: "zyxwvutsrqponmlkjihgfedcba654321" });
+    await waitForHostState(host);
+
+    const player = connect(url);
+    const joined = await player.emitWithAck("player:join", {
+      roomCode: "123456",
+      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+      nickname: "接管目标"
+    });
+    if (!joined.ok) throw new Error("test setup failed");
+
+    const actionId = "33333333-3333-4333-8333-333333333333";
+    const takeoverPayload = {
+      roomCode: "123456",
+      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+      nickname: "接管目标",
+      actionId
+    };
+    const requester = connect(url);
+    const requested = await requester.emitWithAck("player:request-takeover", takeoverPayload);
+    if (!requested.ok) throw new Error("test setup failed");
+    requester.disconnect();
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    const replacementRequester = connect(url);
+    const replay = await replacementRequester.emitWithAck(
+      "player:request-takeover",
+      takeoverPayload
+    );
+    expect(replay).toEqual(requested);
+    expect(runtime.room.getHostView().takeoverRequests).toEqual([
+      expect.objectContaining({
+        id: requested.data.requestId,
+        nickname: "接管目标"
+      })
+    ]);
+
+    expect(await replacementRequester.emitWithAck("player:join", {
+      roomCode: "123456",
+      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+      nickname: "另一个玩家",
+      actionId
+    })).toMatchObject({ ok: false, code: "ACTION_ID_CONFLICT" });
+  });
+
+  it("replays the approved takeover session after the original requester disappears", async () => {
+    const { runtime, url } = await startRuntime();
+    const host = connect(url, { hostSession: "zyxwvutsrqponmlkjihgfedcba654321" });
+    await waitForHostState(host);
+
+    const player = connect(url);
+    const joined = await player.emitWithAck("player:join", {
+      roomCode: "123456",
+      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+      nickname: "接管恢复"
+    });
+    if (!joined.ok) throw new Error("test setup failed");
+
+    const actionId = "44444444-4444-4444-8444-444444444444";
+    const takeoverPayload = {
+      roomCode: "123456",
+      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+      nickname: "接管恢复",
+      actionId
+    };
+    const requester = connect(url);
+    const requested = await requester.emitWithAck("player:request-takeover", takeoverPayload);
+    if (!requested.ok) throw new Error("test setup failed");
+    requester.disconnect();
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    expect(await host.emitWithAck("host:resolve-takeover", {
+      requestId: requested.data.requestId,
+      approved: true
+    })).toMatchObject({ ok: true, data: { takeoverRequests: [] } });
+
+    const replacementRequester = connect(url);
+    const approval = waitForTakeoverApproval(replacementRequester);
+    const replay = await replacementRequester.emitWithAck(
+      "player:request-takeover",
+      takeoverPayload
+    );
+    expect(replay).toEqual(requested);
+    const session = await approval;
+    expect(session.credentials.reconnectToken).not.toBe(joined.data.credentials.reconnectToken);
+    expect(session.lobby.selfId).toBe(joined.data.lobby.selfId);
+    expect(runtime.room.getHostView().players[0]?.connection).toBe("online");
+  });
+
+  it("replays a rejected takeover notification after the original requester disappears", async () => {
+    const { runtime, url } = await startRuntime();
+    const host = connect(url, { hostSession: "zyxwvutsrqponmlkjihgfedcba654321" });
+    await waitForHostState(host);
+
+    const player = connect(url);
+    const joined = await player.emitWithAck("player:join", {
+      roomCode: "123456",
+      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+      nickname: "接管拒绝"
+    });
+    if (!joined.ok) throw new Error("test setup failed");
+
+    const actionId = "55555555-5555-4555-8555-555555555555";
+    const takeoverPayload = {
+      roomCode: "123456",
+      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+      nickname: "接管拒绝",
+      actionId
+    };
+    const requester = connect(url);
+    const requested = await requester.emitWithAck("player:request-takeover", takeoverPayload);
+    if (!requested.ok) throw new Error("test setup failed");
+    requester.disconnect();
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    expect(await host.emitWithAck("host:resolve-takeover", {
+      requestId: requested.data.requestId,
+      approved: false
+    })).toMatchObject({ ok: true, data: { takeoverRequests: [] } });
+
+    const replacementRequester = connect(url);
+    const rejection = waitForTakeoverRejection(replacementRequester);
+    const replay = await replacementRequester.emitWithAck(
+      "player:request-takeover",
+      takeoverPayload
+    );
+    expect(replay).toEqual(requested);
+    await expect(rejection).resolves.toEqual({ message: "主机拒绝了设备接管申请" });
+    expect(runtime.room.getHostView().players[0]?.connection).toBe("online");
+  });
+
   it("keeps each socket bound to at most one player seat", async () => {
     const { url } = await startRuntime();
     const firstSocket = connect(url);
@@ -459,6 +686,38 @@ describe("lobby socket integration", () => {
     expect(resumed).toMatchObject({ ok: true, data: { revision: 3, clock: { status: "running" } } });
     expect(await resumedBroadcast).toMatchObject({ revision: 3, clock: { status: "running" } });
 
+  });
+
+  it("replays idempotent host controls and rejects reused action ids", async () => {
+    const { runtime, url } = await startRuntime();
+    runtime.phaseClock.start(60_000, Date.now());
+    const host = connect(url, { hostSession: "zyxwvutsrqponmlkjihgfedcba654321" });
+    await waitForPublicGameState(host);
+
+    const actionId = "66666666-6666-4666-8666-666666666666";
+    const first = await host.emitWithAck("host:adjust-phase-time", {
+      deltaMs: 15_000,
+      actionId
+    });
+    const replay = await host.emitWithAck("host:adjust-phase-time", {
+      deltaMs: 15_000,
+      actionId
+    });
+
+    expect(first).toEqual(replay);
+    expect(runtime.getPublicGameState().revision).toBe(1);
+    expect(runtime.getPublicGameState().interventions.filter(
+      (intervention) => intervention.type === "adjust-time"
+    )).toHaveLength(1);
+
+    expect(await host.emitWithAck("host:adjust-phase-time", {
+      deltaMs: -15_000,
+      actionId
+    })).toMatchObject({
+      ok: false,
+      code: "ACTION_ID_CONFLICT"
+    });
+    expect(runtime.getPublicGameState().revision).toBe(1);
   });
 
   it("lets only the host terminate an active game and reveals the final record", async () => {
@@ -899,10 +1158,14 @@ describe("lobby socket integration", () => {
     })).toMatchObject({ ok: false, code: "INVALID_PHASE_CONTROL" });
     await host.emitWithAck("host:resume-phase");
 
-    const sent = await players[wolfIndexes[0]!]!.emitWithAck("chat:send", {
+    const chatActionId = "77777777-7777-4777-8777-777777777777";
+    const chatPayload = {
       channel: "wolf-private",
-      content: { kind: "text", text: "今晚统一目标" }
-    });
+      content: { kind: "text", text: "今晚统一目标" },
+      actionId: chatActionId
+    } as const;
+    const sent = await players[wolfIndexes[0]!]!.emitWithAck("chat:send", chatPayload);
+    const replay = await players[wolfIndexes[0]!]!.emitWithAck("chat:send", chatPayload);
     expect(sent).toMatchObject({
       ok: true,
       data: {
@@ -910,10 +1173,16 @@ describe("lobby socket integration", () => {
         content: { kind: "text", text: "今晚统一目标" }
       }
     });
+    expect(replay).toEqual(sent);
     await new Promise((resolve) => setTimeout(resolve, 25));
     expect(hostMessages).toEqual([]);
     expect(playerMessages[nonWolfIndex]).toEqual([]);
     for (const wolfIndex of wolfIndexes) {
+      expect(playerMessages[wolfIndex]?.filter((message) => (
+        message.channel === "wolf-private"
+        && message.content.kind === "text"
+        && message.content.text === "今晚统一目标"
+      ))).toHaveLength(1);
       expect(playerMessages[wolfIndex]).toContainEqual(expect.objectContaining({
         channel: "wolf-private",
         content: { kind: "text", text: "今晚统一目标" }

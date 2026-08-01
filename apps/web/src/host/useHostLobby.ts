@@ -13,6 +13,7 @@ import {
 } from "@werewolf/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
+import { createActionId } from "../socket/action-id";
 
 type ConnectionState = "checking" | "connected" | "disconnected";
 
@@ -241,79 +242,79 @@ export function useHostLobby() {
   }, []);
 
   const refreshJoin = useCallback(() => {
-    socketRef.current?.emit("host:refresh-join", applyResult);
+    socketRef.current?.emit("host:refresh-join", { actionId: createActionId() }, applyResult);
   }, [applyResult]);
 
   const movePlayer = useCallback((playerId: PlayerId, direction: "up" | "down") => {
-    socketRef.current?.emit("host:move-player", { playerId, direction }, applyResult);
+    socketRef.current?.emit("host:move-player", { playerId, direction, actionId: createActionId() }, applyResult);
   }, [applyResult]);
 
   const removePlayer = useCallback((playerId: PlayerId) => {
-    socketRef.current?.emit("host:remove-player", { playerId }, applyResult);
+    socketRef.current?.emit("host:remove-player", { playerId, actionId: createActionId() }, applyResult);
   }, [applyResult]);
 
   const addBot = useCallback((request: HostAddBotRequest) => {
-    socketRef.current?.emit("host:add-bot", request, applyResult);
+    socketRef.current?.emit("host:add-bot", { ...request, actionId: createActionId() }, applyResult);
   }, [applyResult]);
 
   const correctPlayerLife = useCallback((playerId: PlayerId, alive: boolean) => {
-    socketRef.current?.emit("host:correct-player-life", { playerId, alive }, applyResult);
+    socketRef.current?.emit("host:correct-player-life", { playerId, alive, actionId: createActionId() }, applyResult);
   }, [applyResult]);
 
   const resolveTakeover = useCallback((requestId: string, approved: boolean) => {
-    socketRef.current?.emit("host:resolve-takeover", { requestId, approved }, applyResult);
+    socketRef.current?.emit("host:resolve-takeover", { requestId, approved, actionId: createActionId() }, applyResult);
   }, [applyResult]);
 
   const pausePhase = useCallback(() => {
-    socketRef.current?.emit("host:pause-phase", applyGameResult);
+    socketRef.current?.emit("host:pause-phase", { actionId: createActionId() }, applyGameResult);
   }, [applyGameResult]);
 
   const resumePhase = useCallback(() => {
-    socketRef.current?.emit("host:resume-phase", applyGameResult);
+    socketRef.current?.emit("host:resume-phase", { actionId: createActionId() }, applyGameResult);
   }, [applyGameResult]);
 
   const adjustPhaseTime = useCallback((deltaMs: number) => {
-    socketRef.current?.emit("host:adjust-phase-time", { deltaMs }, applyGameResult);
+    socketRef.current?.emit("host:adjust-phase-time", { deltaMs, actionId: createActionId() }, applyGameResult);
   }, [applyGameResult]);
 
   const forceEndPhase = useCallback(() => {
-    socketRef.current?.emit("host:force-end-phase", applyGameResult);
+    socketRef.current?.emit("host:force-end-phase", { actionId: createActionId() }, applyGameResult);
   }, [applyGameResult]);
 
   const skipNightPhase = useCallback(() => {
-    socketRef.current?.emit("host:skip-night-phase", applyGameResult);
+    socketRef.current?.emit("host:skip-night-phase", { actionId: createActionId() }, applyGameResult);
   }, [applyGameResult]);
 
   const updateRoleConfiguration = useCallback((configuration: RoleConfiguration) => {
-    socketRef.current?.emit("host:update-role-configuration", configuration, applyResult);
+    socketRef.current?.emit("host:update-role-configuration", { ...configuration, actionId: createActionId() }, applyResult);
   }, [applyResult]);
 
   const updateChatMode = useCallback((chatMode: ChatMode) => {
-    socketRef.current?.emit("host:update-chat-mode", { chatMode }, applyResult);
+    socketRef.current?.emit("host:update-chat-mode", { chatMode, actionId: createActionId() }, applyResult);
   }, [applyResult]);
 
   const startGame = useCallback(() => {
-    socketRef.current?.emit("host:start-game", applyResult);
+    socketRef.current?.emit("host:start-game", { actionId: createActionId() }, applyResult);
   }, [applyResult]);
 
   const continueFromDawn = useCallback(() => {
-    socketRef.current?.emit("host:continue-from-dawn", applyResult);
+    socketRef.current?.emit("host:continue-from-dawn", { actionId: createActionId() }, applyResult);
   }, [applyResult]);
 
   const continueFromExile = useCallback(() => {
-    socketRef.current?.emit("host:continue-from-exile", applyResult);
+    socketRef.current?.emit("host:continue-from-exile", { actionId: createActionId() }, applyResult);
   }, [applyResult]);
 
   const skipDayPhase = useCallback(() => {
-    socketRef.current?.emit("host:skip-day-phase", applyGameResult);
+    socketRef.current?.emit("host:skip-day-phase", { actionId: createActionId() }, applyGameResult);
   }, [applyGameResult]);
 
   const playAgain = useCallback(() => {
-    socketRef.current?.emit("host:play-again", applyResult);
+    socketRef.current?.emit("host:play-again", { actionId: createActionId() }, applyResult);
   }, [applyResult]);
 
   const returnToLobby = useCallback(() => {
-    socketRef.current?.emit("host:return-to-lobby", applyResult);
+    socketRef.current?.emit("host:return-to-lobby", { actionId: createActionId() }, applyResult);
   }, [applyResult]);
 
   return {

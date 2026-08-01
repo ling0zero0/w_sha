@@ -1,20 +1,22 @@
 import { randomBytes } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import type { AiDecisionResponse, ModelProvider } from "./model-provider.js";
+import { AiAuditStore } from "./ai-audit-store.js";
+import { BudgetLedger } from "./budget-ledger.js";
 import { AiConfigStore } from "./ai-config-store.js";
 import { AesGcmSecretBox } from "./secret-box.js";
 import { ProviderRegistry } from "./provider-registry.js";
 import { LlmBotAdapter } from "./llm-bot-adapter.js";
 import type { PlayerLobbyView } from "@werewolf/shared";
 
-function createView(): PlayerLobbyView {
+function createView(selfId = "11111111-1111-4111-8111-111111111111"): PlayerLobbyView {
   return {
     roomCode: "123456",
     revision: 7,
-    selfId: "11111111-1111-4111-8111-111111111111",
+    selfId,
     phase: "day-vote",
     players: [
-      { id: "11111111-1111-4111-8111-111111111111", number: 1, nickname: "AI", connection: "online", alive: true, controller: "bot", botKind: "llm", botProfileId: "44444444-4444-4444-8444-444444444444" },
+      { id: selfId, number: 1, nickname: "AI", connection: "online", alive: true, controller: "bot", botKind: "llm", botProfileId: "44444444-4444-4444-8444-444444444444" },
       { id: "22222222-2222-4222-8222-222222222222", number: 2, nickname: "P2", connection: "online", alive: true, controller: "human", botKind: null, botProfileId: null }
     ],
     privateRole: { role: "villager", confirmed: true, wolfTeammates: [] },
@@ -46,7 +48,7 @@ function harness(response: AiDecisionResponse) {
   const decide = vi.fn(async (_request: unknown, _signal: AbortSignal) => response);
   const registry = new ProviderRegistry();
   registry.register("openai-compatible-chat", () => ({ decide, testConnection: vi.fn() } as unknown as ModelProvider));
-  return { store, profile, registry, decide };
+  return { store, profile, model, registry, decide };
 }
 
 describe("LlmBotAdapter", () => {
@@ -79,6 +81,109 @@ describe("LlmBotAdapter", () => {
     const adapter = new LlmBotAdapter({ playerId: view.selfId, botProfileId: h.profile.id, gameId: () => "game-1", store: h.store, providers: h.registry });
     expect(await adapter.onView(view, { playerId: view.selfId, revision: 7, deadlineAt: new Date().toISOString(), signal: new AbortController().signal })).toEqual({ type: "day-confirm-vote", payload: { confirmed: true } });
     expect(h.decide).not.toHaveBeenCalled();
+    h.store.close();
+  });
+
+  it("shares a room token budget across concurrent LLM seats", async () => {
+    const h = harness({ ok: true, latencyMs: 5, completedAt: new Date().toISOString(), usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 }, decision: { protocolVersion: 1, intent: { type: "day-select-vote", payload: { target: "22222222-2222-4222-8222-222222222222" } } } });
+    const ledger = new BudgetLedger();
+    const firstAdapter = new LlmBotAdapter({
+      playerId: "11111111-1111-4111-8111-111111111111",
+      botProfileId: h.profile.id,
+      gameId: () => "game-shared",
+      store: h.store,
+      providers: h.registry,
+      budgetLedger: ledger,
+      gameTokenBudget: 64
+    });
+    const secondAdapter = new LlmBotAdapter({
+      playerId: "55555555-5555-4555-8555-555555555555",
+      botProfileId: h.profile.id,
+      gameId: () => "game-shared",
+      store: h.store,
+      providers: h.registry,
+      budgetLedger: ledger,
+      gameTokenBudget: 64
+    });
+
+    let release: (() => void) | null = null;
+    h.decide.mockImplementation(async () => {
+      await new Promise<void>((resolve) => { release = resolve; });
+      return {
+        ok: true,
+        latencyMs: 5,
+        completedAt: new Date().toISOString(),
+        usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+        decision: {
+          protocolVersion: 1,
+          intent: { type: "day-select-vote", payload: { target: "22222222-2222-4222-8222-222222222222" } }
+        }
+      };
+    });
+
+    const first = firstAdapter.onView(createView(), {
+      playerId: "11111111-1111-4111-8111-111111111111",
+      revision: 7,
+      deadlineAt: new Date().toISOString(),
+      signal: new AbortController().signal
+    });
+    await vi.waitFor(() => expect(h.decide).toHaveBeenCalledOnce());
+    const second = secondAdapter.onView(createView("55555555-5555-4555-8555-555555555555"), {
+      playerId: "55555555-5555-4555-8555-555555555555",
+      revision: 7,
+      deadlineAt: new Date().toISOString(),
+      signal: new AbortController().signal
+    });
+    expect(await second).toEqual({
+      type: "day-select-vote",
+      payload: { target: "22222222-2222-4222-8222-222222222222" }
+    });
+    release!();
+    expect(await first).toEqual({
+      type: "day-select-vote",
+      payload: { target: "22222222-2222-4222-8222-222222222222" }
+    });
+    expect(h.decide).toHaveBeenCalledOnce();
+    expect(ledger.getGameUsage("game-shared")).toEqual({ settledTokens: 15, reservedTokens: 0 });
+    h.store.close();
+  });
+
+  it("records successful model usage and locks configuration revisions for a game", async () => {
+    const h = harness({ ok: true, latencyMs: 5, completedAt: new Date().toISOString(), usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 }, decision: { protocolVersion: 1, intent: { type: "day-select-vote", payload: { target: "22222222-2222-4222-8222-222222222222" } } } });
+    const auditStore = new AiAuditStore(":memory:");
+    const adapter = new LlmBotAdapter({
+      playerId: createView().selfId,
+      botProfileId: h.profile.id,
+      gameId: () => "game-locked",
+      store: h.store,
+      providers: h.registry,
+      auditStore
+    });
+    adapter.lockForGame("game-locked");
+    h.store.updateModelProfile(h.model.id, { model: "changed-after-start" });
+
+    const view = createView();
+    await adapter.onView(view, {
+      playerId: view.selfId,
+      revision: view.revision,
+      deadlineAt: new Date().toISOString(),
+      signal: new AbortController().signal
+    });
+
+    expect(h.decide.mock.calls[0]?.[0]).toMatchObject({
+      model: { model: "test-model", revision: 1 }
+    });
+    expect(auditStore.listAttempts()).toMatchObject([{
+      status: "success",
+      botProfileRevision: 1,
+      modelProfileRevision: 1
+    }]);
+    expect(auditStore.listUsage()).toMatchObject([{
+      inputTokens: 10,
+      outputTokens: 5,
+      totalTokens: 15
+    }]);
+    auditStore.close();
     h.store.close();
   });
 });

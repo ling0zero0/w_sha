@@ -37,6 +37,13 @@ describe("AI admin authorization", () => {
     }, hostSession)).toBe(false);
   });
 
+  it.each(["file://127.0.0.1/", "ftp://127.0.0.1/"])(
+    "rejects a non-HTTP loopback source: %s",
+    (source) => {
+      expect(isAuthorizedAiAdmin(request({ origin: source }), hostSession)).toBe(false);
+    }
+  );
+
   it("honors the Vite proxy client address only for a loopback proxy", () => {
     expect(isAuthorizedAiAdmin(request({
       proxyClientAddress: "192.168.1.44"

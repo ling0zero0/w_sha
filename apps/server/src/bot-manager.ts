@@ -5,7 +5,7 @@ import {
   type PlayerId,
   type PlayerLobbyView
 } from "@werewolf/shared";
-import type { LobbyRoom } from "./room.js";
+import type { BotConfigurationLock, LobbyRoom } from "./room.js";
 
 export interface BotTurnContext {
   playerId: PlayerId;
@@ -17,6 +17,7 @@ export interface BotTurnContext {
 export interface BotAdapter {
   readonly kind: BotKind;
   readonly turnTimeoutMs?: number;
+  lockForGame?(gameId: string): void;
   onView(view: PlayerLobbyView, context: BotTurnContext): Promise<BotIntent | null>;
   dispose(): Promise<void>;
 }
@@ -24,7 +25,8 @@ export interface BotAdapter {
 export type BotAdapterFactory = (
   kind: BotKind,
   playerId: PlayerId,
-  botProfileId: string | null
+  botProfileId: string | null,
+  lockedConfiguration?: BotConfigurationLock
 ) => BotAdapter;
 
 interface ManagedBot {
@@ -101,7 +103,12 @@ export class BotManager {
     for (const [playerId, seat] of seats) {
       if (this.bots.has(playerId)) continue;
       this.bots.set(playerId, {
-        adapter: this.adapterFactory(seat.botKind, playerId, seat.botProfileId),
+        adapter: this.adapterFactory(
+          seat.botKind,
+          playerId,
+          seat.botProfileId,
+          seat.lockedConfiguration
+        ),
         kind: seat.botKind,
         lastAttemptedRevision: null,
         task: null,
@@ -114,6 +121,9 @@ export class BotManager {
     const bot = this.bots.get(playerId);
     const view = this.room.getPlayerView(playerId);
     if (!bot || !view) return;
+
+    const gameId = this.room.getGameSessionId();
+    if (gameId) bot.adapter.lockForGame?.(gameId);
 
     if (bot.task) {
       if (bot.task.revision !== view.revision) bot.task.controller.abort();

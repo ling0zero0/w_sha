@@ -48,6 +48,7 @@ interface ProviderSecretRow {
 
 interface ModelProfileRow {
   id: string;
+  revision: number;
   provider_id: string;
   name: string;
   model: string;
@@ -62,6 +63,7 @@ interface ModelProfileRow {
 
 interface BotProfileRow {
   id: string;
+  revision: number;
   name: string;
   default_nickname: string;
   description: string;
@@ -91,6 +93,7 @@ const providerSelect = `
 const modelProfileSelect = `
   SELECT
     id,
+    revision,
     provider_id,
     name,
     model,
@@ -107,6 +110,7 @@ const modelProfileSelect = `
 const botProfileSelect = `
   SELECT
     id,
+    revision,
     name,
     default_nickname,
     description,
@@ -280,6 +284,7 @@ export class AiConfigStore {
     this.database.prepare(`
       INSERT INTO ai_model_profiles (
         id,
+        revision,
         provider_id,
         name,
         model,
@@ -292,7 +297,7 @@ export class AiConfigStore {
         fallback_model_profile_id,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       input.providerId,
@@ -328,6 +333,7 @@ export class AiConfigStore {
     this.database.prepare(`
       UPDATE ai_model_profiles
       SET
+        revision = revision + 1,
         provider_id = ?,
         name = ?,
         model = ?,
@@ -590,6 +596,7 @@ function parseProvider(row: ProviderRow): AiProviderView {
 function parseModelProfile(row: ModelProfileRow): AiModelProfileView {
   return aiModelProfileViewSchema.parse({
     id: row.id,
+    revision: row.revision,
     providerId: row.provider_id,
     name: row.name,
     model: row.model,
@@ -606,6 +613,7 @@ function parseModelProfile(row: ModelProfileRow): AiModelProfileView {
 function parseBotProfile(row: BotProfileRow): AiBotProfileView {
   return aiBotProfileViewSchema.parse({
     id: row.id,
+    revision: row.revision,
     name: row.name,
     defaultNickname: row.default_nickname,
     description: row.description,

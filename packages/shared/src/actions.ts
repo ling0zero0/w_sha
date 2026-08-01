@@ -7,6 +7,16 @@ import {
 import { playerIdSchema, wolfVoteTargetSchema } from "./domain.js";
 import { dayVoteTargetSchema } from "./game.js";
 
+export const actionIdSchema = z.uuid();
+export type ActionId = z.infer<typeof actionIdSchema>;
+
+export const actionRequestSchema = z.object({
+  actionId: actionIdSchema
+}).strict();
+export type ActionRequest = z.infer<typeof actionRequestSchema>;
+
+export type ActionPayload<T> = T & Partial<ActionRequest>;
+
 export const hostPlayerRequestSchema = z.object({ playerId: playerIdSchema });
 export type HostPlayerRequest = z.infer<typeof hostPlayerRequestSchema>;
 
@@ -77,6 +87,7 @@ export type DayConfirmVoteRequest = z.infer<typeof dayConfirmVoteRequestSchema>;
 
 export const roomErrorCodeSchema = z.enum([
   "INVALID_REQUEST",
+  "ACTION_ID_CONFLICT",
   "INVALID_HOST_SESSION",
   "INVALID_JOIN_CREDENTIALS",
   "NICKNAME_TAKEN",

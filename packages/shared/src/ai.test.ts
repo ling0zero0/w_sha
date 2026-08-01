@@ -80,6 +80,14 @@ describe("AI shared contracts", () => {
       ...providerWrite,
       baseUrl: "https://user:password@example.com/v1"
     }).success).toBe(false);
+    expect(createAiProviderRequestSchema.safeParse({
+      ...providerWrite,
+      baseUrl: "http://169.254.169.254/latest/meta-data"
+    }).success).toBe(false);
+    expect(createAiProviderRequestSchema.safeParse({
+      ...providerWrite,
+      baseUrl: "http://[fe80::1]/v1"
+    }).success).toBe(false);
   });
 
   it("keeps provider credentials out of redacted views", () => {

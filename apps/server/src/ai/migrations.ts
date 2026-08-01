@@ -61,6 +61,13 @@ const migrations: readonly Migration[] = [
         updated_at TEXT NOT NULL
       );
     `
+  },
+  {
+    version: 2,
+    sql: `
+      ALTER TABLE ai_model_profiles
+      ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+    `
   }
 ];
 

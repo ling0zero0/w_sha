@@ -11,9 +11,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@fastify/static": "8.3.0",
+    "@fastify/static": "^10.1.2",
     "@werewolf/shared": "workspace:*",
-    "fastify": "^5.10.0",
+    "fastify": "^5.11.0",
     "socket.io": "^4.8.3",
     "zod": "^4.4.3"
   },

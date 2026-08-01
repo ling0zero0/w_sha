@@ -3,6 +3,28 @@ import { z } from "zod";
 const namedConfigurationSchema = z.string().trim().min(1).max(80);
 const apiKeySchema = z.string().min(1).max(8_192);
 const dateTimeSchema = z.iso.datetime();
+const blockedAiProviderHostnames = new Set([
+  "0.0.0.0",
+  "255.255.255.255",
+  "169.254.169.254",
+  "169.254.170.2",
+  "100.100.100.200",
+  "metadata",
+  "metadata.google.internal",
+  "metadata.azure.internal",
+  "instance-data.ec2.internal"
+]);
+
+export function isBlockedAiProviderHostname(hostname: string): boolean {
+  const normalized = hostname.trim().toLowerCase().replace(/^\[|\]$/g, "");
+  if (blockedAiProviderHostnames.has(normalized)) return true;
+  if (/^fe[89ab][0-9a-f]:/i.test(normalized)) return true;
+
+  const octets = normalized.split(".");
+  if (octets.length !== 4 || octets.some((octet) => !/^\d+$/.test(octet))) return false;
+  const values = octets.map(Number);
+  return values[0] === 169 && values[1] === 254;
+}
 
 const httpUrlSchema = z.url().superRefine((value, context) => {
   if (!/^https?:\/\//i.test(value)) {
@@ -23,7 +45,22 @@ const httpUrlSchema = z.url().superRefine((value, context) => {
       message: "URL must not contain a fragment"
     });
   }
+  if (isBlockedAiProviderHostname(extractHttpHostname(value))) {
+    context.addIssue({
+      code: "custom",
+      message: "URL points to a blocked metadata or link-local address"
+    });
+  }
 });
+
+function extractHttpHostname(value: string): string {
+  const authority = /^https?:\/\/([^/?#]*)/i.exec(value)?.[1] ?? "";
+  if (authority.startsWith("[")) {
+    const closingBracket = authority.indexOf("]");
+    return closingBracket >= 0 ? authority.slice(0, closingBracket + 1) : authority;
+  }
+  return authority.split(":", 1)[0] ?? "";
+}
 
 function requireUpdateField(
   value: Record<string, unknown>,
@@ -124,6 +161,7 @@ function validateModelProfileBudget(
 
 export const aiModelProfileViewSchema = z.object({
   id: aiModelProfileIdSchema,
+  revision: z.number().int().positive().default(1),
   ...modelProfileFields
 }).strict().superRefine((value, context) => {
   validateModelProfileBudget(value, context);
@@ -177,6 +215,7 @@ const botProfileFields = {
 
 export const aiBotProfileViewSchema = z.object({
   id: aiBotProfileIdSchema,
+  revision: z.number().int().positive().default(1),
   ...botProfileFields
 }).strict();
 export type AiBotProfileView = z.infer<typeof aiBotProfileViewSchema>;

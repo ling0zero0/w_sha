@@ -1,4 +1,4 @@
-import type { ChatMessage, PlayerLobbyView } from "@werewolf/shared";
+import type { ChatMessage, PlayerLobbyView, PlayerCredentials } from "@werewolf/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const hookHarness = vi.hoisted(() => ({
@@ -237,5 +237,57 @@ describe("usePlayerLobby chat merging", () => {
 
     const current = hookHarness.state as { lobby: PlayerLobbyView };
     expect(current.lobby.publicChat.messages).toEqual([first, second, recent]);
+  });
+
+  it("reuses lifecycle action ids while acknowledgements are pending", () => {
+    const api = usePlayerLobby({
+      roomCode: "123456",
+      joinToken: "abcdefghijklmnopqrstuvwxyz123456"
+    });
+
+    api.join("Alice");
+    api.join("Alice");
+    api.requestTakeover();
+    api.requestTakeover();
+
+    const joinCalls = socketHarness.socket.emit.mock.calls.filter(([event]) => event === "player:join");
+    const takeoverCalls = socketHarness.socket.emit.mock.calls.filter(
+      ([event]) => event === "player:request-takeover"
+    );
+    expect(joinCalls).toHaveLength(2);
+    expect(takeoverCalls).toHaveLength(2);
+    expect((joinCalls[0]![1] as { actionId: string }).actionId)
+      .toBe((joinCalls[1]![1] as { actionId: string }).actionId);
+    expect((takeoverCalls[0]![1] as { actionId: string }).actionId)
+      .toBe((takeoverCalls[1]![1] as { actionId: string }).actionId);
+  });
+
+  it("reuses the reconnect action id across automatic socket reconnects", () => {
+    const credentials: PlayerCredentials = {
+      roomCode: "123456",
+      playerId: "11111111-1111-4111-8111-111111111111",
+      reconnectToken: "abcdefghijklmnopqrstuvwxyz123456"
+    };
+    vi.stubGlobal("window", {
+      localStorage: {
+        getItem: vi.fn(() => JSON.stringify(credentials)),
+        setItem: vi.fn(),
+        removeItem: vi.fn()
+      }
+    });
+
+    usePlayerLobby({
+      roomCode: "123456",
+      joinToken: "abcdefghijklmnopqrstuvwxyz123456"
+    });
+    dispatch("connect", undefined);
+    dispatch("connect", undefined);
+
+    const reconnectCalls = socketHarness.socket.emit.mock.calls.filter(
+      ([event]) => event === "player:reconnect"
+    );
+    expect(reconnectCalls).toHaveLength(2);
+    expect((reconnectCalls[0]![1] as { actionId: string }).actionId)
+      .toBe((reconnectCalls[1]![1] as { actionId: string }).actionId);
   });
 });

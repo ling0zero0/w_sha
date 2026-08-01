@@ -14,12 +14,14 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { ZodError } from "zod";
 import type { GameRuntime } from "../runtime.js";
 import { isAuthorizedAiAdmin } from "./admin-ai-auth.js";
+import type { AiAuditStore } from "./ai-audit-store.js";
 import type { AiConfigStore } from "./ai-config-store.js";
 import type { ProviderRegistry } from "./provider-registry.js";
 
 export interface AiAdminServices {
   store: AiConfigStore;
   providers: ProviderRegistry;
+  auditStore?: AiAuditStore;
 }
 
 export function registerAiAdminRoutes(
@@ -77,6 +79,10 @@ export function registerAiAdminRoutes(
     }));
 
     admin.get("/bot-profiles", async () => services.store.listBotProfiles());
+    admin.get("/usage", async () => ({
+      attempts: services.auditStore?.listAttempts() ?? [],
+      usage: services.auditStore?.listUsage() ?? []
+    }));
     admin.post("/bot-profiles", async (request, reply) => execute(request, reply, () => {
       const input = createAiBotProfileRequestSchema.parse(request.body);
       return services.store.createBotProfile(input);

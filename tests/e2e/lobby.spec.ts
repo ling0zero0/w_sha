@@ -3,7 +3,7 @@ import { expect, test, devices, type Page } from "@playwright/test";
 async function getLocalJoinUrl(page: Page): Promise<string> {
   const joinUrl = await page.evaluate(async () => {
     const response = await fetch("/api/host-bootstrap");
-    const payload = await response.json() as { lobby: { joinUrl: string } };
+    const payload = (await response.json()) as { lobby: { joinUrl: string } };
     return payload.lobby.joinUrl;
   });
   const invitation = new URL(joinUrl);
@@ -15,6 +15,53 @@ async function joinPlayer(player: Page, joinUrl: string, nickname: string): Prom
   await player.getByLabel("昵称").fill(nickname);
   await player.getByRole("button", { name: "进入大厅" }).click();
   await expect(player.getByRole("heading", { name: "已进入大厅" })).toBeVisible();
+}
+
+async function removePlayer(page: Page, nickname: string): Promise<void> {
+  const row = page.getByTestId("host-player").filter({ hasText: nickname });
+  if ((await row.count()) === 0) return;
+  await row.getByTitle("移除玩家").click({ force: true });
+  await expect(page.getByTestId("host-player").filter({ hasText: nickname })).toHaveCount(0);
+}
+
+async function assertMobileLayout(page: Page): Promise<void> {
+  const audit = await page.evaluate(() => {
+    const viewport = window.innerWidth;
+    const overflowers = [...document.querySelectorAll<HTMLElement>("body *")]
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          tag: element.tagName.toLowerCase(),
+          className: element.className,
+          right: Math.round(rect.right),
+          left: Math.round(rect.left)
+        };
+      })
+      .filter(({ right, left }) => right > viewport + 1 || left < -1)
+      .slice(0, 8);
+    return {
+      viewport,
+      scrollWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
+      overflowers
+    };
+  });
+  expect(audit.scrollWidth, JSON.stringify(audit)).toBeLessThanOrEqual(audit.viewport + 1);
+  expect(audit.overflowers, JSON.stringify(audit)).toEqual([]);
+
+  const undersized = await page.locator("button:visible, input:visible, textarea:visible, select:visible").evaluateAll((elements) =>
+    elements
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          tag: element.tagName.toLowerCase(),
+          name: element.getAttribute("aria-label") || element.textContent?.trim() || element.getAttribute("title") || "",
+          width: Math.round(rect.width),
+          height: Math.round(rect.height)
+        };
+      })
+      .filter(({ width, height }) => width < 44 || height < 44)
+  );
+  expect(undersized).toEqual([]);
 }
 
 test("host and two mobile players complete the LAN lobby workflow", async ({ browser, page }) => {
@@ -33,7 +80,7 @@ test("host and two mobile players complete the LAN lobby workflow", async ({ bro
 
   const joinUrl = await page.evaluate(async () => {
     const response = await fetch("/api/host-bootstrap");
-    const payload = await response.json() as { lobby: { joinUrl: string } };
+    const payload = (await response.json()) as { lobby: { joinUrl: string } };
     return payload.lobby.joinUrl;
   });
   const invitation = new URL(joinUrl);
@@ -153,9 +200,7 @@ test("host and two mobile players complete the LAN lobby workflow", async ({ bro
 test("configures a guard and renders its role artwork", async ({ browser, page }) => {
   await page.goto("/");
   const joinUrl = await getLocalJoinUrl(page);
-  const contexts = await Promise.all(
-    [0, 1, 2].map(() => browser.newContext({ ...devices["Pixel 7"] }))
-  );
+  const contexts = await Promise.all([0, 1, 2].map(() => browser.newContext({ ...devices["Pixel 7"] })));
   const players = await Promise.all(contexts.map((context) => context.newPage()));
 
   try {
@@ -174,10 +219,12 @@ test("configures a guard and renders its role artwork", async ({ browser, page }
 
     page.on("dialog", (dialog) => dialog.accept());
     await page.getByRole("button", { name: "开始游戏" }).click();
-    const roleLabels = await Promise.all(players.map(async (player) => {
-      await expect(player.getByText("你的身份是")).toBeVisible();
-      return player.locator("h1").textContent();
-    }));
+    const roleLabels = await Promise.all(
+      players.map(async (player) => {
+        await expect(player.getByText("你的身份是")).toBeVisible();
+        return player.locator("h1").textContent();
+      })
+    );
     expect([...roleLabels].sort()).toEqual(["守卫", "村民", "狼人"].sort());
 
     const guard = players[roleLabels.indexOf("守卫")]!;
@@ -232,7 +279,13 @@ test("host adds deterministic bots that complete a game through the public UI", 
   let sawDawn = false;
   const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) {
-    if (await page.locator(".game-over-panel").isVisible().catch(() => false)) break;
+    if (
+      await page
+        .locator(".game-over-panel")
+        .isVisible()
+        .catch(() => false)
+    )
+      break;
 
     const dawnButton = page.getByRole("button", { name: "进入白天流程" });
     if (await dawnButton.isVisible().catch(() => false)) {
@@ -270,7 +323,14 @@ test("three mobile players complete a full game and start a clean rematch", asyn
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "等待玩家加入" })).toBeVisible();
   const joinUrl = await getLocalJoinUrl(page);
-  const contexts = await Promise.all(Array.from({ length: 3 }, () => browser.newContext({ ...devices["Pixel 7"] })));
+  const contexts = await Promise.all(
+    Array.from({ length: 3 }, () =>
+      browser.newContext({
+        ...devices["Pixel 7"],
+        viewport: { width: 320, height: 667 }
+      })
+    )
+  );
   const players = await Promise.all(contexts.map((context) => context.newPage()));
 
   try {
@@ -293,11 +353,14 @@ test("three mobile players complete a full game and start a clean rematch", asyn
     await expect(page.getByRole("heading", { name: "玩家确认身份" })).toBeVisible();
     await expect(page.locator("body")).not.toContainText(/你的身份是|狼人队友|选择一名玩家查验/);
 
-    const roles = await Promise.all(players.map(async (player) => {
-      const role = await player.getByTestId("private-role").textContent();
-      await player.getByRole("button", { name: "我已记住身份" }).click();
-      return role;
-    }));
+    const roles = await Promise.all(
+      players.map(async (player) => {
+        const role = await player.getByTestId("private-role").textContent();
+        await player.getByRole("button", { name: "我已记住身份" }).click();
+        return role;
+      })
+    );
+    await Promise.all(players.map((player) => assertMobileLayout(player)));
     expect([...roles].sort()).toEqual(["村民", "狼人", "预言家"]);
     const wolf = players[roles.indexOf("狼人")]!;
     const seer = players[roles.indexOf("预言家")]!;
@@ -308,6 +371,8 @@ test("three mobile players complete a full game and start a clean rematch", asyn
     await expect(seer.locator("body")).not.toContainText("狼人私密协作");
     await wolf.getByRole("button", { name: "空刀", exact: true }).click();
     await wolf.getByRole("button", { name: "确认本次选择" }).click();
+    await expect(wolf.getByText("狼人行动已锁定", { exact: true })).toBeVisible();
+    await assertMobileLayout(wolf);
 
     await expect(seer.getByRole("heading", { name: "选择一名玩家查验" })).toBeVisible();
     const wolfNickname = ["林野", "阿岚", "青禾"][roles.indexOf("狼人")]!;
@@ -317,6 +382,7 @@ test("three mobile players complete a full game and start a clean rematch", asyn
 
     await page.getByRole("button", { name: "进入白天流程" }).click();
     await expect(villager.getByAltText("身份牌背面")).toBeVisible();
+    await Promise.all(players.map((player) => assertMobileLayout(player)));
     await expect(villager.getByAltText("村民身份牌")).toHaveCount(0);
     await villager.getByRole("button", { name: "查看身份" }).click();
     await expect(villager.getByAltText("村民身份牌")).toBeVisible();
@@ -369,6 +435,9 @@ test("three mobile players complete a full game and start a clean rematch", asyn
     }
 
     await expect(page.getByRole("heading", { name: "放逐投票" })).toBeVisible();
+    await Promise.all(players.map((player) => assertMobileLayout(player)));
+    await players[0]!.setViewportSize({ width: 667, height: 320 });
+    await assertMobileLayout(players[0]!);
     const wolfName = ["林野", "阿岚", "青禾"][roles.indexOf("狼人")]!;
     for (const [index, player] of players.entries()) {
       if (roles[index] === "狼人") {
@@ -388,9 +457,7 @@ test("three mobile players complete a full game and start a clean rematch", asyn
         await expect(client.getByText(text, { exact: true })).toBeVisible();
       }
     }
-    await expect(
-      villager.getByRole("heading", { name: "对局记录" }).locator("..")
-    ).toContainText("查验");
+    await expect(villager.getByRole("heading", { name: "对局记录" }).locator("..")).toContainText("查验");
     await expect(wolf.getByRole("button", { name: "确认本次选择" })).toHaveCount(0);
 
     await Promise.all([page.reload(), villager.reload()]);
@@ -408,6 +475,15 @@ test("three mobile players complete a full game and start a clean rematch", asyn
       await expect(player.getByRole("button", { name: "我已记住身份" })).toBeVisible();
       await expect(player.locator(".game-records")).toHaveCount(0);
     }
+
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.getByRole("button", { name: "终止对局" }).click();
+    await expect(page.getByRole("heading", { name: "对局终止" })).toBeVisible();
+    await page.getByRole("button", { name: "返回大厅调整" }).click();
+    for (const nickname of ["林野", "阿岚", "青禾"]) {
+      await removePlayer(page, nickname);
+    }
+    await expect(page.getByTestId("host-player")).toHaveCount(0);
   } finally {
     await Promise.all(contexts.map((context) => context.close()));
   }

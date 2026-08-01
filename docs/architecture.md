@@ -253,7 +253,7 @@ player:connection-changed
 每个大里程碑结束后，使用 Windows 主机、Android 手机和 iPhone 验证：
 
 - 二维码和局域网访问。
-- Windows 防火墙行为。
+- Windows 防火墙行为：安装版仅对本地子网放行 Node 程序的 TCP/35173 端口，并覆盖专用、公用和域网络配置；便携版依赖首次启动时的系统提示。
 - 手机浏览器兼容性。
 - 锁屏、切后台和短暂断网恢复。
 
@@ -261,12 +261,15 @@ player:connection-changed
 
 ## 13. AI 玩家执行边界
 
-- `LobbyPlayer.controller` 标记 `human` 或 `bot`，`botKind` 当前仅支持 `deterministic`。
+- `LobbyPlayer.controller` 标记 `human` 或 `bot`，`botKind` 支持 `deterministic` 与 `llm`。
 - `BotAdapter.onView` 每次只接收对应座位的 `PlayerLobbyView`，以及包含 `playerId`、`revision`、截止时间和 `AbortSignal` 的上下文。
 - `BotManager` 对每个机器人只保留一个在途决策；视图 revision 变化、强制重评估、移除座位或关闭服务都会取消旧任务。
 - 决策超时、适配器异常、格式错误、generation 不匹配或 revision 过期时不执行 Intent，也不阻塞房间状态机。
 - `executeBotIntent` 以调用参数绑定 actor，确认座位仍是机器人，并使用现有动作 Schema 和 `LobbyRoom` 方法执行。
-- 当前 `DeterministicBotAdapter` 只用于本地自动化与基础占位，不调用外部模型供应商。外部模型接入需要另行设计重试、成本、内容安全和供应商配置。
+- `LlmBotAdapter` 不获得房间内部对象，只使用自身 `PlayerLobbyView`、共享的房间 token 预算和供应商归一化接口；外部响应仍必须经过 `BotIntent` Schema 与房间规则校验。
+- 同一运行时的 LLM 座位共享 `BudgetLedger`；模型/座位/房间三层预算均在调用前原子预留，实际用量结算后释放未使用部分。
+- AI 调用只记录决策键、配置 revision、延迟、token 用量、错误和回退状态，不记录 API Key、提示词或原始响应；主持人可通过本机 AI 管理接口查看脱敏审计。
+- 对局开始时锁定机器人档案、主模型和 fallback 链 revision，并写入快照。恢复时若配置 revision 不匹配，机器人使用确定性回退，避免对局中热切换模型行为。
 
 ## 14. 开发约束
 

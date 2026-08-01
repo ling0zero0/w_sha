@@ -135,4 +135,19 @@ describe("AI budget ledger", () => {
       "budget reservation is not active"
     );
   });
+
+  it("clears all scopes and reservations for a completed game", () => {
+    const ledger = new BudgetLedger();
+    const reservation = ledger.reserve({
+      gameId: "game-old",
+      modelId: "model-1",
+      seatId: "seat-1",
+      tokens: 100,
+      limits
+    });
+    ledger.clearGame("game-old");
+
+    expect(ledger.getGameUsage("game-old")).toEqual({ settledTokens: 0, reservedTokens: 0 });
+    expect(() => ledger.settle(reservation.id, 1)).toThrow("budget reservation is not active");
+  });
 });

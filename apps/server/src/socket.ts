@@ -1,6 +1,7 @@
 import {
   chatHistoryRequestSchema,
   clientPingSchema,
+  type ActionId,
   type ChatMessage,
   type ClientToServerEvents,
   type PlayerId,
@@ -15,7 +16,9 @@ import { executeBotIntent } from "./bot-executor.js";
 import { BotManager } from "./bot-manager.js";
 import type { GameRuntime } from "./runtime.js";
 import type { AiConfigStore } from "./ai/ai-config-store.js";
+import type { AiAuditStore } from "./ai/ai-audit-store.js";
 import type { ProviderRegistry } from "./ai/provider-registry.js";
+import { BudgetLedger } from "./ai/budget-ledger.js";
 import { LlmBotAdapter } from "./ai/llm-bot-adapter.js";
 import { DeterministicBotAdapter } from "./bot-manager.js";
 import type { TimedStage } from "./room.js";
@@ -27,6 +30,8 @@ import {
 } from "./socket/context.js";
 import { registerHostHandlers } from "./socket/host-handlers.js";
 import { registerPlayerHandlers } from "./socket/player-handlers.js";
+import { ActionLedger } from "./socket/action-ledger.js";
+import { createSocketOriginPolicy } from "./socket-origin.js";
 
 const reconnectGraceMs = 15_000;
 
@@ -51,19 +56,45 @@ export function attachSocketServer(
   persistSnapshot: () => void = () => undefined,
   automaticPhaseProgression = false,
   stageTimingOverrides: Partial<Record<TimedStage, { minimumMs: number; maximumMs: number }>> = {},
-  aiServices?: { store: AiConfigStore; providers: ProviderRegistry }
+  aiServices?: {
+    store: AiConfigStore;
+    providers: ProviderRegistry;
+    auditStore?: AiAuditStore;
+    gameTokenBudget?: number;
+  },
+  additionalSocketOrigins: readonly string[] = []
 ) {
   if (automaticPhaseProgression) runtime.room.enableDeferredStageAdvancement();
   const activeStageTiming = { ...stageTiming, ...stageTimingOverrides };
+  const socketOriginPolicy = createSocketOriginPolicy({
+    publicAddress: runtime.room.localAddress,
+    publicPort: runtime.room.webPort,
+    additionalOrigins: additionalSocketOrigins
+  });
   const io: GameSocketServer = new Server<
     ClientToServerEvents,
     ServerToClientEvents,
     Record<string, never>,
     SocketData
   >(server, {
-    cors: { origin: true, credentials: false }
+    cors: {
+      origin: (origin, callback) => {
+        callback(null, socketOriginPolicy.isAllowed(origin));
+      },
+      credentials: false
+    },
+    allowRequest: (request, callback) => {
+      const origin = request.headers.origin;
+      const allowed = socketOriginPolicy.isAllowed(origin);
+      if (!allowed) logger.warn({ origin }, "socket connection rejected by origin policy");
+      callback(null, allowed);
+    }
   });
   const offlineTimers = new Map<PlayerId, NodeJS.Timeout>();
+  const takeoverActionIds = new Map<string, ActionId>();
+  const aiBudgetLedger = new BudgetLedger();
+  let activeAiGameId = runtime.room.getGameSessionId();
+  const actionLedger = new ActionLedger();
   let botManager: BotManager | null = null;
   let phaseTimer: NodeJS.Timeout | null = null;
   let scheduledStageKey: string | null = runtime.isPhasePaused() ? runtime.room.getTimedStageKey() : null;
@@ -136,6 +167,7 @@ export function attachSocketServer(
   }
 
   function emitLobbyViews(): void {
+    syncAiBudgetScope();
     persistSnapshot();
     emitHostLobbyView();
     for (const playerId of runtime.room.getPlayerIds()) {
@@ -146,17 +178,27 @@ export function attachSocketServer(
   }
 
   function emitHostLobbyView(): void {
+    syncAiBudgetScope();
     persistSnapshot();
     io.to("host").emit("host:state", runtime.room.getHostView());
   }
 
   function emitPublicGameState(): void {
+    syncAiBudgetScope();
     persistSnapshot();
     const state = runtime.getPublicGameState();
     io.to("host").emit("game:public-state", state);
     for (const playerId of runtime.room.getPlayerIds()) {
       io.to(`player:${playerId}`).emit("game:public-state", state);
     }
+  }
+
+  function syncAiBudgetScope(): void {
+    const currentGameId = runtime.room.getGameSessionId();
+    if (activeAiGameId && activeAiGameId !== currentGameId) {
+      aiBudgetLedger.clearGame(activeAiGameId);
+    }
+    activeAiGameId = currentGameId;
   }
 
   function emitChatMessage(message: ChatMessage): void {
@@ -172,8 +214,10 @@ export function attachSocketServer(
 
   const handlerContext: SocketHandlerContext = {
     automaticPhaseProgression,
+    actionLedger,
     io,
     runtime,
+    takeoverActionIds,
     clearOfflineTimer,
     clearPhaseTimer,
     emitChatMessage,
@@ -203,7 +247,7 @@ export function attachSocketServer(
       emitPublicGameState();
       return true;
     },
-    adapterFactory: (kind, playerId, botProfileId) => {
+    adapterFactory: (kind, playerId, botProfileId, lockedConfiguration) => {
       if (kind !== "llm" || !botProfileId || !aiServices) {
         return new DeterministicBotAdapter(kind);
       }
@@ -213,6 +257,16 @@ export function attachSocketServer(
         gameId: () => runtime.room.getGameSessionId() ?? runtime.room.roomCode,
         store: aiServices.store,
         providers: aiServices.providers,
+        budgetLedger: aiBudgetLedger,
+        ...(aiServices.auditStore ? { auditStore: aiServices.auditStore } : {}),
+        ...(aiServices.gameTokenBudget === undefined
+          ? {}
+          : { gameTokenBudget: aiServices.gameTokenBudget }),
+        ...(lockedConfiguration ? { lockedConfiguration } : {}),
+        onConfigurationLocked: (lock) => {
+          runtime.room.lockBotConfiguration(playerId, lock);
+          persistSnapshot();
+        },
         onFallback: (reason, modelErrorCode) => logger.warn(
           { playerId, reason, modelErrorCode },
           "LLM bot used deterministic fallback"
@@ -275,7 +329,13 @@ export function attachSocketServer(
 
     socket.on("disconnect", (reason) => {
       const changedPlayer = runtime.room.setReconnecting(socket.id);
-      const removedTakeoverRequest = runtime.room.cancelTakeoverRequests(socket.id);
+      const preservedTakeoverRequestId = socket.data.pendingTakeoverActionId
+        ? socket.data.pendingTakeoverRequestId ?? null
+        : null;
+      const removedTakeoverRequest = runtime.room.cancelTakeoverRequests(
+        socket.id,
+        preservedTakeoverRequestId
+      );
       if (changedPlayer) {
         emitLobbyViews();
         clearOfflineTimer(changedPlayer);

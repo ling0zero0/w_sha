@@ -127,6 +127,17 @@ export class BudgetLedger {
     return copyUsage(this.getUsage(`seat:${gameId}:${seatId}`));
   }
 
+  clearGame(gameId: string): void {
+    for (const [reservationId, reservation] of this.reservations) {
+      if (reservation.gameId === gameId) this.reservations.delete(reservationId);
+    }
+    for (const key of this.usage.keys()) {
+      if (key === `game:${gameId}` || key.startsWith(`model:${gameId}:`) || key.startsWith(`seat:${gameId}:`)) {
+        this.usage.delete(key);
+      }
+    }
+  }
+
   private getUsage(key: string): MutableUsage {
     let usage = this.usage.get(key);
     if (!usage) {

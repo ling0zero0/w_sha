@@ -1,4 +1,6 @@
 import type {
+  ActionPayload,
+  ActionRequest,
   DayConfirmVoteRequest,
   DaySelectVoteRequest,
   ChatSendRequest,
@@ -36,44 +38,49 @@ import type {
 } from "./lobby.js";
 import type { ClientPing, ServerPong, ServiceStatus } from "./system.js";
 
+type OptionalActionEvent<T> = (
+  payloadOrAck?: ActionRequest | RoomActionAck<T>,
+  ack?: RoomActionAck<T>
+) => void;
+
 export interface ClientToServerEvents {
   "system:ping": (payload: ClientPing) => void;
-  "player:join": (payload: JoinLobbyRequest, ack: RoomActionAck<PlayerSession>) => void;
-  "player:reconnect": (payload: ReconnectPlayerRequest, ack: RoomActionAck<PlayerSession>) => void;
-  "player:request-takeover": (payload: TakeoverPlayerRequest, ack: RoomActionAck<TakeoverReceipt>) => void;
-  "host:refresh-join": (ack: RoomActionAck<HostLobbyView>) => void;
-  "host:add-bot": (payload: HostAddBotRequest, ack: RoomActionAck<HostLobbyView>) => void;
-  "host:move-player": (payload: HostMovePlayerRequest, ack: RoomActionAck<HostLobbyView>) => void;
-  "host:remove-player": (payload: HostPlayerRequest, ack: RoomActionAck<HostLobbyView>) => void;
-  "host:depart-player": (payload: HostPlayerRequest, ack: RoomActionAck<HostLobbyView>) => void;
-  "host:correct-player-life": (payload: HostCorrectPlayerLifeRequest, ack: RoomActionAck<HostLobbyView>) => void;
-  "host:resolve-takeover": (payload: HostResolveTakeoverRequest, ack: RoomActionAck<HostLobbyView>) => void;
-  "host:update-role-configuration": (payload: RoleConfigurationInput, ack: RoomActionAck<HostLobbyView>) => void;
-  "host:update-chat-mode": (payload: HostUpdateChatModeRequest, ack: RoomActionAck<HostLobbyView>) => void;
-  "host:start-game": (ack: RoomActionAck<HostLobbyView>) => void;
-  "player:confirm-role": (ack: RoomActionAck<PlayerLobbyView>) => void;
-  "wolf:select-target": (payload: WolfSelectTargetRequest, ack: RoomActionAck<PlayerLobbyView>) => void;
-  "wolf:confirm-vote": (payload: WolfConfirmVoteRequest, ack: RoomActionAck<PlayerLobbyView>) => void;
-  "wolf:send-message": (payload: WolfSendMessageRequest, ack: RoomActionAck<PlayerLobbyView>) => void;
-  "chat:send": (payload: ChatSendRequest, ack: RoomActionAck<ChatMessage>) => void;
+  "player:join": (payload: ActionPayload<JoinLobbyRequest>, ack: RoomActionAck<PlayerSession>) => void;
+  "player:reconnect": (payload: ActionPayload<ReconnectPlayerRequest>, ack: RoomActionAck<PlayerSession>) => void;
+  "player:request-takeover": (payload: ActionPayload<TakeoverPlayerRequest>, ack: RoomActionAck<TakeoverReceipt>) => void;
+  "host:refresh-join": OptionalActionEvent<HostLobbyView>;
+  "host:add-bot": (payload: ActionPayload<HostAddBotRequest>, ack: RoomActionAck<HostLobbyView>) => void;
+  "host:move-player": (payload: ActionPayload<HostMovePlayerRequest>, ack: RoomActionAck<HostLobbyView>) => void;
+  "host:remove-player": (payload: ActionPayload<HostPlayerRequest>, ack: RoomActionAck<HostLobbyView>) => void;
+  "host:depart-player": (payload: ActionPayload<HostPlayerRequest>, ack: RoomActionAck<HostLobbyView>) => void;
+  "host:correct-player-life": (payload: ActionPayload<HostCorrectPlayerLifeRequest>, ack: RoomActionAck<HostLobbyView>) => void;
+  "host:resolve-takeover": (payload: ActionPayload<HostResolveTakeoverRequest>, ack: RoomActionAck<HostLobbyView>) => void;
+  "host:update-role-configuration": (payload: ActionPayload<RoleConfigurationInput>, ack: RoomActionAck<HostLobbyView>) => void;
+  "host:update-chat-mode": (payload: ActionPayload<HostUpdateChatModeRequest>, ack: RoomActionAck<HostLobbyView>) => void;
+  "host:start-game": OptionalActionEvent<HostLobbyView>;
+  "player:confirm-role": OptionalActionEvent<PlayerLobbyView>;
+  "wolf:select-target": (payload: ActionPayload<WolfSelectTargetRequest>, ack: RoomActionAck<PlayerLobbyView>) => void;
+  "wolf:confirm-vote": (payload: ActionPayload<WolfConfirmVoteRequest>, ack: RoomActionAck<PlayerLobbyView>) => void;
+  "wolf:send-message": (payload: ActionPayload<WolfSendMessageRequest>, ack: RoomActionAck<PlayerLobbyView>) => void;
+  "chat:send": (payload: ActionPayload<ChatSendRequest>, ack: RoomActionAck<ChatMessage>) => void;
   "chat:history": (payload: ChatHistoryRequest, ack: RoomActionAck<ChatHistoryPage>) => void;
-  "seer:inspect": (payload: SeerInspectRequest, ack: RoomActionAck<PlayerLobbyView>) => void;
-  "witch:submit-action": (payload: WitchSubmitActionRequest, ack: RoomActionAck<PlayerLobbyView>) => void;
-  "guard:protect": (payload: GuardProtectRequest, ack: RoomActionAck<PlayerLobbyView>) => void;
-  "hunter:shoot": (payload: HunterShootRequest, ack: RoomActionAck<PlayerLobbyView>) => void;
-  "host:continue-from-dawn": (ack: RoomActionAck<HostLobbyView>) => void;
-  "host:continue-from-exile": (ack: RoomActionAck<HostLobbyView>) => void;
-  "host:play-again": (ack: RoomActionAck<HostLobbyView>) => void;
-  "host:return-to-lobby": (ack: RoomActionAck<HostLobbyView>) => void;
-  "player:finish-speaking": (ack: RoomActionAck<PlayerLobbyView>) => void;
-  "day:select-vote": (payload: DaySelectVoteRequest, ack: RoomActionAck<PlayerLobbyView>) => void;
-  "day:confirm-vote": (payload: DayConfirmVoteRequest, ack: RoomActionAck<PlayerLobbyView>) => void;
-  "host:pause-phase": (ack: RoomActionAck<PublicGameState>) => void;
-  "host:resume-phase": (ack: RoomActionAck<PublicGameState>) => void;
-  "host:adjust-phase-time": (payload: HostAdjustPhaseTimeRequest, ack: RoomActionAck<PublicGameState>) => void;
-  "host:force-end-phase": (ack: RoomActionAck<PublicGameState>) => void;
-  "host:skip-night-phase": (ack: RoomActionAck<PublicGameState>) => void;
-  "host:skip-day-phase": (ack: RoomActionAck<PublicGameState>) => void;
+  "seer:inspect": (payload: ActionPayload<SeerInspectRequest>, ack: RoomActionAck<PlayerLobbyView>) => void;
+  "witch:submit-action": (payload: ActionPayload<WitchSubmitActionRequest>, ack: RoomActionAck<PlayerLobbyView>) => void;
+  "guard:protect": (payload: ActionPayload<GuardProtectRequest>, ack: RoomActionAck<PlayerLobbyView>) => void;
+  "hunter:shoot": (payload: ActionPayload<HunterShootRequest>, ack: RoomActionAck<PlayerLobbyView>) => void;
+  "host:continue-from-dawn": OptionalActionEvent<HostLobbyView>;
+  "host:continue-from-exile": OptionalActionEvent<HostLobbyView>;
+  "host:play-again": OptionalActionEvent<HostLobbyView>;
+  "host:return-to-lobby": OptionalActionEvent<HostLobbyView>;
+  "player:finish-speaking": OptionalActionEvent<PlayerLobbyView>;
+  "day:select-vote": (payload: ActionPayload<DaySelectVoteRequest>, ack: RoomActionAck<PlayerLobbyView>) => void;
+  "day:confirm-vote": (payload: ActionPayload<DayConfirmVoteRequest>, ack: RoomActionAck<PlayerLobbyView>) => void;
+  "host:pause-phase": OptionalActionEvent<PublicGameState>;
+  "host:resume-phase": OptionalActionEvent<PublicGameState>;
+  "host:adjust-phase-time": (payload: ActionPayload<HostAdjustPhaseTimeRequest>, ack: RoomActionAck<PublicGameState>) => void;
+  "host:force-end-phase": OptionalActionEvent<PublicGameState>;
+  "host:skip-night-phase": OptionalActionEvent<PublicGameState>;
+  "host:skip-day-phase": OptionalActionEvent<PublicGameState>;
 }
 
 export interface ServerToClientEvents {

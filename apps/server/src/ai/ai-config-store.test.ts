@@ -92,6 +92,9 @@ describe("SQLite AI configuration store", () => {
       FROM schema_migrations
       WHERE version = 1
     `).get() as { version: number };
+    const revisionColumn = migratedDatabase.prepare(`
+      PRAGMA table_info(ai_model_profiles)
+    `).all() as Array<{ name: string }>;
     const snapshot = migratedDatabase.prepare(`
       SELECT payload
       FROM runtime_snapshot
@@ -100,6 +103,7 @@ describe("SQLite AI configuration store", () => {
     migratedDatabase.close();
 
     expect(migration.version).toBe(1);
+    expect(revisionColumn.some((column) => column.name === "revision")).toBe(true);
     expect(snapshot.payload).toBe('{"version":2}');
   });
 
@@ -119,6 +123,8 @@ describe("SQLite AI configuration store", () => {
 
     const model = createModel(first, provider.id, "Primary model");
     const bot = createBot(first, model.id);
+    expect(model.revision).toBe(1);
+    expect(bot.revision).toBe(1);
     expect(first.getConfiguration()).toEqual({
       providers: [provider],
       models: [model],
@@ -134,22 +140,26 @@ describe("SQLite AI configuration store", () => {
       enabled: false,
       credentialConfigured: true
     });
-    expect(first.updateModelProfile(model.id, {
-      temperature: null,
-      maxOutputTokens: 2_048,
-      gameTokenBudget: 30_000
-    })).toMatchObject({
+    const updatedModel = first.updateModelProfile(model.id, {
       temperature: null,
       maxOutputTokens: 2_048,
       gameTokenBudget: 30_000
     });
-    expect(first.updateBotProfile(bot.id, {
-      strategy: "balanced",
-      speakingStyle: "Ask concise questions."
-    })).toMatchObject({
+    expect(updatedModel).toMatchObject({
+      temperature: null,
+      maxOutputTokens: 2_048,
+      gameTokenBudget: 30_000
+    });
+    expect(updatedModel.revision).toBe(2);
+    const updatedBot = first.updateBotProfile(bot.id, {
       strategy: "balanced",
       speakingStyle: "Ask concise questions."
     });
+    expect(updatedBot).toMatchObject({
+      strategy: "balanced",
+      speakingStyle: "Ask concise questions."
+    });
+    expect(updatedBot.revision).toBe(2);
 
     first.close();
     stores.splice(stores.indexOf(first), 1);

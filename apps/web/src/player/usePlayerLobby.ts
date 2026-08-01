@@ -1,5 +1,6 @@
 import {
   playerCredentialsSchema,
+  type ActionId,
   type ChatMessage,
   type ChatSendRequest,
   type ClientToServerEvents,
@@ -14,6 +15,7 @@ import {
 } from "@werewolf/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
+import { createActionId } from "../socket/action-id";
 
 interface PlayerLobbyState {
   socket: "checking" | "connected" | "disconnected";
@@ -26,6 +28,11 @@ interface PlayerLobbyState {
   error: string;
   removed: boolean;
   replaced: boolean;
+}
+
+interface PendingLifecycleAction {
+  actionId: ActionId;
+  nickname: string;
 }
 
 const initialState: PlayerLobbyState = {
@@ -108,11 +115,21 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
   const credentialsRef = useRef<PlayerCredentials | null>(invitation ? loadCredentials(invitation.roomCode) : null);
   const lastNicknameRef = useRef("");
+  const joinActionRef = useRef<PendingLifecycleAction | null>(null);
+  const reconnectActionRef = useRef<ActionId | null>(null);
+  const takeoverActionRef = useRef<PendingLifecycleAction | null>(null);
   const chatSessionRef = useRef<string | null>(null);
   const chatCursorRef = useRef(0);
   const replayLoadedRef = useRef(false);
 
+  const clearLifecycleActions = () => {
+    joinActionRef.current = null;
+    reconnectActionRef.current = null;
+    takeoverActionRef.current = null;
+  };
+
   useEffect(() => {
+    clearLifecycleActions();
     if (!invitation) return;
 
     const resetChatHistory = () => {
@@ -235,6 +252,7 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
     };
 
     const applySession = (session: PlayerSession) => {
+      clearLifecycleActions();
       credentialsRef.current = session.credentials;
       saveSession(session);
       setState((current) => ({
@@ -256,7 +274,10 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
       const credentials = credentialsRef.current;
       if (!credentials || credentials.roomCode !== invitation.roomCode) return;
       setState((current) => ({ ...current, restoring: true, error: "" }));
-      socket.emit("player:reconnect", credentials, (result) => {
+      const actionId = reconnectActionRef.current ?? createActionId();
+      reconnectActionRef.current = actionId;
+      socket.emit("player:reconnect", { ...credentials, actionId }, (result) => {
+        if (reconnectActionRef.current === actionId) reconnectActionRef.current = null;
         if (result.ok) {
           applySession(result.data);
           return;
@@ -292,17 +313,20 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
       }));
     });
     socket.on("player:removed", ({ message }) => {
+      clearLifecycleActions();
       clearCredentials(invitation.roomCode);
       credentialsRef.current = null;
       setState((current) => ({ ...current, lobby: null, game: null, removed: true, error: message }));
     });
     socket.on("player:session-replaced", ({ message }) => {
+      clearLifecycleActions();
       clearCredentials(invitation.roomCode);
       credentialsRef.current = null;
       setState((current) => ({ ...current, lobby: null, game: null, replaced: true, error: message }));
     });
     socket.on("player:takeover-approved", applySession);
     socket.on("player:takeover-rejected", ({ message }) => {
+      takeoverActionRef.current = null;
       setState((current) => ({ ...current, takeoverPending: false, error: message }));
     });
 
@@ -320,9 +344,15 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
       return;
     }
 
-    lastNicknameRef.current = nickname.trim();
+    const normalizedNickname = nickname.trim();
+    lastNicknameRef.current = normalizedNickname;
+    const actionId = joinActionRef.current?.nickname === normalizedNickname
+      ? joinActionRef.current.actionId
+      : createActionId();
+    joinActionRef.current = { actionId, nickname: normalizedNickname };
     setState((current) => ({ ...current, joining: true, canRequestTakeover: false, error: "" }));
-    socket.emit("player:join", { ...invitation, nickname }, (result) => {
+    socket.emit("player:join", { ...invitation, nickname, actionId }, (result) => {
+      if (joinActionRef.current?.actionId === actionId) joinActionRef.current = null;
       if (result.ok) {
         credentialsRef.current = result.data.credentials;
         saveSession(result.data);
@@ -341,21 +371,28 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
   const requestTakeover = useCallback(() => {
     const socket = socketRef.current;
     if (!socket?.connected || !invitation || !lastNicknameRef.current) return;
+    const nickname = lastNicknameRef.current;
+    const actionId = takeoverActionRef.current?.nickname === nickname
+      ? takeoverActionRef.current.actionId
+      : createActionId();
+    takeoverActionRef.current = { actionId, nickname };
     setState((current) => ({ ...current, takeoverPending: true, canRequestTakeover: false, error: "" }));
     socket.emit("player:request-takeover", {
       ...invitation,
-      nickname: lastNicknameRef.current
+      nickname,
+      actionId
     }, (result) => {
       if (result.ok) {
         setState((current) => ({ ...current, error: "接管申请已发送，请等待主机批准" }));
       } else {
+        if (takeoverActionRef.current?.actionId === actionId) takeoverActionRef.current = null;
         setState((current) => ({ ...current, takeoverPending: false, error: result.message }));
       }
     });
   }, [invitation]);
 
   const confirmRole = useCallback(() => {
-    socketRef.current?.emit("player:confirm-role", (result) => {
+    socketRef.current?.emit("player:confirm-role", { actionId: createActionId() }, (result) => {
       if (result.ok) {
         setState((current) => ({ ...current, lobby: result.data, error: "" }));
       } else {
@@ -401,49 +438,51 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
   }, []);
 
   const selectWolfTarget = useCallback((target: WolfVoteTarget) => {
-    socketRef.current?.emit("wolf:select-target", { target }, applyPlayerView);
+    socketRef.current?.emit("wolf:select-target", { target, actionId: createActionId() }, applyPlayerView);
   }, [applyPlayerView]);
 
   const confirmWolfVote = useCallback((confirmed: boolean) => {
-    socketRef.current?.emit("wolf:confirm-vote", { confirmed }, applyPlayerView);
+    socketRef.current?.emit("wolf:confirm-vote", { confirmed, actionId: createActionId() }, applyPlayerView);
   }, [applyPlayerView]);
 
   const sendChatMessage = useCallback((payload: ChatSendRequest) => {
-    socketRef.current?.emit("chat:send", payload, (result) => {
+    socketRef.current?.emit("chat:send", { ...payload, actionId: createActionId() }, (result) => {
       if (!result.ok) setState((current) => ({ ...current, error: result.message }));
     });
   }, []);
 
   const inspectAsSeer = useCallback((target: string) => {
-    socketRef.current?.emit("seer:inspect", { target }, applyPlayerView);
+    socketRef.current?.emit("seer:inspect", { target, actionId: createActionId() }, applyPlayerView);
   }, [applyPlayerView]);
 
   const submitWitchAction = useCallback((action: "none" | "save" | "poison", target?: string) => {
     if (action === "poison" && target) {
-      socketRef.current?.emit("witch:submit-action", { action, target }, applyPlayerView);
+      socketRef.current?.emit("witch:submit-action", { action, target, actionId: createActionId() }, applyPlayerView);
       return;
     }
-    if (action !== "poison") socketRef.current?.emit("witch:submit-action", { action }, applyPlayerView);
+    if (action !== "poison") {
+      socketRef.current?.emit("witch:submit-action", { action, actionId: createActionId() }, applyPlayerView);
+    }
   }, [applyPlayerView]);
 
   const protectAsGuard = useCallback((target: string | null) => {
-    socketRef.current?.emit("guard:protect", { target }, applyPlayerView);
+    socketRef.current?.emit("guard:protect", { target, actionId: createActionId() }, applyPlayerView);
   }, [applyPlayerView]);
 
   const shootAsHunter = useCallback((target: string | null) => {
-    socketRef.current?.emit("hunter:shoot", { target }, applyPlayerView);
+    socketRef.current?.emit("hunter:shoot", { target, actionId: createActionId() }, applyPlayerView);
   }, [applyPlayerView]);
 
   const finishSpeaking = useCallback(() => {
-    socketRef.current?.emit("player:finish-speaking", applyPlayerView);
+    socketRef.current?.emit("player:finish-speaking", { actionId: createActionId() }, applyPlayerView);
   }, [applyPlayerView]);
 
   const selectDayVote = useCallback((target: string | "abstain" | null) => {
-    socketRef.current?.emit("day:select-vote", { target }, applyPlayerView);
+    socketRef.current?.emit("day:select-vote", { target, actionId: createActionId() }, applyPlayerView);
   }, [applyPlayerView]);
 
   const confirmDayVote = useCallback((confirmed: boolean) => {
-    socketRef.current?.emit("day:confirm-vote", { confirmed }, applyPlayerView);
+    socketRef.current?.emit("day:confirm-vote", { confirmed, actionId: createActionId() }, applyPlayerView);
   }, [applyPlayerView]);
 
   return {

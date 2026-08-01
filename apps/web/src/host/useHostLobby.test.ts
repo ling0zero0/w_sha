@@ -59,6 +59,8 @@ vi.mock("@werewolf/shared", async (importOriginal) => {
 
 import { useHostLobby } from "./useHostLobby";
 
+const actionIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function message(
   id: string,
   sequence: number,
@@ -158,7 +160,10 @@ describe("useHostLobby chat history", () => {
 
     expect(socketHarness.socket.emit).toHaveBeenCalledWith(
       "host:update-chat-mode",
-      { chatMode: "open" },
+      expect.objectContaining({
+        chatMode: "open",
+        actionId: expect.stringMatching(actionIdPattern)
+      }),
       expect.any(Function)
     );
   });
@@ -182,10 +187,11 @@ describe("useHostLobby chat history", () => {
 
     expect(socketHarness.socket.emit).toHaveBeenCalledWith(
       "host:add-bot",
-      {
+      expect.objectContaining({
         nickname: "小灰",
-        botKind: "deterministic"
-      },
+        botKind: "deterministic",
+        actionId: expect.stringMatching(actionIdPattern)
+      }),
       expect.any(Function)
     );
   });

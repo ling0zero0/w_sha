@@ -162,6 +162,29 @@ describe("lobby room", () => {
     });
   });
 
+  it("persists the approved takeover credential through snapshot restore", () => {
+    const room = createRoom();
+    const joined = room.join({ roomCode: "123456", joinToken: token, nickname: "林野" }, "socket-a");
+    if (!joined.ok) throw new Error("test setup failed");
+    const requested = room.requestTakeover(
+      { roomCode: "123456", joinToken: token, nickname: "林野" },
+      "socket-b"
+    );
+    if (!requested.ok) throw new Error("test setup failed");
+    const resolved = room.resolveTakeover(requested.data.requestId, true);
+    if (!resolved.ok || !resolved.data.session) throw new Error("test setup failed");
+
+    const restoredRoom = new LobbyRoom({
+      localAddress: "192.168.1.20",
+      webPort: 5173,
+      snapshot: room.createSnapshot()
+    });
+    expect(restoredRoom.reconnect(resolved.data.session.credentials, "socket-restored")).toMatchObject({
+      ok: true,
+      data: { session: { lobby: { selfId: joined.data.lobby.selfId } } }
+    });
+  });
+
   it("marks a player departed without deleting or renumbering the roster", () => {
     const room = createRoom();
     const first = room.join({ roomCode: "123456", joinToken: token, nickname: "林野" }, "socket-a");

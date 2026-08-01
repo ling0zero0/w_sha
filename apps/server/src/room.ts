@@ -25,7 +25,6 @@ import {
   type Role,
   type RoleConfiguration,
   type RoleConfigurationInput,
-  type RoomActionFailure,
   type RoomActionResult,
   type TakeoverPlayerRequest,
   type TakeoverReceipt,
@@ -39,6 +38,7 @@ import {
 } from "@werewolf/shared";
 import { createHash, randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { evaluateGameOutcome, resolveNightDeaths, resolvePlurality, resolveWolfAttack } from "./game/rules.js";
+import { roomFailures as failures } from "./room-failures.js";
 import { evaluateStartReadiness } from "./role-configuration.js";
 
 interface InternalPlayer extends LobbyPlayer {
@@ -56,6 +56,19 @@ interface InternalPlayer extends LobbyPlayer {
   dayVoteTarget: DayVoteTarget;
   dayVoteConfirmed: boolean;
   idiotRevealed: boolean;
+  aiConfigurationLocked: boolean;
+  aiBotProfileRevision: number | null;
+  aiModelProfileId: string | null;
+  aiModelProfileRevision: number | null;
+  aiModelChainRevision: string | null;
+}
+
+export interface BotConfigurationLock {
+  locked: boolean;
+  botProfileRevision: number | null;
+  modelProfileId: string | null;
+  modelProfileRevision: number | null;
+  modelChainRevision: string | null;
 }
 
 interface PendingHunterResolution {
@@ -156,94 +169,22 @@ export interface LobbyRoomSnapshot {
   gameRecords: GameRecord[];
   roleConfiguration: RoleConfiguration;
   players: Array<
-    Omit<InternalPlayer, "socketId" | "reconnectTokenHash" | "controller" | "botKind" | "botProfileId">
+    Omit<InternalPlayer, "socketId" | "reconnectTokenHash" | "controller" | "botKind" | "botProfileId"
+      | "aiConfigurationLocked" | "aiBotProfileRevision" | "aiModelProfileId" | "aiModelProfileRevision" | "aiModelChainRevision">
     & {
       reconnectTokenHash: string;
       lastWolfMessageAtMs?: number | null;
       controller?: "human" | "bot";
       botKind?: BotKind | null;
       botProfileId?: LobbyPlayer["botProfileId"];
+      aiConfigurationLocked?: boolean;
+      aiBotProfileRevision?: number | null;
+      aiModelProfileId?: string | null;
+      aiModelProfileRevision?: number | null;
+      aiModelChainRevision?: string | null;
     }
   >;
 }
-
-const failures = {
-  invalidCredentials: (): RoomActionFailure => ({
-    ok: false,
-    code: "INVALID_JOIN_CREDENTIALS",
-    message: "房间号或加入链接已失效"
-  }),
-  nicknameTaken: (): RoomActionFailure => ({
-    ok: false,
-    code: "NICKNAME_TAKEN",
-    message: "该昵称已被使用"
-  }),
-  alreadyJoined: (): RoomActionFailure => ({
-    ok: false,
-    code: "ALREADY_JOINED",
-    message: "此设备已经加入房间"
-  }),
-  playerNotFound: (): RoomActionFailure => ({
-    ok: false,
-    code: "PLAYER_NOT_FOUND",
-    message: "玩家不存在"
-  }),
-  invalidReconnectCredentials: (): RoomActionFailure => ({
-    ok: false,
-    code: "INVALID_RECONNECT_CREDENTIALS",
-    message: "重连凭证无效或已经失效"
-  }),
-  takeoverAlreadyPending: (): RoomActionFailure => ({
-    ok: false,
-    code: "TAKEOVER_ALREADY_PENDING",
-    message: "该玩家已有待处理的设备接管申请"
-  }),
-  takeoverRequestNotFound: (): RoomActionFailure => ({
-    ok: false,
-    code: "TAKEOVER_REQUEST_NOT_FOUND",
-    message: "设备接管申请不存在或已处理"
-  }),
-  playerAlreadyDeparted: (): RoomActionFailure => ({
-    ok: false,
-    code: "PLAYER_ALREADY_DEPARTED",
-    message: "玩家已经离场"
-  }),
-  gameAlreadyStarted: (): RoomActionFailure => ({
-    ok: false,
-    code: "GAME_ALREADY_STARTED",
-    message: "游戏已经开始，无法修改大厅"
-  }),
-  gameNotReady: (): RoomActionFailure => ({
-    ok: false,
-    code: "GAME_NOT_READY",
-    message: "身份配置或参赛名单尚未满足开局条件"
-  }),
-  roleAlreadyConfirmed: (): RoomActionFailure => ({
-    ok: false,
-    code: "ROLE_ALREADY_CONFIRMED",
-    message: "身份已经确认"
-  }),
-  invalidNightAction: (): RoomActionFailure => ({
-    ok: false,
-    code: "INVALID_NIGHT_ACTION",
-    message: "当前身份或阶段不允许此夜间操作"
-  }),
-  nightActionLocked: (): RoomActionFailure => ({
-    ok: false,
-    code: "NIGHT_ACTION_LOCKED",
-    message: "狼人行动已经锁定"
-  }),
-  chatRateLimited: (): RoomActionFailure => ({
-    ok: false,
-    code: "CHAT_RATE_LIMITED",
-    message: "消息发送过快，请稍后再试"
-  }),
-  invalidPhaseControl: (): RoomActionFailure => ({
-    ok: false,
-    code: "INVALID_PHASE_CONTROL",
-    message: "当前阶段状态不允许此操作"
-  })
-};
 
 function createRoomCode(): string {
   return randomInt(0, 1_000_000).toString().padStart(6, "0");
@@ -608,7 +549,12 @@ export class LobbyRoom {
       alive: true,
       dayVoteTarget: null,
       dayVoteConfirmed: false,
-      idiotRevealed: false
+      idiotRevealed: false,
+      aiConfigurationLocked: false,
+      aiBotProfileRevision: null,
+      aiModelProfileId: null,
+      aiModelProfileRevision: null,
+      aiModelChainRevision: null
     };
     this.players.push(player);
     this.revision += 1;
@@ -654,7 +600,12 @@ export class LobbyRoom {
       alive: true,
       dayVoteTarget: null,
       dayVoteConfirmed: false,
-      idiotRevealed: false
+      idiotRevealed: false,
+      aiConfigurationLocked: false,
+      aiBotProfileRevision: null,
+      aiModelProfileId: null,
+      aiModelProfileRevision: null,
+      aiModelChainRevision: null
     });
     this.revision += 1;
     return { ok: true, data: this.getHostView() };
@@ -738,6 +689,40 @@ export class LobbyRoom {
     return { ok: true, data: { requestId: request.id, nickname: request.nickname } };
   }
 
+  reattachTakeoverRequest(
+    requestId: string,
+    input: TakeoverPlayerRequest,
+    socketId: string
+  ): RoomActionResult<TakeoverReceipt> {
+    if (this.phase !== "lobby") return failures.gameAlreadyStarted();
+    if (input.roomCode !== this.roomCode || input.joinToken !== this.joinToken) {
+      return failures.invalidCredentials();
+    }
+    if (this.players.some((player) => player.socketId === socketId)) {
+      return failures.alreadyJoined();
+    }
+    if (this.takeoverRequests.some((request) => request.socketId === socketId && request.id !== requestId)) {
+      return failures.alreadyJoined();
+    }
+
+    const request = this.takeoverRequests.find((candidate) => candidate.id === requestId);
+    if (!request) return failures.takeoverRequestNotFound();
+
+    const player = this.players.find((candidate) => candidate.id === request.playerId);
+    if (!player || player.controller === "bot" || player.connection === "departed") {
+      return failures.playerNotFound();
+    }
+    if (player.nickname.toLocaleLowerCase() !== input.nickname.toLocaleLowerCase()) {
+      return failures.invalidCredentials();
+    }
+
+    if (request.socketId !== socketId) {
+      request.socketId = socketId;
+      this.revision += 1;
+    }
+    return { ok: true, data: { requestId: request.id, nickname: request.nickname } };
+  }
+
   resolveTakeover(requestId: string, approved: boolean): RoomActionResult<TakeoverResolution> {
     const index = this.takeoverRequests.findIndex((request) => request.id === requestId);
     if (index < 0) return failures.takeoverRequestNotFound();
@@ -773,9 +758,11 @@ export class LobbyRoom {
     };
   }
 
-  cancelTakeoverRequests(socketId: string): boolean {
+  cancelTakeoverRequests(socketId: string, preservedRequestId: string | null = null): boolean {
     const previousLength = this.takeoverRequests.length;
-    this.takeoverRequests = this.takeoverRequests.filter((request) => request.socketId !== socketId);
+    this.takeoverRequests = this.takeoverRequests.filter((request) => (
+      request.socketId !== socketId || request.id === preservedRequestId
+    ));
     if (this.takeoverRequests.length === previousLength) return false;
     this.revision += 1;
     return true;
@@ -1380,14 +1367,32 @@ export class LobbyRoom {
     playerId: PlayerId;
     botKind: BotKind;
     botProfileId: LobbyPlayer["botProfileId"];
+    lockedConfiguration: BotConfigurationLock;
   }> {
     return this.players.flatMap((player) => player.controller === "bot" && player.botKind
       ? [{
           playerId: player.id,
           botKind: player.botKind,
-          botProfileId: player.botProfileId
+          botProfileId: player.botProfileId,
+          lockedConfiguration: {
+            locked: player.aiConfigurationLocked,
+            botProfileRevision: player.aiBotProfileRevision,
+            modelProfileId: player.aiModelProfileId,
+            modelProfileRevision: player.aiModelProfileRevision,
+            modelChainRevision: player.aiModelChainRevision
+          }
         }]
       : []);
+  }
+
+  lockBotConfiguration(playerId: PlayerId, lock: Omit<BotConfigurationLock, "locked">): void {
+    const player = this.players.find((candidate) => candidate.id === playerId);
+    if (!player || player.controller !== "bot" || player.botKind !== "llm") return;
+    player.aiConfigurationLocked = true;
+    player.aiBotProfileRevision = lock.botProfileRevision;
+    player.aiModelProfileId = lock.modelProfileId;
+    player.aiModelProfileRevision = lock.modelProfileRevision;
+    player.aiModelChainRevision = lock.modelChainRevision;
   }
 
   getSocketId(playerId: PlayerId): string | null {
@@ -1932,6 +1937,11 @@ export class LobbyRoom {
         botProfileId: controller === "bot" && player.botKind === "llm"
           ? player.botProfileId ?? null
           : null,
+        aiConfigurationLocked: player.aiConfigurationLocked ?? false,
+        aiBotProfileRevision: player.aiBotProfileRevision ?? null,
+        aiModelProfileId: player.aiModelProfileId ?? null,
+        aiModelProfileRevision: player.aiModelProfileRevision ?? null,
+        aiModelChainRevision: player.aiModelChainRevision ?? null,
         lastChatMessageAtMs: player.lastChatMessageAtMs ?? lastWolfMessageAtMs ?? null,
         idiotRevealed: player.idiotRevealed ?? false,
         socketId: null,

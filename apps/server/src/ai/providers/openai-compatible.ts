@@ -1,4 +1,4 @@
-import type { AiModelProfile } from "@werewolf/shared";
+import { isBlockedAiProviderHostname, type AiModelProfile } from "@werewolf/shared";
 import {
   parseAiModelDecision,
   type AiConnectionTestResult,
@@ -203,6 +203,9 @@ function createChatCompletionsUrl(baseUrl: string): string {
   }
   if (url.username || url.password) {
     throw new Error("model provider base URL must not contain credentials");
+  }
+  if (isBlockedAiProviderHostname(url.hostname)) {
+    throw new Error("model provider base URL points to a blocked metadata or link-local address");
   }
   url.pathname = `${url.pathname.replace(/\/+$/, "")}/chat/completions`;
   url.search = "";
