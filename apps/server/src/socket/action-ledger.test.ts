@@ -1,4 +1,10 @@
+import { randomBytes } from "node:crypto";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
+import { AesGcmSecretBox } from "../ai/secret-box.js";
 import { ActionLedger, actionFingerprint } from "./action-ledger.js";
 
 const result = { ok: true as const, data: { revision: 3 } };
@@ -92,5 +98,81 @@ describe("ActionLedger", () => {
       result,
       metadata: { kind: "takeover", state: "approved" }
     });
+  });
+
+  it("replays encrypted results after reopening SQLite", () => {
+    const directory = mkdtempSync(join(tmpdir(), "werewolf-action-ledger-"));
+    const databasePath = join(directory, "runtime.sqlite");
+    const secretBox = new AesGcmSecretBox(randomBytes(32));
+    const actionId = "77777777-7777-4777-8777-777777777777";
+    const fingerprint = actionFingerprint({ roomCode: "123456", nickname: "重启玩家" });
+    const persistedResult = {
+      ok: true as const,
+      data: { reconnectToken: "sensitive-reconnect-token" }
+    };
+
+    const first = new ActionLedger({ databasePath, secretBox });
+    first.record(
+      "player:lifecycle",
+      "player:join",
+      actionId,
+      fingerprint,
+      persistedResult,
+      { kind: "session", credential: "sensitive-session" }
+    );
+    first.close();
+
+    const database = new DatabaseSync(databasePath);
+    const row = database.prepare(
+      "SELECT encrypted_payload FROM action_ledger WHERE action_id = ?"
+    ).get(actionId) as { encrypted_payload: string };
+    database.close();
+    expect(row.encrypted_payload).not.toContain("sensitive-reconnect-token");
+    expect(row.encrypted_payload).not.toContain("sensitive-session");
+
+    const restored = new ActionLedger({ databasePath, secretBox });
+    expect(restored.lookup(
+      "player:lifecycle",
+      "player:join",
+      actionId,
+      fingerprint
+    )).toEqual({
+      kind: "replay",
+      result: persistedResult,
+      metadata: { kind: "session", credential: "sensitive-session" }
+    });
+    restored.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  it("enforces the capacity limit when reopening an oversized SQLite ledger", () => {
+    const directory = mkdtempSync(join(tmpdir(), "werewolf-action-ledger-capacity-"));
+    const databasePath = join(directory, "runtime.sqlite");
+    const secretBox = new AesGcmSecretBox(randomBytes(32));
+    const actionIds = [
+      "88888888-8888-4888-8888-888888888888",
+      "99999999-9999-4999-8999-999999999999",
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    ] as const;
+    const fingerprint = actionFingerprint({ value: true });
+
+    try {
+      const first = new ActionLedger({ databasePath, secretBox, maxEntries: 3 });
+      for (const [index, actionId] of actionIds.entries()) {
+        first.record("host", `host:action-${index}`, actionId, fingerprint, result);
+      }
+      first.close();
+
+      const reopened = new ActionLedger({ databasePath, secretBox, maxEntries: 2 });
+      expect(reopened.size()).toBe(2);
+      expect(reopened.lookup("host", "host:action-0", actionIds[0], fingerprint)).toEqual({
+        kind: "miss"
+      });
+      expect(reopened.lookup("host", "host:action-1", actionIds[1], fingerprint).kind).toBe("replay");
+      expect(reopened.lookup("host", "host:action-2", actionIds[2], fingerprint).kind).toBe("replay");
+      reopened.close();
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

@@ -27,12 +27,13 @@ export class SnapshotStore {
   }
 
   save(snapshot: GameRuntimeSnapshot, now = new Date()): void {
+    const validatedSnapshot = parseGameRuntimeSnapshot(snapshot);
     this.flush();
-    this.write(snapshot, now);
+    this.write(validatedSnapshot, now);
   }
 
   schedule(snapshot: GameRuntimeSnapshot, now = new Date()): void {
-    this.pendingWrite = { snapshot, now };
+    this.pendingWrite = { snapshot: parseGameRuntimeSnapshot(snapshot), now };
     if (this.scheduledWrite) return;
     this.scheduledWrite = setImmediate(() => {
       this.scheduledWrite = null;

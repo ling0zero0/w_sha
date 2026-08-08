@@ -19,11 +19,29 @@ export function isBlockedAiProviderHostname(hostname: string): boolean {
   const normalized = hostname.trim().toLowerCase().replace(/^\[|\]$/g, "");
   if (blockedAiProviderHostnames.has(normalized)) return true;
   if (/^fe[89ab][0-9a-f]:/i.test(normalized)) return true;
+  if (isBlockedMappedIpv4(normalized)) return true;
 
-  const octets = normalized.split(".");
+  return isBlockedIpv4(normalized);
+}
+
+function isBlockedIpv4(hostname: string): boolean {
+  if (blockedAiProviderHostnames.has(hostname)) return true;
+  const octets = hostname.split(".");
   if (octets.length !== 4 || octets.some((octet) => !/^\d+$/.test(octet))) return false;
   const values = octets.map(Number);
   return values[0] === 169 && values[1] === 254;
+}
+
+function isBlockedMappedIpv4(hostname: string): boolean {
+  const dottedMatch = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(hostname);
+  if (dottedMatch) return isBlockedIpv4(dottedMatch[1]!);
+
+  const match = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i.exec(hostname);
+  if (!match) return false;
+  const high = Number.parseInt(match[1]!, 16);
+  const low = Number.parseInt(match[2]!, 16);
+  const ipv4 = [high >> 8, high & 0xff, low >> 8, low & 0xff].join(".");
+  return isBlockedIpv4(ipv4);
 }
 
 const httpUrlSchema = z.url().superRefine((value, context) => {

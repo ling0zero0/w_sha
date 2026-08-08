@@ -55,7 +55,7 @@
 - 手机和主机必须处于允许设备互访的同一局域网。
 - 生产版默认使用端口 `35173`。
 - 游戏数据保存在 `%LOCALAPPDATA%\W_SHA\werewolf.sqlite`。
-- AI 凭据由服务端自动加密，主密钥保存在同目录的 `ai-master-key` 文件中；请勿单独删除该文件。
+- AI 凭据由服务端自动加密；Windows 版本使用当前用户 DPAPI 保护同目录的 `ai-master-key`，旧版明文 Base64 文件会在首次启动时迁移，请勿单独删除该文件。
 - 卸载程序不会自动删除游戏数据。
 
 ## 源码开发
@@ -131,9 +131,17 @@ corepack pnpm package:installer
 
 安装包构建需要本机安装 [Inno Setup 6](https://jrsoftware.org/isinfo.php)。生成结果位于 `release/`，该目录属于构建产物，不应提交到 Git。
 
+打包完成后可检查 ZIP 内容、安装包格式和最终 SHA256：
+
+```powershell
+corepack pnpm verify:release
+```
+
+该检查不执行安装器，不替代真实 Windows 安装、防火墙和卸载验收。
+
 ## 发布前局域网烟测
 
-便携版生成后，可在 Windows 主机上运行生产服务的局域网烟测。它会验证 LAN 主页、加入链接、Socket 来源白名单、主机接口隔离、跨 Socket 生命周期 action 重放、快照重启恢复和玩家重连；这不能替代 Android、iPhone 或微信浏览器的实机完整对局：
+便携版生成后，可在 Windows 主机上运行生产服务的局域网烟测。它会验证 LAN 主页、加入链接、Socket 来源白名单、主机接口隔离、跨 Socket/跨服务重启 action 重放、快照重启恢复和玩家重连；这不能替代 Android、iPhone 或微信浏览器的实机完整对局：
 
 ```powershell
 corepack pnpm verify:lan
@@ -155,6 +163,14 @@ corepack pnpm verify:lan
 ```
 
 真实设备验收请按 [docs/release-acceptance.md](docs/release-acceptance.md) 记录结果。
+
+如需确认便携发布包中的生产静态资源能在桌面、Android 尺寸、iPhone 尺寸和微信 User-Agent 下实际启动，可运行：
+
+```powershell
+corepack pnpm verify:package:ui
+```
+
+该检查使用本机 Playwright 浏览器验证发布包，不替代真实设备验收。
 
 ## 项目结构
 

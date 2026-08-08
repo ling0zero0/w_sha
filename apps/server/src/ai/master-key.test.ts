@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -23,8 +23,26 @@ describe("loadOrCreateSecretBox", () => {
     const second = loadOrCreateSecretBox(databasePath);
 
     expect(second.open("provider:test", encrypted)).toBe("secret-value");
-    expect(readFileSync(join(directory, "ai-master-key"), "utf8"))
-      .toMatch(/^[A-Za-z0-9+/]{43}=$/);
+    const storedKey = readFileSync(join(directory, "ai-master-key"), "utf8");
+    if (process.platform === "win32") {
+      expect(storedKey).toMatch(/^dpapi:v1:[A-Za-z0-9+/]+=*$/);
+    } else {
+      expect(storedKey).toMatch(/^[A-Za-z0-9+/]{43}=$/);
+    }
+  });
+
+  it.runIf(process.platform === "win32")("migrates a legacy plaintext key to DPAPI", () => {
+    const directory = createTemporaryDirectory();
+    const databasePath = join(directory, "werewolf.sqlite");
+    const encodedKey = randomBytes(32).toString("base64");
+    writeFileSync(join(directory, "ai-master-key"), encodedKey, "utf8");
+
+    const box = loadOrCreateSecretBox(databasePath);
+
+    expect(box.open("provider:test", box.seal("provider:test", "secret-value"))).toBe("secret-value");
+    const storedKey = readFileSync(join(directory, "ai-master-key"), "utf8");
+    expect(storedKey.startsWith("dpapi:v1:")).toBe(true);
+    expect(storedKey).not.toBe(encodedKey);
   });
 
   it("prefers an explicitly configured key", () => {

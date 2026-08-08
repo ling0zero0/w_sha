@@ -27,4 +27,9 @@ result = spawnSync(compiler, [
   `/DMyAppVersion=${packageJson.version}`,
   path.join(projectRoot, 'installer', 'W_SHA.iss')
 ], { cwd: projectRoot, stdio: 'inherit', windowsHide: true });
+if (result.status !== 0) process.exit(result.status ?? 1);
+
+result = spawnSync(process.execPath, [
+  path.join(__dirname, 'verify-release-artifacts.cjs')
+], { cwd: projectRoot, stdio: 'inherit', windowsHide: true });
 process.exit(result.status ?? 1);

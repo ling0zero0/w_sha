@@ -13,25 +13,26 @@
 - [x] 阶段 4：AI 治理。房间级预算、用量审计、模型配置版本锁定、多 LLM 并发验证。
 - [x] 阶段 5：移动端体验。收敛首屏行动区、320px/横屏适配、焦点管理和读屏验收。
 - [x] 阶段 6：工程化。拆分房间领域模块，补充 lint、format、CI、安全扫描和产物检查。
-- [ ] 阶段 7：发布验收（执行中）。Windows 安装包/便携版、Android/iPhone/微信浏览器、断网/锁屏/重启和真实完整对局。
+- [x] 阶段 7A：自动化发布验收。Windows 发布产物、固定端口 LAN、桌面/Android/iPhone/微信 UA 页面烟测。
+- [ ] 阶段 7B：真实设备发布验收（执行中）。Windows 安装/防火墙、Android/iPhone/微信浏览器、断网/锁屏/重启和真实完整对局。
 
-阶段 1 增加了可选环境变量 `SOCKET_ALLOWED_ORIGINS`，多个来源用逗号分隔。默认会允许当前运行时公布的 LAN 地址和回环开发地址；使用自定义域名或反向代理时，应显式配置该变量。
+阶段 1 增加了可选环境变量 `SOCKET_ALLOWED_ORIGINS`，多个来源用逗号分隔。默认会允许当前运行时公布的 LAN 地址和回环开发地址；使用自定义域名或反向代理时，应显式配置该变量。AI provider URL 会拒绝元数据、链路本地及其 IPv4-mapped IPv6 表示，仍允许明确配置的本机/局域网模型服务。
 
-阶段 3 使用兼容式迁移：旧客户端仍可省略 `actionId`，新 Web 客户端为状态变更请求生成 UUID v4。服务端按主机/玩家作用域保存 15 分钟或最多 2048 条结果，重复请求重放原结果，复用同一 `actionId` 但改变事件或参数则返回 `ACTION_ID_CONFLICT`。聊天重放不会再次广播消息。加入、重连和接管已纳入独立的 `player:lifecycle` ledger：同一请求可在同 Socket 或跨 Socket 重放，玩家凭证会重新绑定到当前 Socket，带 `actionId` 的接管申请在断线后保留并可重挂载；主机已处理的批准/拒绝状态也会在重试时恢复对应通知。
+阶段 3 使用兼容式迁移：旧客户端仍可省略 `actionId`，新 Web 客户端为状态变更请求生成 UUID v4。服务端按主机/玩家作用域保存 15 分钟或最多 2048 条结果，重复请求重放原结果，复用同一 `actionId` 但改变事件或参数则返回 `ACTION_ID_CONFLICT`；结果和生命周期 metadata 使用 `SecretBox` 加密写入 SQLite，因此可跨 Socket、跨服务重启重放，且不会把凭证明文写入数据库。账本在启动和每次清理时都会收敛到容量上限，避免升级配置后旧数据库无限增长。聊天重放不会再次广播消息。加入、重连和接管已纳入独立的 `player:lifecycle` ledger：同一请求可在同 Socket、跨 Socket 或服务重启后重放，玩家凭证会重新绑定到当前 Socket，带 `actionId` 的接管申请在断线后保留并可重挂载；主机已处理的批准/拒绝状态也会在重试时恢复对应通知。已补充旧凭证撤销后的业务失败边界测试，避免把不可重放的历史会话误当作幂等命中。
 
-阶段 4 已完成：所有 LLM 座位共享房间级 `BudgetLedger`，调用按 game/model/seat 三层预算原子预留；`AiAuditStore` 记录决策状态、延迟、错误、回退和 token 用量；模型与机器人档案增加 revision，开局锁定主模型及 fallback 链并写入快照，恢复时检测版本漂移并回退确定性 Bot。shared、server、web 测试、typecheck、build 和 Playwright E2E 均已通过。
+阶段 4 已完成：所有 LLM 座位共享房间级 `BudgetLedger`，调用按 game/model/seat 三层预算原子预留；`AiAuditStore` 记录决策状态、延迟、错误、回退和 token 用量；模型与机器人档案增加 revision，开局锁定主模型及 fallback 链并写入快照，恢复时检测版本漂移并回退确定性 Bot。Windows 版本使用当前用户 DPAPI 保护 AI 主密钥，旧版明文 Base64 文件首次启动时自动迁移。shared、server、web 测试、typecheck、build 和 Playwright E2E 均已通过。
 
 阶段 5 的验收边界：在 320×667 和 393×852 视口下，加入大厅、身份确认、夜间目标、白天聊天和投票的主要操作不横向溢出；横屏时内容仍可滚动且底部操作不被遮挡；Tab 顺序可到达主要表单、行动和发送控件，焦点可见；主要触控目标不小于 44px；系统开启 reduced motion 时不依赖动画完成操作。
 
 阶段 6 已完成：生产依赖升级并通过 `pnpm audit --prod --audit-level high`，新增 `verify:repo` 检查必需路径、Node/pnpm 版本、生成物和源码资产边界，并锁定启动脚本、安装器防火墙和 LAN 烟测都使用 `TCP/35173`；引入 Biome 作为新增代码的增量 lint/format 工具，加入 `.editorconfig` 和 Windows GitHub Actions CI；房间失败码表抽为独立模块；便携版和 Inno Setup 安装包均已在 Windows 本机编译并自检通过。既有大范围历史代码暂不做全量格式化，避免把行为无关的格式噪声混入功能改动，后续按文件迁移到同一规则。
 
-阶段 7 当前状态：便携 ZIP 和安装 EXE 已生成。本轮已修复安装版只允许 `private` 防火墙配置的问题，并将规则收紧为所有配置下仅允许本地子网访问 `TCP/35173`，随后重新编译安装包。当前 Windows 主机的 WLAN 地址上，生产便携版烟测默认使用固定端口 `35173`，已验证 LAN 主页和加入页可访问、Socket.IO 合法 LAN 来源可连接、非法来源被拒绝、主机 bootstrap 从 LAN 侧保持 403；加入玩家、跨 Socket 生命周期 action 重放、接管批准会话恢复、房间号和重连凭证在服务重启后恢复。若本机端口冲突，可设置 `RELEASE_PORT=0` 做动态端口诊断，但不能替代固定端口验收。可用 `corepack pnpm verify:lan` 重复执行这组检查。
+阶段 7A 当前状态：便携 ZIP 和安装 EXE 已生成。本轮已修复安装版只允许 `private` 防火墙配置的问题，并将规则收紧为所有配置下仅允许本地子网访问 `TCP/35173`；同时收紧主机 bootstrap 和 AI 管理接口的浏览器来源协议，并禁止主机会话 bootstrap 被缓存，随后重新编译安装包。当前 Windows 主机的 WLAN 地址上，生产便携版烟测默认使用固定端口 `35173`，13 项检查已通过：LAN 主页可访问、Windows DPAPI 主密钥落盘、加入页可访问、主机 bootstrap 仅限本机且禁止缓存、Socket.IO 合法 LAN 来源可连接、非法来源被拒绝；加入玩家、跨 Socket 生命周期 action 重放、跨服务重启 action 重放、接管批准会话恢复、房间号和重连凭证在服务重启后恢复。`verify:release` 另外检查了版本化 ZIP 的必需入口、安装 EXE 的 PE 头和最终 SHA256。若本机端口冲突，可设置 `RELEASE_PORT=0` 做动态端口诊断，但不能替代固定端口验收。可用 `corepack pnpm verify:lan` 重复执行这组检查。
 
 阶段 7 的自动化补充验收已覆盖 7 条 Playwright 流程，包括 Android Chrome、iPhone Safari 和微信 UA 的移动浏览器仿真；完整对局测试在确认动作后等待服务端锁定状态，避免把 React 状态切换中的临时 0×0 控件误判为触控尺寸缺陷。
 
 实机执行按照 [release-acceptance.md](release-acceptance.md) 记录安装、防火墙、扫码、断线恢复和完整对局证据。
 
-阶段 7 仍未完成：还需在真实 Windows 安装环境、Android Chrome、iPhone Safari/微信浏览器和另一台设备的实际局域网中完成二维码扫描、防火墙放行、断网/锁屏/切后台/刷新/主机重启，以及至少一局完整对局验收；自动化浏览器测试和同机 WLAN 烟测都不能替代实机验证。
+阶段 7B 仍未完成：还需在真实 Windows 安装环境、Android Chrome、iPhone Safari/微信浏览器和另一台设备的实际局域网中完成二维码扫描、防火墙放行、断网/锁屏/切后台/刷新/主机重启，以及至少一局完整对局验收；自动化浏览器测试和同机 WLAN 烟测都不能替代实机验证。
 
 ## 阶段验收原则
 

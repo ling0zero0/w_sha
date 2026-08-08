@@ -154,6 +154,24 @@ describe("SQLite runtime snapshots", () => {
     })).toThrow();
   });
 
+  it("validates snapshots before save or schedule can write them", () => {
+    const store = new SnapshotStore(":memory:");
+    stores.push(store);
+    const runtime = new GameRuntime({
+      localAddress: "192.168.1.20",
+      webPort: 5173,
+      roomCode: "123456",
+      joinToken: "abcdefghijklmnopqrstuvwxyz123456"
+    });
+    const snapshot = runtime.createSnapshot();
+    const invalidSnapshot = { ...snapshot, clockRemainingMs: -1 } as typeof snapshot;
+
+    expect(() => store.save(invalidSnapshot)).toThrow();
+    expect(store.load()).toBeNull();
+    expect(() => store.schedule(invalidSnapshot)).toThrow();
+    expect(store.load()).toBeNull();
+  });
+
   it("recovers a corrupted primary snapshot from the previous valid backup", () => {
     const directory = mkdtempSync(join(tmpdir(), "werewolf-snapshot-"));
     temporaryDirectories.push(directory);

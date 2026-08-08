@@ -62,7 +62,8 @@ export function attachSocketServer(
     auditStore?: AiAuditStore;
     gameTokenBudget?: number;
   },
-  additionalSocketOrigins: readonly string[] = []
+  additionalSocketOrigins: readonly string[] = [],
+  providedActionLedger?: ActionLedger
 ) {
   if (automaticPhaseProgression) runtime.room.enableDeferredStageAdvancement();
   const activeStageTiming = { ...stageTiming, ...stageTimingOverrides };
@@ -94,7 +95,7 @@ export function attachSocketServer(
   const takeoverActionIds = new Map<string, ActionId>();
   const aiBudgetLedger = new BudgetLedger();
   let activeAiGameId = runtime.room.getGameSessionId();
-  const actionLedger = new ActionLedger();
+  const actionLedger = providedActionLedger ?? new ActionLedger();
   let botManager: BotManager | null = null;
   let phaseTimer: NodeJS.Timeout | null = null;
   let scheduledStageKey: string | null = runtime.isPhasePaused() ? runtime.room.getTimedStageKey() : null;

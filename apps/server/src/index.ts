@@ -11,6 +11,7 @@ import { AiConfigStore } from "./ai/ai-config-store.js";
 import { loadOrCreateSecretBox } from "./ai/master-key.js";
 import { ProviderRegistry } from "./ai/provider-registry.js";
 import { createOpenAiCompatibleProvider } from "./ai/providers/openai-compatible.js";
+import { ActionLedger } from "./socket/action-ledger.js";
 
 const config = loadConfig();
 const aiGameTokenBudget = config.AI_GAME_TOKEN_BUDGET ?? 100_000;
@@ -36,6 +37,19 @@ try {
 const runtime = new GameRuntime(snapshot
   ? { localAddress, webPort: config.WEB_PORT, snapshot, chatPersistence: chatStore }
   : { localAddress, webPort: config.WEB_PORT, chatPersistence: chatStore });
+let actionLedger: ActionLedger;
+try {
+  actionLedger = new ActionLedger({
+    databasePath: config.DATABASE_PATH,
+    secretBox
+  });
+} catch (error) {
+  snapshotStore.close();
+  chatStore.close();
+  aiAuditStore.close();
+  aiConfigStore.close();
+  throw error;
+}
 const app = buildServer(config, runtime, {
   store: aiConfigStore,
   providers: providerRegistry,
@@ -68,7 +82,8 @@ const io = attachSocketServer(
     auditStore: aiAuditStore,
     gameTokenBudget: aiGameTokenBudget
   },
-  config.SOCKET_ALLOWED_ORIGINS?.split(",").map((origin) => origin.trim()).filter(Boolean)
+  config.SOCKET_ALLOWED_ORIGINS?.split(",").map((origin) => origin.trim()).filter(Boolean),
+  actionLedger
 );
 
 async function shutdown(signal: string) {
@@ -76,6 +91,7 @@ async function shutdown(signal: string) {
   persistSnapshot();
   snapshotStore.flush();
   io.close();
+  actionLedger.close();
   await app.close();
   snapshotStore.close();
   chatStore.close();
@@ -105,5 +121,6 @@ try {
   chatStore.close();
   aiAuditStore.close();
   aiConfigStore.close();
+  actionLedger.close();
   process.exit(1);
 }

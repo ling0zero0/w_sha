@@ -52,7 +52,9 @@ const requiredPaths = [
   "tests/e2e/lobby.spec.ts",
   "installer/W_SHA.iss",
   "release-template/使用说明.txt",
-  "docs/release-acceptance.md"
+  "docs/release-acceptance.md",
+  "scripts/verify-packaged-ui.cjs",
+  "scripts/verify-release-artifacts.cjs"
 ];
 for (const relativePath of requiredPaths) {
   assert(fs.existsSync(resolveProjectPath(relativePath)), `required path is missing: ${relativePath}`);
@@ -60,7 +62,7 @@ for (const relativePath of requiredPaths) {
 
 assert(/^pnpm@\d+\.\d+\.\d+$/.test(packageJson.packageManager ?? ""), "packageManager must pin a pnpm version");
 assert(packageJson.engines?.node === ">=22", "Node.js engine must remain >=22");
-for (const script of ["check", "check:all", "security:check", "verify:repo"]) {
+for (const script of ["check", "check:all", "security:check", "verify:repo", "verify:package:ui", "verify:release"]) {
   assert(typeof packageJson.scripts?.[script] === "string", `missing package script: ${script}`);
 }
 assert(Number(process.versions.node.split(".")[0]) >= 22, `Node.js 22 or newer is required (found ${process.version})`);
@@ -94,5 +96,8 @@ assert(launcherScript.includes('set "PORT=35173"') && launcherScript.includes('s
 
 const lanVerifierScript = fs.readFileSync(resolveProjectPath("scripts/verify-lan-release.cjs"), "utf8");
 assert(lanVerifierScript.includes("const DEFAULT_RELEASE_PORT = 35173;"), "LAN release verifier must default to TCP/35173");
+
+const installerPackagingScript = fs.readFileSync(resolveProjectPath("scripts/package-installer.cjs"), "utf8");
+assert(installerPackagingScript.includes("verify-release-artifacts.cjs"), "installer packaging must verify final release artifacts");
 
 console.log(`Repository verification passed (${trackedFiles.length} tracked files checked).`);

@@ -220,9 +220,12 @@ describe("OpenAI-compatible model provider", () => {
     });
   });
 
-  it("rejects metadata and link-local provider endpoints before making a request", () => {
+  it.each([
+    "http://169.254.169.254/latest/meta-data",
+    "http://[::ffff:169.254.169.254]/latest/meta-data"
+  ])("rejects metadata and link-local provider endpoints before making a request: %s", (baseUrl) => {
     expect(() => new OpenAiCompatibleProvider({
-      baseUrl: "http://169.254.169.254/latest/meta-data",
+      baseUrl,
       apiKey: null,
       fetch: vi.fn<typeof fetch>()
     })).toThrow(/blocked metadata or link-local/);

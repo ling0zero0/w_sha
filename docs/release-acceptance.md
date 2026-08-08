@@ -5,12 +5,15 @@
 ## 0. 自动化前置证据（非实机验收）
 
 - 日期：2026-08-01
-- `corepack pnpm check:all`：通过；shared 35、server 214、web 34，Playwright 7/7。
+- `corepack pnpm check:all`：通过；shared 35、server 223、web 34，Playwright 7/7。
 - `corepack pnpm quality`：通过；生产依赖高危审计无已知漏洞，仓库契约检查通过。
-- `corepack pnpm verify:lan`（默认固定端口 `35173`）：通过；LAN HTTP、来源白名单、跨 Socket 生命周期重放、接管批准凭证、快照重启恢复共 10 项检查。
-- 便携版 SHA256：`5C19864C04A5D06B7C3F9A2F96173F7CCB47B59D33E5411EA2E9F2BDF574B20E`
-- 安装包 SHA256：`9EA6C93456A8002772F41EF6FF87763C1BCBBA08C10ABBE7BB9526B9CF900BFF`
+- `corepack pnpm verify:lan`（默认固定端口 `35173`）：通过；LAN HTTP、Windows DPAPI 主密钥落盘、主机令牌禁止缓存、来源白名单、跨 Socket 生命周期重放、跨服务重启 action 重放、接管批准凭证、快照重启恢复共 13 项检查。
+- `corepack pnpm verify:package:ui`：通过；使用本机 Chrome 验证便携发布包的桌面、Android 尺寸、iPhone 尺寸和微信 User-Agent 页面实际渲染，并确认移动页面无横向溢出。
+- `corepack pnpm verify:release`：通过；确认版本化 ZIP 的必需入口、安装 EXE 的 Windows PE 头和最终 SHA256。
+- 便携版 SHA256：`F154F7DC88C019790AA2867EDCC3EA11FE0A817DDA3CEB650030587E91634949`
+- 安装包 SHA256：`986AB166B394E838A55CDFE5F72AE9F13A9D1D05C84D54E78140488CED4F3AB4`
 - 当前 LAN 地址：`192.168.3.70`
+- Windows 安装 smoke attempt：未完成；非管理员静默启动返回码 `2`，管理员 UAC 提示被取消，未创建临时安装目录或 `W_SHA 局域网狼人杀` 防火墙规则。
 
 以上记录只证明本机自动化和生产便携版烟测，不代表真实设备验收通过。
 
@@ -21,7 +24,7 @@
 - Windows 版本：
 - 主机 WLAN IPv4：
 - 安装包版本：`0.1.0`
-- 安装包 SHA256：
+- 安装包 SHA256：`986AB166B394E838A55CDFE5F72AE9F13A9D1D05C84D54E78140488CED4F3AB4`
 - 路由器/局域网名称：
 
 ## 2. Windows 安装与防火墙

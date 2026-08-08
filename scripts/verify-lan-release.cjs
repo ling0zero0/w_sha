@@ -98,11 +98,13 @@ async function stopChild(child, output) {
 
 async function startServer(port, databasePath) {
   const output = [];
+  const childEnvironment = { ...process.env };
+  delete childEnvironment.AI_MASTER_KEY;
   const child = spawn(nodePath, [entryPath], {
     cwd: productRoot,
     windowsHide: true,
     env: {
-      ...process.env,
+      ...childEnvironment,
       HOST: "0.0.0.0",
       PORT: String(port),
       WEB_PORT: String(port),
@@ -191,6 +193,11 @@ async function main() {
 
     const health = await fetch(`${lanUrl}/health`);
     if (!health.ok) throw new Error("LAN health endpoint is not reachable");
+    const masterKeyPath = path.join(temporaryRoot, "ai-master-key");
+    const masterKey = fs.readFileSync(masterKeyPath, "utf8");
+    if (process.platform === "win32" && !masterKey.startsWith("dpapi:v1:")) {
+      throw new Error("packaged Windows runtime did not protect the AI master key with DPAPI");
+    }
     const home = await fetch(`${lanUrl}/`);
     if (!home.ok || !(await home.text()).includes('id="root"')) throw new Error("LAN home page is invalid");
 
@@ -198,6 +205,9 @@ async function main() {
       headers: { origin: loopbackUrl, referer: `${loopbackUrl}/` }
     });
     if (!bootstrapResponse.ok) throw new Error(`host bootstrap failed: ${bootstrapResponse.status}`);
+    if (bootstrapResponse.headers.get("cache-control") !== "no-store") {
+      throw new Error("host bootstrap must disable caching");
+    }
     const bootstrap = await bootstrapResponse.json();
     const joinUrl = new URL(bootstrap.lobby.joinUrl);
     if (bootstrap.lobby.localAddress !== lanAddress) {
@@ -288,10 +298,11 @@ async function main() {
     secondarySocket = null;
     await delay(300);
     secondarySocket = await connectSocket(lanUrl, { extraHeaders: { origin: lanUrl } });
-    const preRestartReconnect = await emitWithAck(secondarySocket, "player:reconnect", {
+    const preRestartReconnectPayload = {
       ...credentials,
       actionId: randomUUID()
-    });
+    };
+    const preRestartReconnect = await emitWithAck(secondarySocket, "player:reconnect", preRestartReconnectPayload);
     if (!preRestartReconnect?.ok) {
       throw new Error(`approved takeover credential failed before restart: ${JSON.stringify(preRestartReconnect)}`);
     }
@@ -314,6 +325,18 @@ async function main() {
     if (!restored.lobby.players.some((player) => player.nickname === "局域网验收玩家")) {
       throw new Error("joined player did not survive restart");
     }
+
+    playerSocket = await connectSocket(lanUrl, { extraHeaders: { origin: lanUrl } });
+    const replayedReconnectAfterRestart = await emitWithAck(playerSocket, "player:reconnect", preRestartReconnectPayload);
+    if (JSON.stringify(replayedReconnectAfterRestart) !== JSON.stringify(preRestartReconnect)) {
+      throw new Error("cross-restart action replay did not return the original result");
+    }
+    if (replayedReconnectAfterRestart.data.lobby.players.filter((player) => player.nickname === "局域网验收玩家").length !== 1) {
+      throw new Error("cross-restart action replay created a duplicate player");
+    }
+    playerSocket.close();
+    playerSocket = null;
+    await delay(300);
 
     playerSocket = await connectSocket(lanUrl, { extraHeaders: { origin: lanUrl } });
     const reconnectActionId = randomUUID();
@@ -348,11 +371,14 @@ async function main() {
           port,
           checks: [
             "LAN HTTP",
+            "Windows DPAPI master key at rest",
             "LAN join route",
             "host bootstrap local-only",
+            "host bootstrap no-store",
             "Socket.IO origin allowlist",
             "Socket.IO LAN origin",
             "cross-socket lifecycle action replay",
+            "cross-restart action replay",
             "takeover approval session recovery",
             "approved takeover credential before restart",
             "snapshot restart recovery",
