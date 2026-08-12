@@ -3,12 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { GameOverPanel } from "./GameOverPanel";
 
-function message(
-  id: string,
-  sequence: number,
-  text: string,
-  channel: ChatMessage["channel"]
-): ChatMessage {
+function message(id: string, sequence: number, text: string, channel: ChatMessage["channel"]): ChatMessage {
   return {
     id,
     sequence,
@@ -30,13 +25,15 @@ describe("GameOverPanel", () => {
   it("renders the public replay without exposing wolf-private messages", () => {
     const result: NonNullable<GameResult> = {
       outcome: "good-win",
-      revealedPlayers: [{
-        id: "11111111-1111-4111-8111-111111111111",
-        number: 1,
-        nickname: "Alice",
-        role: "villager",
-        alive: true
-      }],
+      revealedPlayers: [
+        {
+          id: "11111111-1111-4111-8111-111111111111",
+          number: 1,
+          nickname: "Alice",
+          role: "villager",
+          alive: true
+        }
+      ],
       records: []
     };
 

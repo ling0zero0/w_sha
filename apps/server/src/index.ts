@@ -34,9 +34,11 @@ try {
   aiConfigStore.close();
   throw error;
 }
-const runtime = new GameRuntime(snapshot
-  ? { localAddress, webPort: config.WEB_PORT, snapshot, chatPersistence: chatStore }
-  : { localAddress, webPort: config.WEB_PORT, chatPersistence: chatStore });
+const runtime = new GameRuntime(
+  snapshot
+    ? { localAddress, webPort: config.WEB_PORT, snapshot, chatPersistence: chatStore }
+    : { localAddress, webPort: config.WEB_PORT, chatPersistence: chatStore }
+);
 let actionLedger: ActionLedger;
 try {
   actionLedger = new ActionLedger({
@@ -56,19 +58,22 @@ const app = buildServer(config, runtime, {
   auditStore: aiAuditStore
 });
 const persistSnapshot = () => snapshotStore.schedule(runtime.createSnapshot());
-const testStageTiming = config.NODE_ENV === "test" ? {
-  "role-reveal": { minimumMs: 50, maximumMs: 500 },
-  wolf: { minimumMs: 50, maximumMs: 500 },
-  seer: { minimumMs: 50, maximumMs: 500 },
-  guard: { minimumMs: 50, maximumMs: 500 },
-  witch: { minimumMs: 50, maximumMs: 500 },
-  hunter: { minimumMs: 50, maximumMs: 500 },
-  dawn: { minimumMs: 5_000, maximumMs: 5_000 },
-  "last-words": { minimumMs: 50, maximumMs: 500 },
-  "day-speech": { minimumMs: 50, maximumMs: 500 },
-  "day-vote": { minimumMs: 50, maximumMs: 500 },
-  "exile-result": { minimumMs: 50, maximumMs: 500 }
-} as const : {};
+const testStageTiming =
+  config.NODE_ENV === "test"
+    ? ({
+        "role-reveal": { minimumMs: 50, maximumMs: 500 },
+        wolf: { minimumMs: 50, maximumMs: 500 },
+        seer: { minimumMs: 50, maximumMs: 500 },
+        guard: { minimumMs: 50, maximumMs: 500 },
+        witch: { minimumMs: 50, maximumMs: 500 },
+        hunter: { minimumMs: 50, maximumMs: 500 },
+        dawn: { minimumMs: 5_000, maximumMs: 5_000 },
+        "last-words": { minimumMs: 50, maximumMs: 500 },
+        "day-speech": { minimumMs: 50, maximumMs: 500 },
+        "day-vote": { minimumMs: 50, maximumMs: 500 },
+        "exile-result": { minimumMs: 50, maximumMs: 500 }
+      } as const)
+    : {};
 const io = attachSocketServer(
   app.server,
   app.log,
@@ -82,7 +87,9 @@ const io = attachSocketServer(
     auditStore: aiAuditStore,
     gameTokenBudget: aiGameTokenBudget
   },
-  config.SOCKET_ALLOWED_ORIGINS?.split(",").map((origin) => origin.trim()).filter(Boolean),
+  config.SOCKET_ALLOWED_ORIGINS?.split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
   actionLedger
 );
 
@@ -108,12 +115,15 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
 try {
   await app.listen({ host: config.HOST, port: config.PORT });
   persistSnapshot();
-  app.log.info({
-    host: config.HOST,
-    port: config.PORT,
-    joinAddress: runtime.room.getJoinUrl(),
-    restored: snapshot !== null
-  }, "server ready");
+  app.log.info(
+    {
+      host: config.HOST,
+      port: config.PORT,
+      joinAddress: runtime.room.getJoinUrl(),
+      restored: snapshot !== null
+    },
+    "server ready"
+  );
   if (config.OPEN_BROWSER) openBrowser(`http://127.0.0.1:${config.PORT}/`);
 } catch (error) {
   app.log.fatal({ err: error }, "server failed to start");

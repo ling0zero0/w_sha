@@ -8,21 +8,14 @@ vi.mock("react", async (importOriginal) => {
     ...actual,
     useEffect: () => undefined,
     useState(initial: unknown) {
-      return [
-        typeof initial === "function" ? (initial as () => unknown)() : initial,
-        vi.fn()
-      ];
+      return [typeof initial === "function" ? (initial as () => unknown)() : initial, vi.fn()];
     }
   };
 });
 
 import { RoleConfigurationPanel } from "./RoleConfigurationPanel";
 
-function findElements(
-  node: ReactNode,
-  predicate: (element: ReactElement) => boolean,
-  matches: ReactElement[] = []
-): ReactElement[] {
+function findElements(node: ReactNode, predicate: (element: ReactElement) => boolean, matches: ReactElement[] = []): ReactElement[] {
   if (!isValidElement(node)) return matches;
   if (predicate(node)) matches.push(node);
 
@@ -62,10 +55,7 @@ describe("RoleConfigurationPanel chat mode", () => {
   it("renders an accessible segmented radio control and emits a selection", () => {
     const onChatModeChange = vi.fn();
     const panel = renderPanel(true, onChatModeChange);
-    const options = findElements(
-      panel,
-      (element) => (element.props as { role?: string }).role === "radio"
-    );
+    const options = findElements(panel, (element) => (element.props as { role?: string }).role === "radio");
 
     expect(options).toHaveLength(2);
     expect((options[0]!.props as { "aria-checked": boolean })["aria-checked"]).toBe(false);
@@ -77,10 +67,7 @@ describe("RoleConfigurationPanel chat mode", () => {
 
   it("disables both mode options while disconnected", () => {
     const panel = renderPanel(false);
-    const options = findElements(
-      panel,
-      (element) => (element.props as { role?: string }).role === "radio"
-    );
+    const options = findElements(panel, (element) => (element.props as { role?: string }).role === "radio");
 
     expect(options.every((option) => (option.props as { disabled?: boolean }).disabled)).toBe(true);
   });

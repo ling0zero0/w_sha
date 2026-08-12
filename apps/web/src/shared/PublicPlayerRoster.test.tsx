@@ -40,11 +40,9 @@ const otherHuman = {
 
 describe("PublicPlayerRoster", () => {
   it("marks bots without presenting device connection semantics", () => {
-    const html = renderToStaticMarkup(
-      <PublicPlayerRoster players={[bot]} selfId={humanId} phase="lobby" />
-    );
+    const html = renderToStaticMarkup(<PublicPlayerRoster players={[bot]} selfId={humanId} phase="lobby" />);
 
-    expect(html).toContain("data-controller=\"bot\"");
+    expect(html).toContain('data-controller="bot"');
     expect(html).toContain("机器人");
     expect(html).toContain("自动控制");
     expect(html).not.toContain("重连中");
@@ -53,9 +51,7 @@ describe("PublicPlayerRoster", () => {
   });
 
   it("uses only public player metadata during the game", () => {
-    const html = renderToStaticMarkup(
-      <PublicPlayerRoster players={[human, bot, otherHuman]} selfId={humanId} phase="day-speech" />
-    );
+    const html = renderToStaticMarkup(<PublicPlayerRoster players={[human, bot, otherHuman]} selfId={humanId} phase="day-speech" />);
 
     expect(html).toContain("Alice");
     expect(html).toContain("小灰");

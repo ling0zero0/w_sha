@@ -54,9 +54,8 @@ export class PhaseClock {
   }
 
   view(nowMs = Date.now()): PublicPhaseClock {
-    const remainingMs = this.status === "running" && this.deadlineMs !== null
-      ? Math.max(0, this.deadlineMs - nowMs)
-      : this.status === "paused" ? this.pausedRemainingMs : 0;
+    const remainingMs =
+      this.status === "running" && this.deadlineMs !== null ? Math.max(0, this.deadlineMs - nowMs) : this.status === "paused" ? this.pausedRemainingMs : 0;
     return {
       status: this.status,
       deadlineAt: this.deadlineMs === null ? null : new Date(this.deadlineMs).toISOString(),

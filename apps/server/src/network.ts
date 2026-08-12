@@ -18,9 +18,7 @@ function addressScore(interfaceName: string, address: string): number {
   return score;
 }
 
-export function selectLanAddress(
-  interfaces: NodeJS.Dict<ReturnType<typeof networkInterfaces>[string]> = networkInterfaces()
-): string {
+export function selectLanAddress(interfaces: NodeJS.Dict<ReturnType<typeof networkInterfaces>[string]> = networkInterfaces()): string {
   const candidates: AddressCandidate[] = [];
 
   for (const [interfaceName, entries] of Object.entries(interfaces)) {

@@ -1,13 +1,12 @@
-import {
-  botIntentSchema,
-  type AiModelProfile
-} from "@werewolf/shared";
+import { botIntentSchema, type AiModelProfile } from "@werewolf/shared";
 import { z } from "zod";
 
-export const aiModelDecisionSchema = z.object({
-  protocolVersion: z.literal(1),
-  intent: botIntentSchema.nullable()
-}).strict();
+export const aiModelDecisionSchema = z
+  .object({
+    protocolVersion: z.literal(1),
+    intent: botIntentSchema.nullable()
+  })
+  .strict();
 
 export type AiModelDecision = z.infer<typeof aiModelDecisionSchema>;
 
@@ -71,15 +70,9 @@ export type AiConnectionTestResult =
     });
 
 export interface ModelProvider {
-  decide(
-    request: AiDecisionRequest,
-    signal: AbortSignal
-  ): Promise<AiDecisionResponse>;
+  decide(request: AiDecisionRequest, signal: AbortSignal): Promise<AiDecisionResponse>;
 
-  testConnection(
-    model: AiModelProfile,
-    signal: AbortSignal
-  ): Promise<AiConnectionTestResult>;
+  testConnection(model: AiModelProfile, signal: AbortSignal): Promise<AiConnectionTestResult>;
 }
 
 export function parseAiModelDecision(value: unknown): AiModelDecision {

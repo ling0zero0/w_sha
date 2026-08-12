@@ -22,13 +22,15 @@ export function PhaseClockDisplay({ clock }: { clock: PublicPhaseClock }) {
     return () => window.clearInterval(timer);
   }, [clock.status, clock.deadlineAt]);
 
-  const statusText = clock.status === "running" ? "阶段进行中"
-    : clock.status === "paused" ? "阶段已暂停"
-      : clock.status === "ended" ? "阶段已结束" : "阶段计时未开始";
+  const statusText =
+    clock.status === "running" ? "阶段进行中" : clock.status === "paused" ? "阶段已暂停" : clock.status === "ended" ? "阶段已结束" : "阶段计时未开始";
 
   return (
     <div className={`phase-clock phase-clock-${clock.status}`}>
-      <span><Timer size={18} aria-hidden="true" />{statusText}</span>
+      <span>
+        <Timer size={18} aria-hidden="true" />
+        {statusText}
+      </span>
       <strong data-testid="phase-clock">{formatRemainingMs(getRemainingMs(clock, nowMs))}</strong>
     </div>
   );
@@ -41,15 +43,15 @@ export function InterventionNotices({ game }: { game: PublicGameState }) {
   return (
     <div className="intervention-notice" aria-live="polite" data-testid="intervention-notice">
       <ShieldCheck size={17} aria-hidden="true" />
-      <span><small>主机操作</small>{latest.detail}</span>
+      <span>
+        <small>主机操作</small>
+        {latest.detail}
+      </span>
     </div>
   );
 }
 
-export function HostConnectionStatus({ api, socket }: {
-  api: "checking" | "connected" | "disconnected";
-  socket: "checking" | "connected" | "disconnected";
-}) {
+export function HostConnectionStatus({ api, socket }: { api: "checking" | "connected" | "disconnected"; socket: "checking" | "connected" | "disconnected" }) {
   return (
     <div className="host-statuses">
       <span className={`status-chip status-${api}`}>

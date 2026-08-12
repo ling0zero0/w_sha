@@ -11,15 +11,7 @@ export interface CredentialInputProps {
   onClearRequested(value: boolean): void;
 }
 
-export function CredentialInput({
-  value,
-  configured,
-  hint,
-  disabled,
-  clearRequested,
-  onChange,
-  onClearRequested
-}: CredentialInputProps) {
+export function CredentialInput({ value, configured, hint, disabled, clearRequested, onChange, onClearRequested }: CredentialInputProps) {
   const [visible, setVisible] = useState(false);
 
   return (
@@ -48,13 +40,7 @@ export function CredentialInput({
         </button>
       </div>
       <div className="ai-credential-status">
-        <span>
-          {clearRequested
-            ? "保存后将删除凭据"
-            : configured
-              ? `已保存凭据${hint ? `（${hint}）` : ""}，密钥不会重新显示`
-              : "尚未保存凭据"}
-        </span>
+        <span>{clearRequested ? "保存后将删除凭据" : configured ? `已保存凭据${hint ? `（${hint}）` : ""}，密钥不会重新显示` : "尚未保存凭据"}</span>
         {configured ? (
           <button
             type="button"

@@ -1,10 +1,5 @@
 import type { PlayerLobbyView } from "@werewolf/shared";
-import {
-  Children,
-  isValidElement,
-  type ReactElement,
-  type ReactNode
-} from "react";
+import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const hookHarness = vi.hoisted(() => ({
@@ -21,17 +16,13 @@ vi.mock("react", async (importOriginal) => {
     useState(initial: unknown) {
       const index = hookHarness.cursor++;
       if (!(index in hookHarness.states)) {
-        hookHarness.states[index] = typeof initial === "function"
-          ? (initial as () => unknown)()
-          : initial;
+        hookHarness.states[index] = typeof initial === "function" ? (initial as () => unknown)() : initial;
       }
 
       return [
         hookHarness.states[index],
         (next: unknown) => {
-          hookHarness.states[index] = typeof next === "function"
-            ? (next as (current: unknown) => unknown)(hookHarness.states[index])
-            : next;
+          hookHarness.states[index] = typeof next === "function" ? (next as (current: unknown) => unknown)(hookHarness.states[index]) : next;
         }
       ];
     }
@@ -87,10 +78,7 @@ function lobbyWithChat(
   } as unknown as PlayerLobbyView;
 }
 
-function findElement(
-  node: ReactNode,
-  predicate: (element: ReactElement) => boolean
-): ReactElement | undefined {
+function findElement(node: ReactNode, predicate: (element: ReactElement) => boolean): ReactElement | undefined {
   if (!isValidElement(node)) return undefined;
   if (predicate(node)) return node;
 
@@ -102,10 +90,7 @@ function findElement(
   return undefined;
 }
 
-function renderDayFlow(
-  lobby: PlayerLobbyView,
-  onSendChat = vi.fn()
-): ReactElement {
+function renderDayFlow(lobby: PlayerLobbyView, onSendChat = vi.fn()): ReactElement {
   hookHarness.cursor = 0;
   return DayFlowScreen({
     lobby,
@@ -128,10 +113,7 @@ describe("DayFlowScreen public chat", () => {
   it("does not expose the composer when canSend is false", () => {
     const screen = renderDayFlow(lobbyWithChat(false));
 
-    expect(findElement(
-      screen,
-      (element) => (element.props as { className?: string }).className === "day-chat-form"
-    )).toBeUndefined();
+    expect(findElement(screen, (element) => (element.props as { className?: string }).className === "day-chat-form")).toBeUndefined();
   });
 
   it("trims the sent message and clears the input after submission", () => {
@@ -141,23 +123,14 @@ describe("DayFlowScreen public chat", () => {
     const textarea = findElement(screen, (element) => element.type === "textarea");
 
     expect(textarea).toBeDefined();
-    (textarea?.props as { onChange: (event: { target: { value: string } }) => void })
-      .onChange({ target: { value: "  ready to vote  " } });
+    (textarea?.props as { onChange: (event: { target: { value: string } }) => void }).onChange({ target: { value: "  ready to vote  " } });
 
     screen = renderDayFlow(lobby, onSendChat);
-    const form = findElement(
-      screen,
-      (element) => (element.props as { className?: string }).className === "day-chat-form"
-    );
-    const enabledButton = findElement(
-      screen,
-      (element) => element.type === "button"
-        && (element.props as { title?: string }).title === "发送公开发言"
-    );
+    const form = findElement(screen, (element) => (element.props as { className?: string }).className === "day-chat-form");
+    const enabledButton = findElement(screen, (element) => element.type === "button" && (element.props as { title?: string }).title === "发送公开发言");
 
     expect((enabledButton?.props as { disabled?: boolean }).disabled).toBe(false);
-    (form?.props as { onSubmit: (event: { preventDefault: () => void }) => void })
-      .onSubmit({ preventDefault: vi.fn() });
+    (form?.props as { onSubmit: (event: { preventDefault: () => void }) => void }).onSubmit({ preventDefault: vi.fn() });
 
     expect(onSendChat).toHaveBeenCalledWith({
       channel: "day-public",
@@ -166,11 +139,7 @@ describe("DayFlowScreen public chat", () => {
 
     screen = renderDayFlow(lobby, onSendChat);
     const clearedTextarea = findElement(screen, (element) => element.type === "textarea");
-    const disabledButton = findElement(
-      screen,
-      (element) => element.type === "button"
-        && (element.props as { title?: string }).title === "发送公开发言"
-    );
+    const disabledButton = findElement(screen, (element) => element.type === "button" && (element.props as { title?: string }).title === "发送公开发言");
 
     expect((clearedTextarea?.props as { value?: string }).value).toBe("");
     expect((disabledButton?.props as { disabled?: boolean }).disabled).toBe(true);
@@ -179,30 +148,22 @@ describe("DayFlowScreen public chat", () => {
   it("shows the composer to a non-current speaker in open mode without exposing finish speaking", () => {
     const screen = renderDayFlow(lobbyWithChat(true, "open", otherPlayer));
 
-    expect(findElement(
-      screen,
-      (element) => (element.props as { className?: string }).className === "day-chat-form"
-    )).toBeDefined();
-    expect(findElement(
-      screen,
-      (element) => element.type === "button"
-        && (element.props as { children?: ReactNode }).children === "结束我的发言"
-    )).toBeUndefined();
-    expect(findElement(
-      screen,
-      (element) => typeof element.type === "function"
-        && element.type.name === "ChatModeStatus"
-        && (element.props as { chatMode?: string }).chatMode === "open"
-    )).toBeDefined();
+    expect(findElement(screen, (element) => (element.props as { className?: string }).className === "day-chat-form")).toBeDefined();
+    expect(
+      findElement(screen, (element) => element.type === "button" && (element.props as { children?: ReactNode }).children === "结束我的发言")
+    ).toBeUndefined();
+    expect(
+      findElement(
+        screen,
+        (element) =>
+          typeof element.type === "function" && element.type.name === "ChatModeStatus" && (element.props as { chatMode?: string }).chatMode === "open"
+      )
+    ).toBeDefined();
   });
 
   it("keeps the public player roster visible during the game", () => {
     const screen = renderDayFlow(lobbyWithChat(false));
-    const roster = findElement(
-      screen,
-      (element) => typeof element.type === "function"
-        && element.type.name === "PublicPlayerRoster"
-    );
+    const roster = findElement(screen, (element) => typeof element.type === "function" && element.type.name === "PublicPlayerRoster");
 
     expect(roster).toBeDefined();
     expect((roster?.props as { players?: unknown[] }).players).toHaveLength(2);

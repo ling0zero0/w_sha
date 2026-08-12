@@ -1,9 +1,4 @@
-import {
-  Children,
-  isValidElement,
-  type ReactElement,
-  type ReactNode
-} from "react";
+import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("react", async (importOriginal) => {
@@ -16,10 +11,7 @@ vi.mock("react", async (importOriginal) => {
 
 import { CredentialInput } from "./CredentialInput";
 
-function findElement(
-  node: ReactNode,
-  predicate: (element: ReactElement) => boolean
-): ReactElement | undefined {
+function findElement(node: ReactNode, predicate: (element: ReactElement) => boolean): ReactElement | undefined {
   if (!isValidElement(node)) return undefined;
   if (predicate(node)) return node;
   const children = (node.props as { children?: ReactNode }).children;
@@ -60,10 +52,7 @@ describe("CredentialInput", () => {
       onChange,
       onClearRequested
     });
-    const clearButton = findElement(
-      field,
-      (element) => (element.props as { className?: string }).className?.includes("ai-danger-command") ?? false
-    );
+    const clearButton = findElement(field, (element) => (element.props as { className?: string }).className?.includes("ai-danger-command") ?? false);
 
     (clearButton?.props as { onClick(): void }).onClick();
     expect(onChange).toHaveBeenCalledWith("");

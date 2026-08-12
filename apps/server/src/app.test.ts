@@ -144,29 +144,26 @@ describe("server shell", () => {
     expect(response.json()).not.toHaveProperty("sessionToken");
   });
 
-  it.each(["file://127.0.0.1/", "ftp://127.0.0.1/"])(
-    "rejects a non-HTTP loopback source: %s",
-    async (source) => {
-      const runtime = new GameRuntime({
-        localAddress: "192.168.1.20",
-        webPort: 5173,
-        roomCode: "123456",
-        joinToken: "abcdefghijklmnopqrstuvwxyz123456",
-        hostSession: "zyxwvutsrqponmlkjihgfedcba654321"
-      });
-      const server = buildServer(testConfig, runtime);
-      servers.push(server);
+  it.each(["file://127.0.0.1/", "ftp://127.0.0.1/"])("rejects a non-HTTP loopback source: %s", async (source) => {
+    const runtime = new GameRuntime({
+      localAddress: "192.168.1.20",
+      webPort: 5173,
+      roomCode: "123456",
+      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+      hostSession: "zyxwvutsrqponmlkjihgfedcba654321"
+    });
+    const server = buildServer(testConfig, runtime);
+    servers.push(server);
 
-      const response = await server.inject({
-        method: "GET",
-        url: "/api/host-bootstrap",
-        headers: { referer: source }
-      });
+    const response = await server.inject({
+      method: "GET",
+      url: "/api/host-bootstrap",
+      headers: { referer: source }
+    });
 
-      expect(response.statusCode).toBe(403);
-      expect(response.json()).not.toHaveProperty("sessionToken");
-    }
-  );
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).not.toHaveProperty("sessionToken");
+  });
 
   it("allows a loopback browser forwarded by the local Vite proxy", async () => {
     const runtime = new GameRuntime({

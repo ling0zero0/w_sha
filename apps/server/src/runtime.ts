@@ -59,8 +59,8 @@ export class GameRuntime {
           localAddress: options.localAddress,
           webPort: options.webPort,
           ...(options.chatPersistence ? { chatPersistence: options.chatPersistence } : {}),
-          ...options.roomCode ? { roomCode: options.roomCode } : {},
-          ...options.joinToken ? { joinToken: options.joinToken } : {}
+          ...(options.roomCode ? { roomCode: options.roomCode } : {}),
+          ...(options.joinToken ? { joinToken: options.joinToken } : {})
         };
     this.room = new LobbyRoom(roomOptions);
     this.hostSession = options.hostSession ?? randomBytes(32).toString("base64url");
@@ -149,11 +149,7 @@ export class GameRuntime {
     if (!result.ok) return result;
 
     const { number, nickname } = result.data.player;
-    this.recordIntervention(
-      "depart-player",
-      `主机将 ${number} 号玩家${nickname}判定为离场`,
-      nowMs
-    );
+    this.recordIntervention("depart-player", `主机将 ${number} 号玩家${nickname}判定为离场`, nowMs);
     this.publicRevision += 1;
     return {
       ok: true,
@@ -164,19 +160,11 @@ export class GameRuntime {
     };
   }
 
-  correctPlayerLife(
-    playerId: PlayerId,
-    alive: boolean,
-    nowMs = Date.now()
-  ): RoomActionResult<PlayerLifeCorrectionOutcome> {
+  correctPlayerLife(playerId: PlayerId, alive: boolean, nowMs = Date.now()): RoomActionResult<PlayerLifeCorrectionOutcome> {
     const result = this.room.correctPlayerLife(playerId, alive);
     if (!result.ok) return result;
     const { number, nickname } = result.data.player;
-    this.recordIntervention(
-      "correct-life",
-      `主机将 ${number} 号玩家${nickname}修正为${alive ? "存活" : "死亡"}`,
-      nowMs
-    );
+    this.recordIntervention("correct-life", `主机将 ${number} 号玩家${nickname}修正为${alive ? "存活" : "死亡"}`, nowMs);
     this.publicRevision += 1;
     return {
       ok: true,

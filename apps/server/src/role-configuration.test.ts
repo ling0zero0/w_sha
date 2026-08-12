@@ -32,22 +32,26 @@ describe("role configuration readiness", () => {
   });
 
   it("reports role totals above and below the participant count", () => {
-    expect(evaluateStartReadiness({ wolf: 1, villager: 2, seer: 1, witch: 0 }, 5).issues)
-      .toContainEqual(expect.objectContaining({ code: "ROLE_TOTAL_MISMATCH" }));
-    expect(evaluateStartReadiness({ wolf: 2, villager: 3, seer: 1, witch: 0 }, 5).issues)
-      .toContainEqual(expect.objectContaining({ code: "ROLE_TOTAL_MISMATCH" }));
+    expect(evaluateStartReadiness({ wolf: 1, villager: 2, seer: 1, witch: 0 }, 5).issues).toContainEqual(
+      expect.objectContaining({ code: "ROLE_TOTAL_MISMATCH" })
+    );
+    expect(evaluateStartReadiness({ wolf: 2, villager: 3, seer: 1, witch: 0 }, 5).issues).toContainEqual(
+      expect.objectContaining({ code: "ROLE_TOTAL_MISMATCH" })
+    );
   });
 
   it("keeps four-role inputs compatible and includes optional roles in totals", () => {
     expect(countConfiguredRoles({ wolf: 1, villager: 1, seer: 1, witch: 0 })).toBe(3);
-    expect(countConfiguredRoles({
-      wolf: 1,
-      villager: 1,
-      seer: 0,
-      witch: 0,
-      guard: 1,
-      hunter: 1,
-      idiot: 1
-    })).toBe(5);
+    expect(
+      countConfiguredRoles({
+        wolf: 1,
+        villager: 1,
+        seer: 0,
+        witch: 0,
+        guard: 1,
+        hunter: 1,
+        idiot: 1
+      })
+    ).toBe(5);
   });
 });

@@ -34,10 +34,7 @@ export interface ActionLedgerOptions {
   secretBox?: SecretBox;
 }
 
-export type ActionLookup =
-  | { kind: "miss" }
-  | { kind: "replay"; result: RoomActionResult<unknown>; metadata?: unknown }
-  | { kind: "conflict" };
+export type ActionLookup = { kind: "miss" } | { kind: "replay"; result: RoomActionResult<unknown>; metadata?: unknown } | { kind: "conflict" };
 
 export class ActionLedger {
   private readonly entries = new Map<string, ActionEntry>();
@@ -49,14 +46,8 @@ export class ActionLedger {
 
   constructor(options?: ActionLedgerOptions);
   constructor(maxEntries?: number, ttlMs?: number, now?: () => number);
-  constructor(
-    optionsOrMaxEntries: ActionLedgerOptions | number = {},
-    ttlMs = 15 * 60_000,
-    now = Date.now
-  ) {
-    const options = typeof optionsOrMaxEntries === "number"
-      ? { maxEntries: optionsOrMaxEntries, ttlMs, now }
-      : optionsOrMaxEntries;
+  constructor(optionsOrMaxEntries: ActionLedgerOptions | number = {}, ttlMs = 15 * 60_000, now = Date.now) {
+    const options = typeof optionsOrMaxEntries === "number" ? { maxEntries: optionsOrMaxEntries, ttlMs, now } : optionsOrMaxEntries;
     this.maxEntries = options.maxEntries ?? 2_048;
     this.ttlMs = options.ttlMs ?? 15 * 60_000;
     this.now = options.now ?? Date.now;
@@ -84,30 +75,16 @@ export class ActionLedger {
     this.enforceCapacity();
   }
 
-  lookup(
-    scope: string,
-    event: string,
-    actionId: ActionId,
-    fingerprint: string
-  ): ActionLookup {
+  lookup(scope: string, event: string, actionId: ActionId, fingerprint: string): ActionLookup {
     this.prune();
     const key = this.key(scope, actionId);
     const entry = this.entries.get(key) ?? this.readPersistentEntry(scope, actionId);
     if (!entry) return { kind: "miss" };
     if (entry.event !== event || entry.fingerprint !== fingerprint) return { kind: "conflict" };
-    return entry.metadata === undefined
-      ? { kind: "replay", result: entry.result }
-      : { kind: "replay", result: entry.result, metadata: entry.metadata };
+    return entry.metadata === undefined ? { kind: "replay", result: entry.result } : { kind: "replay", result: entry.result, metadata: entry.metadata };
   }
 
-  record(
-    scope: string,
-    event: string,
-    actionId: ActionId,
-    fingerprint: string,
-    result: RoomActionResult<unknown>,
-    metadata?: unknown
-  ): void {
+  record(scope: string, event: string, actionId: ActionId, fingerprint: string, result: RoomActionResult<unknown>, metadata?: unknown): void {
     this.prune();
     const entry: ActionEntry = {
       actionId,
@@ -167,7 +144,8 @@ export class ActionLedger {
     };
     const excess = Number(row.count) - this.maxEntries;
     if (excess <= 0) return;
-    this.database.prepare(`
+    this.database
+      .prepare(`
       DELETE FROM action_ledger
       WHERE rowid IN (
         SELECT rowid
@@ -175,16 +153,19 @@ export class ActionLedger {
         ORDER BY recorded_at ASC, rowid ASC
         LIMIT ?
       )
-    `).run(excess);
+    `)
+      .run(excess);
   }
 
   private readPersistentEntry(scope: string, actionId: ActionId): ActionEntry | null {
     if (!this.database) return null;
-    const row = this.database.prepare(`
+    const row = this.database
+      .prepare(`
       SELECT event, fingerprint, encrypted_payload, recorded_at
       FROM action_ledger
       WHERE scope = ? AND action_id = ?
-    `).get(scope, actionId) as PersistedActionRow | undefined;
+    `)
+      .get(scope, actionId) as PersistedActionRow | undefined;
     if (!row) return null;
     const payload = this.openPayload(scope, actionId, row.encrypted_payload);
     const entry: ActionEntry = {
@@ -207,7 +188,8 @@ export class ActionLedger {
       ...(entry.metadata === undefined ? {} : { metadata: entry.metadata })
     };
     const encryptedPayload = this.sealPayload(scope, entry.actionId, payload);
-    this.database.prepare(`
+    this.database
+      .prepare(`
       INSERT INTO action_ledger (
         scope, action_id, event, fingerprint, encrypted_payload, recorded_at
       ) VALUES (?, ?, ?, ?, ?, ?)
@@ -216,22 +198,13 @@ export class ActionLedger {
         fingerprint = excluded.fingerprint,
         encrypted_payload = excluded.encrypted_payload,
         recorded_at = excluded.recorded_at
-    `).run(
-      scope,
-      entry.actionId,
-      entry.event,
-      entry.fingerprint,
-      encryptedPayload,
-      entry.recordedAt
-    );
+    `)
+      .run(scope, entry.actionId, entry.event, entry.fingerprint, encryptedPayload, entry.recordedAt);
   }
 
   private sealPayload(scope: string, actionId: ActionId, payload: PersistedActionPayload): string {
     if (!this.secretBox) throw new Error("persistent action ledger requires a secret box");
-    return JSON.stringify(this.secretBox.seal(
-      this.purpose(scope, actionId),
-      JSON.stringify(payload)
-    ));
+    return JSON.stringify(this.secretBox.seal(this.purpose(scope, actionId), JSON.stringify(payload)));
   }
 
   private openPayload(scope: string, actionId: ActionId, encryptedPayload: string): PersistedActionPayload {
@@ -264,18 +237,13 @@ export class ActionLedger {
 }
 
 export function actionFingerprint(value: unknown): string {
-  return createHash("sha256")
-    .update(stableSerialize(value), "utf8")
-    .digest("hex");
+  return createHash("sha256").update(stableSerialize(value), "utf8").digest("hex");
 }
 
 function isPersistedActionPayload(value: unknown): value is PersistedActionPayload {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const result = (value as Record<string, unknown>).result;
-  return typeof result === "object"
-    && result !== null
-    && !Array.isArray(result)
-    && typeof (result as Record<string, unknown>).ok === "boolean";
+  return typeof result === "object" && result !== null && !Array.isArray(result) && typeof (result as Record<string, unknown>).ok === "boolean";
 }
 
 function stableSerialize(value: unknown): string {
@@ -283,7 +251,8 @@ function stableSerialize(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "undefined";
   if (Array.isArray(value)) return `[${value.map(stableSerialize).join(",")}]`;
   const record = value as Record<string, unknown>;
-  return `{${Object.keys(record).sort().map((key) => (
-    `${JSON.stringify(key)}:${stableSerialize(record[key])}`
-  )).join(",")}}`;
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableSerialize(record[key])}`)
+    .join(",")}}`;
 }

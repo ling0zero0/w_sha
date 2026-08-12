@@ -40,11 +40,7 @@ function createSession(store: ChatStore, id = "session-1", chatMode: "ordered" |
   });
 }
 
-function message(
-  sequence: number,
-  channel: ChatMessage["channel"] = "day-public",
-  overrides: Partial<ChatMessage> = {}
-): ChatMessage {
+function message(sequence: number, channel: ChatMessage["channel"] = "day-public", overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {
     id: `00000000-0000-4000-8000-${sequence.toString().padStart(12, "0")}`,
     sequence,
@@ -91,7 +87,8 @@ describe("SQLite chat store", () => {
     expect(second.loadRecentForRecovery("session-1")).toEqual([message(1)]);
 
     const database = new DatabaseSync(path);
-    const objects = database.prepare(`
+    const objects = database
+      .prepare(`
       SELECT name
       FROM sqlite_master
       WHERE name IN (
@@ -100,19 +97,18 @@ describe("SQLite chat store", () => {
         'chat_messages_session_channel_sequence_idx'
       )
       ORDER BY name
-    `).all() as unknown as { name: string }[];
-    const legacyRow = database.prepare(`
+    `)
+      .all() as unknown as { name: string }[];
+    const legacyRow = database
+      .prepare(`
       SELECT payload
       FROM runtime_snapshot
       WHERE id = 1
-    `).get() as unknown as { payload: string };
+    `)
+      .get() as unknown as { payload: string };
     database.close();
 
-    expect(objects.map((row) => row.name)).toEqual([
-      "chat_messages",
-      "chat_messages_session_channel_sequence_idx",
-      "game_sessions"
-    ]);
+    expect(objects.map((row) => row.name)).toEqual(["chat_messages", "chat_messages_session_channel_sequence_idx", "game_sessions"]);
     expect(legacyRow.payload).toBe('{"version":1}');
     expect(existsSync(path)).toBe(true);
   });
@@ -135,10 +131,12 @@ describe("SQLite chat store", () => {
       chatMode: "open",
       roleConfiguration: { guard: 0, hunter: 0, idiot: 0 }
     });
-    expect(store.finishSession("session-finish", {
-      endedAt: "2026-07-19T09:30:00.000Z",
-      outcome: "good-win"
-    })).toMatchObject({
+    expect(
+      store.finishSession("session-finish", {
+        endedAt: "2026-07-19T09:30:00.000Z",
+        outcome: "good-win"
+      })
+    ).toMatchObject({
       endedAt: "2026-07-19T09:30:00.000Z",
       outcome: "good-win"
     });
@@ -174,11 +172,13 @@ describe("SQLite chat store", () => {
 
     createStore(path);
     const database = new DatabaseSync(path);
-    const row = database.prepare(`
+    const row = database
+      .prepare(`
       SELECT chat_mode
       FROM game_sessions
       WHERE id = 'legacy-session'
-    `).get() as unknown as { chat_mode: string };
+    `)
+      .get() as unknown as { chat_mode: string };
     database.close();
 
     expect(row.chat_mode).toBe("ordered");
@@ -201,22 +201,30 @@ describe("SQLite chat store", () => {
 
     const created = store.createSession(input);
     expect(store.createSession({ ...input })).toEqual(created);
-    expect(() => store.createSession({
-      ...input,
-      chatMode: "ordered"
-    })).toThrow(/session id conflict/);
-    expect(() => store.createSession({
-      ...input,
-      roomCode: "654321"
-    })).toThrow(/session id conflict/);
-    expect(() => store.createSession({
-      ...input,
-      startedAt: "2026-07-19T08:00:01.000Z"
-    })).toThrow(/session id conflict/);
-    expect(() => store.createSession({
-      ...input,
-      roleConfiguration: { ...input.roleConfiguration, villager: 2 }
-    })).toThrow(/session id conflict/);
+    expect(() =>
+      store.createSession({
+        ...input,
+        chatMode: "ordered"
+      })
+    ).toThrow(/session id conflict/);
+    expect(() =>
+      store.createSession({
+        ...input,
+        roomCode: "654321"
+      })
+    ).toThrow(/session id conflict/);
+    expect(() =>
+      store.createSession({
+        ...input,
+        startedAt: "2026-07-19T08:00:01.000Z"
+      })
+    ).toThrow(/session id conflict/);
+    expect(() =>
+      store.createSession({
+        ...input,
+        roleConfiguration: { ...input.roleConfiguration, villager: 2 }
+      })
+    ).toThrow(/session id conflict/);
   });
 
   it("treats an identical message ID as idempotent and rejects conflicting data", () => {
@@ -227,10 +235,12 @@ describe("SQLite chat store", () => {
 
     expect(store.appendMessage("session-1", original)).toEqual(original);
     expect(store.appendMessage("session-1", { ...original })).toEqual(original);
-    expect(() => store.appendMessage("session-1", {
-      ...original,
-      content: { kind: "text", text: "冲突内容" }
-    })).toThrow(/message id conflict/);
+    expect(() =>
+      store.appendMessage("session-1", {
+        ...original,
+        content: { kind: "text", text: "冲突内容" }
+      })
+    ).toThrow(/message id conflict/);
     expect(() => store.appendMessage("session-2", original)).toThrow(/message id conflict/);
     expect(store.loadRecentForRecovery("session-1")).toEqual([original]);
   });
@@ -279,41 +289,17 @@ describe("SQLite chat store", () => {
       })
     ]);
 
-    expect(store.queryAfter(
-      "session-1",
-      { kind: "host" },
-      0,
-      100
-    ).messages.map((entry) => entry.sequence)).toEqual([1, 3]);
-    expect(store.queryAfter(
-      "session-1",
-      { kind: "player", canReadWolfPrivate: false },
-      0,
-      100
-    ).messages.map((entry) => entry.sequence)).toEqual([1, 3]);
-    expect(store.queryAfter(
-      "session-1",
-      { kind: "player", canReadWolfPrivate: true },
-      0,
-      100
-    ).messages.map((entry) => entry.sequence)).toEqual([1, 2, 3]);
+    expect(store.queryAfter("session-1", { kind: "host" }, 0, 100).messages.map((entry) => entry.sequence)).toEqual([1, 3]);
+    expect(store.queryAfter("session-1", { kind: "player", canReadWolfPrivate: false }, 0, 100).messages.map((entry) => entry.sequence)).toEqual([1, 3]);
+    expect(store.queryAfter("session-1", { kind: "player", canReadWolfPrivate: true }, 0, 100).messages.map((entry) => entry.sequence)).toEqual([1, 2, 3]);
   });
 
   it("loads only the latest authorized recovery window in ascending order", () => {
     const store = createStore();
     createSession(store);
-    store.importMessages("session-1", [
-      message(1),
-      message(2, "wolf-private"),
-      message(3),
-      message(4),
-      message(5, "wolf-private")
-    ]);
+    store.importMessages("session-1", [message(1), message(2, "wolf-private"), message(3), message(4), message(5, "wolf-private")]);
 
-    expect(store.loadRecentForRecovery(
-      "session-1",
-      3
-    ).map((entry) => entry.sequence)).toEqual([3, 4, 5]);
+    expect(store.loadRecentForRecovery("session-1", 3).map((entry) => entry.sequence)).toEqual([3, 4, 5]);
   });
 
   it("rolls back a batch when one imported message conflicts", () => {
@@ -321,37 +307,24 @@ describe("SQLite chat store", () => {
     createSession(store);
     store.appendMessage("session-1", message(2));
 
-    expect(() => store.importMessages("session-1", [
-      message(1),
-      message(2, "day-public", {
-        content: { kind: "text", text: "不同内容" }
-      }),
-      message(3)
-    ])).toThrow(/message id conflict/);
-    expect(store.loadRecentForRecovery(
-      "session-1"
-    ).map((entry) => entry.sequence)).toEqual([2]);
+    expect(() =>
+      store.importMessages("session-1", [
+        message(1),
+        message(2, "day-public", {
+          content: { kind: "text", text: "不同内容" }
+        }),
+        message(3)
+      ])
+    ).toThrow(/message id conflict/);
+    expect(store.loadRecentForRecovery("session-1").map((entry) => entry.sequence)).toEqual([2]);
   });
 
   it("validates cursor and page limits", () => {
     const store = createStore();
     createSession(store);
 
-    expect(() => store.queryAfter(
-      "session-1",
-      { kind: "host" },
-      -1,
-      10
-    )).toThrow(/afterSequence/);
-    expect(() => store.queryAfter(
-      "session-1",
-      { kind: "host" },
-      0,
-      101
-    )).toThrow(/limit/);
-    expect(() => store.loadRecentForRecovery(
-      "session-1",
-      0
-    )).toThrow(/limit/);
+    expect(() => store.queryAfter("session-1", { kind: "host" }, -1, 10)).toThrow(/afterSequence/);
+    expect(() => store.queryAfter("session-1", { kind: "host" }, 0, 101)).toThrow(/limit/);
+    expect(() => store.loadRecentForRecovery("session-1", 0)).toThrow(/limit/);
   });
 });

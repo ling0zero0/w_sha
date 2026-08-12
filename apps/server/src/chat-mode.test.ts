@@ -96,23 +96,19 @@ describe("discussion chat modes", () => {
 
     expect(room.getPlayerView(playerIds[0]!)?.publicChat.canSend).toBe(true);
     expect(room.getPlayerView(playerIds[1]!)?.publicChat.canSend).toBe(false);
-    expect(room.sendChat(
-      playerIds[1]!,
-      { channel: "day-public", content: { kind: "text", text: "out of order" } }
-    )).toMatchObject({ ok: false, code: "INVALID_PHASE_CONTROL" });
+    expect(room.sendChat(playerIds[1]!, { channel: "day-public", content: { kind: "text", text: "out of order" } })).toMatchObject({
+      ok: false,
+      code: "INVALID_PHASE_CONTROL"
+    });
   });
 
   it("allows every living non-departed player during open day speech", () => {
     const { room, playerIds } = restoreAtSpeech("open");
 
-    expect(playerIds.map((playerId) =>
-      room.getPlayerView(playerId)?.publicChat.canSend
-    )).toEqual([true, true, true]);
-    expect(room.sendChat(
-      playerIds[1]!,
-      { channel: "day-public", content: { kind: "text", text: "open discussion" } },
-      new Date("2026-07-19T08:00:01.000Z")
-    )).toMatchObject({ ok: true, data: { channel: "day-public" } });
+    expect(playerIds.map((playerId) => room.getPlayerView(playerId)?.publicChat.canSend)).toEqual([true, true, true]);
+    expect(
+      room.sendChat(playerIds[1]!, { channel: "day-public", content: { kind: "text", text: "open discussion" } }, new Date("2026-07-19T08:00:01.000Z"))
+    ).toMatchObject({ ok: true, data: { channel: "day-public" } });
   });
 
   it("rejects dead and departed players during open day speech", () => {
@@ -120,19 +116,19 @@ describe("discussion chat modes", () => {
       snapshot.players[2]!.alive = false;
     });
     expect(dead.room.getPlayerView(dead.playerIds[2]!)?.publicChat.canSend).toBe(false);
-    expect(dead.room.sendChat(
-      dead.playerIds[2]!,
-      { channel: "day-public", content: { kind: "text", text: "dead player" } }
-    )).toMatchObject({ ok: false, code: "INVALID_PHASE_CONTROL" });
+    expect(dead.room.sendChat(dead.playerIds[2]!, { channel: "day-public", content: { kind: "text", text: "dead player" } })).toMatchObject({
+      ok: false,
+      code: "INVALID_PHASE_CONTROL"
+    });
 
     const departed = restoreAtSpeech("open", "day-speech", (snapshot) => {
       snapshot.players[1]!.connection = "departed";
     });
     expect(departed.room.getPlayerView(departed.playerIds[1]!)?.publicChat.canSend).toBe(false);
-    expect(departed.room.sendChat(
-      departed.playerIds[1]!,
-      { channel: "day-public", content: { kind: "text", text: "departed player" } }
-    )).toMatchObject({ ok: false, code: "PLAYER_NOT_FOUND" });
+    expect(departed.room.sendChat(departed.playerIds[1]!, { channel: "day-public", content: { kind: "text", text: "departed player" } })).toMatchObject({
+      ok: false,
+      code: "PLAYER_NOT_FOUND"
+    });
   });
 
   it("keeps last words limited to the current speaker in open mode", () => {
@@ -142,15 +138,11 @@ describe("discussion chat modes", () => {
 
     expect(room.getPlayerView(playerIds[0]!)?.publicChat.canSend).toBe(true);
     expect(room.getPlayerView(playerIds[1]!)?.publicChat.canSend).toBe(false);
-    expect(room.sendChat(
-      playerIds[0]!,
-      { channel: "day-public", content: { kind: "text", text: "last words" } },
-      new Date("2026-07-19T08:00:01.000Z")
-    )).toMatchObject({ ok: true });
-    expect(room.sendChat(
-      playerIds[1]!,
-      { channel: "day-public", content: { kind: "text", text: "interruption" } },
-      new Date("2026-07-19T08:00:02.000Z")
-    )).toMatchObject({ ok: false, code: "INVALID_PHASE_CONTROL" });
+    expect(
+      room.sendChat(playerIds[0]!, { channel: "day-public", content: { kind: "text", text: "last words" } }, new Date("2026-07-19T08:00:01.000Z"))
+    ).toMatchObject({ ok: true });
+    expect(
+      room.sendChat(playerIds[1]!, { channel: "day-public", content: { kind: "text", text: "interruption" } }, new Date("2026-07-19T08:00:02.000Z"))
+    ).toMatchObject({ ok: false, code: "INVALID_PHASE_CONTROL" });
   });
 });

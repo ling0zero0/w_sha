@@ -7,14 +7,17 @@ const nicknames = ["林野", "阿岚", "青禾"];
 async function getLocalJoinUrl(page: Page): Promise<string> {
   const joinUrl = await page.evaluate(async () => {
     const response = await fetch("/api/host-bootstrap");
-    const payload = await response.json() as { lobby: { joinUrl: string } };
+    const payload = (await response.json()) as { lobby: { joinUrl: string } };
     return payload.lobby.joinUrl;
   });
   const invitation = new URL(joinUrl);
   return `${new URL(page.url()).origin}${invitation.pathname}${invitation.search}`;
 }
 
-async function joinPlayers(browser: Browser, joinUrl: string): Promise<{
+async function joinPlayers(
+  browser: Browser,
+  joinUrl: string
+): Promise<{
   contexts: BrowserContext[];
   players: Page[];
 }> {
@@ -109,9 +112,11 @@ test("generate README screenshots from a complete game", async ({ browser, page 
       if (player === villager) {
         await player.getByRole("button", { name: "确认投票" }).click();
       } else {
-        await player.getByRole("button", {
-          name: roles[index] === "狼人" ? "弃票" : new RegExp(wolfNickname)
-        }).click();
+        await player
+          .getByRole("button", {
+            name: roles[index] === "狼人" ? "弃票" : new RegExp(wolfNickname)
+          })
+          .click();
         await player.getByRole("button", { name: "确认投票" }).click();
       }
     }

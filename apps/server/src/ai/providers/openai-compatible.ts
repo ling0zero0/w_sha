@@ -12,8 +12,7 @@ import type { ModelProviderConnection } from "../provider-registry.js";
 
 type FetchImplementation = typeof fetch;
 
-export interface OpenAiCompatibleProviderOptions
-  extends ModelProviderConnection {
+export interface OpenAiCompatibleProviderOptions extends ModelProviderConnection {
   fetch?: FetchImplementation;
   now?: () => number;
 }
@@ -57,20 +56,19 @@ export class OpenAiCompatibleProvider implements ModelProvider {
     this.now = options.now ?? Date.now;
   }
 
-  async decide(
-    request: AiDecisionRequest,
-    signal: AbortSignal
-  ): Promise<AiDecisionResponse> {
+  async decide(request: AiDecisionRequest, signal: AbortSignal): Promise<AiDecisionResponse> {
     const startedAt = this.now();
-    const result = await this.request({
-      model: request.model.model,
-      messages: request.messages,
-      max_tokens: request.model.maxOutputTokens,
-      response_format: { type: "json_object" },
-      ...(request.model.temperature === null
-        ? {}
-        : { temperature: request.model.temperature })
-    }, request.model.requestTimeoutMs, signal);
+    const result = await this.request(
+      {
+        model: request.model.model,
+        messages: request.messages,
+        max_tokens: request.model.maxOutputTokens,
+        response_format: { type: "json_object" },
+        ...(request.model.temperature === null ? {} : { temperature: request.model.temperature })
+      },
+      request.model.requestTimeoutMs,
+      signal
+    );
     const metadata = this.metadata(startedAt);
 
     if (!result.ok) {
@@ -96,20 +94,23 @@ export class OpenAiCompatibleProvider implements ModelProvider {
     };
   }
 
-  async testConnection(
-    model: AiModelProfile,
-    signal: AbortSignal
-  ): Promise<AiConnectionTestResult> {
+  async testConnection(model: AiModelProfile, signal: AbortSignal): Promise<AiConnectionTestResult> {
     const startedAt = this.now();
-    const result = await this.request({
-      model: model.model,
-      messages: [{
-        role: "user",
-        content: "Reply with OK."
-      }],
-      max_tokens: 4,
-      temperature: 0
-    }, model.requestTimeoutMs, signal);
+    const result = await this.request(
+      {
+        model: model.model,
+        messages: [
+          {
+            role: "user",
+            content: "Reply with OK."
+          }
+        ],
+        max_tokens: 4,
+        temperature: 0
+      },
+      model.requestTimeoutMs,
+      signal
+    );
     const metadata = this.metadata(startedAt);
 
     if (!result.ok) {
@@ -118,11 +119,7 @@ export class OpenAiCompatibleProvider implements ModelProvider {
     return { ok: true, ...metadata };
   }
 
-  private async request(
-    body: Record<string, unknown>,
-    timeoutMs: number,
-    callerSignal: AbortSignal
-  ): Promise<RequestResult> {
+  private async request(body: Record<string, unknown>, timeoutMs: number, callerSignal: AbortSignal): Promise<RequestResult> {
     const abort = composeAbortSignal(callerSignal, timeoutMs);
 
     try {
@@ -170,7 +167,7 @@ export class OpenAiCompatibleProvider implements ModelProvider {
   private headers(): Headers {
     const headers = new Headers({
       "Content-Type": "application/json",
-      "Accept": "application/json"
+      Accept: "application/json"
     });
     if (this.apiKey !== null) {
       headers.set("Authorization", `Bearer ${this.apiKey}`);
@@ -190,9 +187,7 @@ export class OpenAiCompatibleProvider implements ModelProvider {
   }
 }
 
-export function createOpenAiCompatibleProvider(
-  connection: ModelProviderConnection
-): OpenAiCompatibleProvider {
+export function createOpenAiCompatibleProvider(connection: ModelProviderConnection): OpenAiCompatibleProvider {
   return new OpenAiCompatibleProvider(connection);
 }
 
@@ -235,11 +230,7 @@ function classifyHttpError(status: number): AiProviderError {
   return createError("REQUEST_REJECTED", false, status);
 }
 
-function createError(
-  code: AiProviderError["code"],
-  retryable = false,
-  httpStatus: number | null = null
-): AiProviderError {
+function createError(code: AiProviderError["code"], retryable = false, httpStatus: number | null = null): AiProviderError {
   return {
     code,
     message: safeMessages[code],
@@ -285,9 +276,7 @@ function normalizeUsage(value: unknown): AiTokenUsage {
 }
 
 function nonNegativeInteger(value: unknown): number | null {
-  return Number.isSafeInteger(value) && (value as number) >= 0
-    ? value as number
-    : null;
+  return Number.isSafeInteger(value) && (value as number) >= 0 ? (value as number) : null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

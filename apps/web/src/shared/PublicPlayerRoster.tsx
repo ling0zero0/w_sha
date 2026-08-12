@@ -12,24 +12,15 @@ function playerStatus(player: LobbyPlayer, selfId: PlayerId, phase: RoomPhase): 
   return "离线";
 }
 
-export function PublicPlayerRoster({
-  players,
-  selfId,
-  phase
-}: {
-  players: LobbyPlayer[];
-  selfId: PlayerId;
-  phase: RoomPhase;
-}) {
+export function PublicPlayerRoster({ players, selfId, phase }: { players: LobbyPlayer[]; selfId: PlayerId; phase: RoomPhase }) {
   return (
     <section className="mobile-roster public-player-roster" aria-label="当前玩家">
-      <header><span>当前玩家</span><strong>{players.length}</strong></header>
+      <header>
+        <span>当前玩家</span>
+        <strong>{players.length}</strong>
+      </header>
       {players.map((player) => (
-        <div
-          className={player.id === selfId ? "is-self" : ""}
-          key={player.id}
-          data-controller={player.controller}
-        >
+        <div className={player.id === selfId ? "is-self" : ""} key={player.id} data-controller={player.controller}>
           <span>{String(player.number).padStart(2, "0")}</span>
           <span className="mobile-player-name">
             <strong>{player.nickname}</strong>

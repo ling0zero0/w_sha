@@ -28,29 +28,30 @@ afterEach(async () => {
 });
 
 function createHarness(provider?: ModelProvider) {
-  const store = new AiConfigStore(
-    ":memory:",
-    new AesGcmSecretBox(randomBytes(32))
-  );
+  const store = new AiConfigStore(":memory:", new AesGcmSecretBox(randomBytes(32)));
   const providers = new ProviderRegistry();
-  providers.register("openai-compatible-chat", () => provider ?? {
-    decide: async () => ({
-      ok: false,
-      error: {
-        code: "PROVIDER_ERROR",
-        message: "Provider unavailable.",
-        retryable: true,
-        httpStatus: 503
-      },
-      latencyMs: 1,
-      completedAt: new Date(0).toISOString()
-    }),
-    testConnection: async () => ({
-      ok: true,
-      latencyMs: 1,
-      completedAt: new Date(0).toISOString()
-    })
-  });
+  providers.register(
+    "openai-compatible-chat",
+    () =>
+      provider ?? {
+        decide: async () => ({
+          ok: false,
+          error: {
+            code: "PROVIDER_ERROR",
+            message: "Provider unavailable.",
+            retryable: true,
+            httpStatus: 503
+          },
+          latencyMs: 1,
+          completedAt: new Date(0).toISOString()
+        }),
+        testConnection: async () => ({
+          ok: true,
+          latencyMs: 1,
+          completedAt: new Date(0).toISOString()
+        })
+      }
+  );
   const runtime = new GameRuntime({
     localAddress: "192.168.1.20",
     webPort: 5173,

@@ -64,10 +64,6 @@ describe("game rules", () => {
       connection: "online" as const
     });
 
-    expect(evaluateGameOutcome([
-      player("wolf", false),
-      player("villager", true),
-      player("hunter", false)
-    ])).toBe("draw");
+    expect(evaluateGameOutcome([player("wolf", false), player("villager", true), player("hunter", false)])).toBe("draw");
   });
 });

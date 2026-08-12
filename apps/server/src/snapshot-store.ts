@@ -58,11 +58,13 @@ export class SnapshotStore {
     try {
       const current = this.readStoredRow("runtime_snapshot");
       if (current) {
-        this.database.prepare(`
+        this.database
+          .prepare(`
           INSERT INTO runtime_snapshot_backup (id, saved_at, payload)
           VALUES (1, ?, ?)
           ON CONFLICT(id) DO UPDATE SET saved_at = excluded.saved_at, payload = excluded.payload
-        `).run(current.saved_at, current.payload);
+        `)
+          .run(current.saved_at, current.payload);
       }
       this.writePrimary(savedAt, payload);
       this.database.exec("COMMIT");
@@ -90,9 +92,7 @@ export class SnapshotStore {
 
   checkIntegrity(): boolean {
     try {
-      const row = this.database.prepare("PRAGMA integrity_check").get() as
-        | Record<string, unknown>
-        | undefined;
+      const row = this.database.prepare("PRAGMA integrity_check").get() as Record<string, unknown> | undefined;
       return row !== undefined && Object.values(row)[0] === "ok";
     } catch {
       return false;
@@ -111,20 +111,24 @@ export class SnapshotStore {
     saved_at: string;
     payload: string;
   } | null {
-    const row = this.database.prepare(`
+    const row = this.database
+      .prepare(`
       SELECT saved_at, payload
       FROM ${table}
       WHERE id = 1
-    `).get() as { saved_at: string; payload: string } | undefined;
+    `)
+      .get() as { saved_at: string; payload: string } | undefined;
     return row ?? null;
   }
 
   private writePrimary(savedAt: string, payload: string): void {
-    this.database.prepare(`
+    this.database
+      .prepare(`
       INSERT INTO runtime_snapshot (id, saved_at, payload)
       VALUES (1, ?, ?)
       ON CONFLICT(id) DO UPDATE SET saved_at = excluded.saved_at, payload = excluded.payload
-    `).run(savedAt, payload);
+    `)
+      .run(savedAt, payload);
   }
 
   close(): void {

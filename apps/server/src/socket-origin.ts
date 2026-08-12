@@ -11,9 +11,7 @@ export interface SocketOriginPolicy {
 
 const loopbackHosts = ["127.0.0.1", "localhost", "[::1]"] as const;
 
-export function createSocketOriginPolicy(
-  options: SocketOriginPolicyOptions
-): SocketOriginPolicy {
+export function createSocketOriginPolicy(options: SocketOriginPolicyOptions): SocketOriginPolicy {
   const allowedOrigins = new Set<string>();
   const port = String(options.publicPort);
 
@@ -56,7 +54,5 @@ function normalizeOrigin(origin: string): string | null {
 }
 
 function formatHost(address: string): string {
-  return address.includes(":") && !address.startsWith("[")
-    ? `[${address}]`
-    : address;
+  return address.includes(":") && !address.startsWith("[") ? `[${address}]` : address;
 }

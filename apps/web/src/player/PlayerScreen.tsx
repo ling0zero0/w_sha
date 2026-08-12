@@ -1,15 +1,4 @@
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  CircleAlert,
-  LogIn,
-  RefreshCw,
-  ShieldCheck,
-  Smartphone,
-  UsersRound,
-  X
-} from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CircleAlert, LogIn, RefreshCw, ShieldCheck, Smartphone, UsersRound, X } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { GameOverPanel } from "../game/GameOverPanel";
 import { RoleArtwork } from "../game/RoleArtwork";
@@ -24,14 +13,19 @@ import { usePlayerLobby } from "./usePlayerLobby";
 function InvalidInvitation() {
   return (
     <main className="player-shell">
-      <header className="player-header"><Brand /></header>
+      <header className="player-header">
+        <Brand />
+      </header>
       <section className="mobile-state mobile-state-centered">
-        <span className="large-state-icon"><CircleAlert size={31} aria-hidden="true" /></span>
+        <span className="large-state-icon">
+          <CircleAlert size={31} aria-hidden="true" />
+        </span>
         <p className="eyebrow">无法加入</p>
         <h1>邀请链接无效</h1>
         <p>请重新扫描主机屏幕上的二维码。</p>
         <a className="secondary-link" href="/">
-          <ArrowLeft size={18} aria-hidden="true" />返回
+          <ArrowLeft size={18} aria-hidden="true" />
+          返回
         </a>
       </section>
     </main>
@@ -81,9 +75,14 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
   if (restoring && !lobby) {
     return (
       <main className="player-shell">
-        <header className="player-header"><Brand /><ConnectionBadge connected={socket === "connected"} /></header>
+        <header className="player-header">
+          <Brand />
+          <ConnectionBadge connected={socket === "connected"} />
+        </header>
         <section className="mobile-state mobile-state-centered">
-          <span className="large-state-icon"><RefreshCw className="spin" size={28} aria-hidden="true" /></span>
+          <span className="large-state-icon">
+            <RefreshCw className="spin" size={28} aria-hidden="true" />
+          </span>
           <p className="eyebrow">正在恢复会话</p>
           <h1>重新连接原座位</h1>
           <p>正在验证此设备保存的玩家凭证。</p>
@@ -95,33 +94,57 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
   if (lobby) {
     const self = lobby.players.find((player) => player.id === lobby.selfId);
     if (lobby.phase === "game-over" && lobby.gameResult) {
-      return <main className="player-shell day-shell"><header className="player-header"><Brand /><ConnectionBadge connected={socket === "connected"} /></header><section className="mobile-state"><PublicPlayerRoster players={lobby.players} selfId={lobby.selfId} phase={lobby.phase} /><GameOverPanel result={lobby.gameResult} publicMessages={lobby.publicChat.messages} /></section></main>;
+      return (
+        <main className="player-shell day-shell">
+          <header className="player-header">
+            <Brand />
+            <ConnectionBadge connected={socket === "connected"} />
+          </header>
+          <section className="mobile-state">
+            <PublicPlayerRoster players={lobby.players} selfId={lobby.selfId} phase={lobby.phase} />
+            <GameOverPanel result={lobby.gameResult} publicMessages={lobby.publicChat.messages} />
+          </section>
+        </main>
+      );
     }
     if (["dawn", "last-words", "day-speech", "day-vote", "exile-result"].includes(lobby.phase) || lobby.hunterAction?.active) {
-      return <DayFlowScreen
-        lobby={lobby}
-        game={game}
-        connected={socket === "connected"}
-        onFinishSpeaking={finishSpeaking}
-        onSendChat={sendChatMessage}
-        onSelectVote={selectDayVote}
-        onConfirmVote={confirmDayVote}
-        onHunterShoot={shootAsHunter}
-      />;
+      return (
+        <DayFlowScreen
+          lobby={lobby}
+          game={game}
+          connected={socket === "connected"}
+          onFinishSpeaking={finishSpeaking}
+          onSendChat={sendChatMessage}
+          onSelectVote={selectDayVote}
+          onConfirmVote={confirmDayVote}
+          onHunterShoot={shootAsHunter}
+        />
+      );
     }
     if (lobby.privateRole) {
       const privateRole = lobby.privateRole;
       if (self && !self.alive && lobby.phase !== "dawn") {
         return (
           <main className="player-shell role-screen dead-observer-screen">
-            <header className="player-header"><Brand /><ConnectionBadge connected={socket === "connected"} /></header>
+            <header className="player-header">
+              <Brand />
+              <ConnectionBadge connected={socket === "connected"} />
+            </header>
             <section className="mobile-state mobile-state-centered">
               <ChatModeStatus chatMode={lobby.chatMode} />
-              <span className="large-state-icon"><X size={30} aria-hidden="true" /></span>
-              <p className="eyebrow">{self.number} 号 · {self.nickname}</p>
+              <span className="large-state-icon">
+                <X size={30} aria-hidden="true" />
+              </span>
+              <p className="eyebrow">
+                {self.number} 号 · {self.nickname}
+              </p>
               <h1>你已死亡</h1>
               <p>你现在只能查看公开流程，不能聊天、投票或执行角色技能。</p>
-              {game ? <div className="private-night-clock"><PhaseClockDisplay clock={game.clock} /></div> : null}
+              {game ? (
+                <div className="private-night-clock">
+                  <PhaseClockDisplay clock={game.clock} />
+                </div>
+              ) : null}
               <PublicPlayerRoster players={lobby.players} selfId={lobby.selfId} phase={lobby.phase} />
             </section>
           </main>
@@ -129,11 +152,16 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
       }
       return (
         <main className={`player-shell role-screen role-${privateRole.role}`}>
-          <header className="player-header"><Brand /><ConnectionBadge connected={socket === "connected"} /></header>
+          <header className="player-header">
+            <Brand />
+            <ConnectionBadge connected={socket === "connected"} />
+          </header>
           <section className="mobile-state role-reveal-state">
             <ChatModeStatus chatMode={lobby.chatMode} />
             {lobby.phase === "first-night" && game ? (
-              <div className="private-night-clock"><PhaseClockDisplay clock={game.clock} /></div>
+              <div className="private-night-clock">
+                <PhaseClockDisplay clock={game.clock} />
+              </div>
             ) : null}
             <p className="eyebrow">{self ? `${self.number} 号 · ${self.nickname}` : `房间 ${lobby.roomCode}`}</p>
             <RoleArtwork role={privateRole.role} className="role-artwork" />
@@ -142,9 +170,15 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
             {privateRole.role === "wolf" ? (
               <div className="wolf-teammates">
                 <span>狼人队友</span>
-                {privateRole.wolfTeammates.length > 0
-                  ? privateRole.wolfTeammates.map((teammate) => <strong key={teammate.id}>{teammate.number} 号 · {teammate.nickname}</strong>)
-                  : <strong>你是唯一的狼人</strong>}
+                {privateRole.wolfTeammates.length > 0 ? (
+                  privateRole.wolfTeammates.map((teammate) => (
+                    <strong key={teammate.id}>
+                      {teammate.number} 号 · {teammate.nickname}
+                    </strong>
+                  ))
+                ) : (
+                  <strong>你是唯一的狼人</strong>
+                )}
               </div>
             ) : (
               <p className="role-guidance">请记住自己的身份，不要向其他玩家展示此屏幕。</p>
@@ -164,7 +198,8 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
                         disabled={lobby.wolfAction?.locked || nightPaused}
                         onClick={() => selectWolfTarget(candidate.id)}
                       >
-                        <span>{String(candidate.number).padStart(2, "0")}</span>{candidate.nickname}
+                        <span>{String(candidate.number).padStart(2, "0")}</span>
+                        {candidate.nickname}
                       </button>
                     ))}
                     <button
@@ -172,10 +207,15 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
                       type="button"
                       disabled={lobby.wolfAction.locked || nightPaused}
                       onClick={() => selectWolfTarget("no-kill")}
-                    >空刀</button>
+                    >
+                      空刀
+                    </button>
                   </div>
                   {lobby.wolfAction.locked ? (
-                    <div className="role-confirmed"><Check size={18} aria-hidden="true" />狼人行动已锁定</div>
+                    <div className="role-confirmed">
+                      <Check size={18} aria-hidden="true" />
+                      狼人行动已锁定
+                    </div>
                   ) : (
                     <button
                       className="confirm-role-button"
@@ -194,14 +234,17 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
                   <p>查验结果只显示狼人或好人，并且只有你能看到。</p>
                   {lobby.seerAction.result && lobby.seerAction.inspectedPlayer ? (
                     <div className={`inspection-result result-${lobby.seerAction.result}`}>
-                      <span>{lobby.seerAction.inspectedPlayer.number} 号 · {lobby.seerAction.inspectedPlayer.nickname}</span>
+                      <span>
+                        {lobby.seerAction.inspectedPlayer.number} 号 · {lobby.seerAction.inspectedPlayer.nickname}
+                      </span>
                       <strong>{lobby.seerAction.result === "wolf" ? "狼人" : "好人"}</strong>
                     </div>
                   ) : (
                     <div className="night-targets">
                       {lobby.seerAction.candidates.map((candidate) => (
                         <button type="button" disabled={nightPaused} key={candidate.id} onClick={() => inspectAsSeer(candidate.id)}>
-                          <span>{String(candidate.number).padStart(2, "0")}</span>{candidate.nickname}
+                          <span>{String(candidate.number).padStart(2, "0")}</span>
+                          {candidate.nickname}
                         </button>
                       ))}
                     </div>
@@ -210,31 +253,37 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
               ) : privateRole.role === "witch" && lobby.witchAction?.active ? (
                 <WitchActionPanel action={lobby.witchAction} paused={nightPaused} onSubmit={submitWitchAction} />
               ) : privateRole.role === "guard" && (lobby.guardAction?.active || lobby.guardAction?.submitted) ? (
-                <GuardActionPanel
-                  action={lobby.guardAction}
-                  paused={nightPaused}
-                  connected={socket === "connected"}
-                  onSubmit={protectAsGuard}
-                />
+                <GuardActionPanel action={lobby.guardAction} paused={nightPaused} connected={socket === "connected"} onSubmit={protectAsGuard} />
               ) : (
-                <div className="role-confirmed"><RefreshCw className="slow-spin" size={18} aria-hidden="true" />夜间行动进行中</div>
+                <div className="role-confirmed">
+                  <RefreshCw className="slow-spin" size={18} aria-hidden="true" />
+                  夜间行动进行中
+                </div>
               )
             ) : lobby.phase === "dawn" ? (
               <div className="dawn-result">
                 <p className="eyebrow">天亮公布</p>
-                <h2>{lobby.dawnResult?.deaths.length
-                  ? lobby.dawnResult.deaths.map((player) => `${player.number} 号 · ${player.nickname}`).join("、")
-                  : "昨夜平安夜"}</h2>
+                <h2>
+                  {lobby.dawnResult?.deaths.length
+                    ? lobby.dawnResult.deaths.map((player) => `${player.number} 号 · ${player.nickname}`).join("、")
+                    : "昨夜平安夜"}
+                </h2>
                 <p>{lobby.dawnResult?.deaths.length ? "以上玩家昨夜死亡，死亡原因不会公开。" : "昨夜没有玩家死亡。"}</p>
               </div>
             ) : privateRole.confirmed ? (
-              <div className="role-confirmed"><Check size={18} aria-hidden="true" />已确认，等待其他玩家</div>
+              <div className="role-confirmed">
+                <Check size={18} aria-hidden="true" />
+                已确认，等待其他玩家
+              </div>
             ) : (
               <button className="confirm-role-button" type="button" onClick={confirmRole} disabled={socket !== "connected"}>
-                <Check size={19} aria-hidden="true" />我已记住身份
+                <Check size={19} aria-hidden="true" />
+                我已记住身份
               </button>
             )}
-            <small className="confirmation-count">已确认 {lobby.roleConfirmation.confirmed} / {lobby.roleConfirmation.total}</small>
+            <small className="confirmation-count">
+              已确认 {lobby.roleConfirmation.confirmed} / {lobby.roleConfirmation.total}
+            </small>
             <PublicPlayerRoster players={lobby.players} selfId={lobby.selfId} phase={lobby.phase} />
           </section>
         </main>
@@ -249,7 +298,9 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
         <section className="mobile-state waiting-state">
           {lobby.phase !== "lobby" ? <ChatModeStatus chatMode={lobby.chatMode} /> : null}
           <div className="waiting-heading">
-            <span className="large-state-icon"><UsersRound size={29} aria-hidden="true" /></span>
+            <span className="large-state-icon">
+              <UsersRound size={29} aria-hidden="true" />
+            </span>
             <p className="eyebrow">房间 {lobby.roomCode}</p>
             <h1>已进入大厅</h1>
             <p>{self ? `${self.number} 号 · ${self.nickname}` : "玩家席位已确认"}</p>
@@ -288,7 +339,8 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
 
         {removed || replaced ? (
           <a className="secondary-link wide-link" href={window.location.href}>
-            <RefreshCw size={18} aria-hidden="true" />重新加入
+            <RefreshCw size={18} aria-hidden="true" />
+            重新加入
           </a>
         ) : (
           <form className="join-form" onSubmit={submit}>
@@ -309,12 +361,7 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
               <ArrowRight size={18} aria-hidden="true" />
             </button>
             {canRequestTakeover || takeoverPending ? (
-              <button
-                className="takeover-button"
-                type="button"
-                disabled={takeoverPending || socket !== "connected"}
-                onClick={requestTakeover}
-              >
+              <button className="takeover-button" type="button" disabled={takeoverPending || socket !== "connected"} onClick={requestTakeover}>
                 <Smartphone size={19} aria-hidden="true" />
                 {takeoverPending ? "等待主机批准" : "申请接管这个昵称"}
               </button>
@@ -322,10 +369,17 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
           </form>
         )}
 
-        {error ? <p className="form-message" role="alert">{error}</p> : null}
+        {error ? (
+          <p className="form-message" role="alert">
+            {error}
+          </p>
+        ) : null}
         <div className="player-security">
           <ShieldCheck size={20} aria-hidden="true" />
-          <span><strong>身份信息仅在开局后发送</strong><small>当前页面只同步公开大厅信息</small></span>
+          <span>
+            <strong>身份信息仅在开局后发送</strong>
+            <small>当前页面只同步公开大厅信息</small>
+          </span>
         </div>
       </section>
     </main>

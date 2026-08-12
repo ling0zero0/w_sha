@@ -26,7 +26,9 @@ export function AiManagementScreen() {
         </a>
         <nav className="ai-host-nav" aria-label="主机管理">
           <a href="/">主持人大厅</a>
-          <a href="/ai" aria-current="page">AI 玩家</a>
+          <a href="/ai" aria-current="page">
+            AI 玩家
+          </a>
         </nav>
       </header>
 
@@ -45,22 +47,11 @@ export function AiManagementScreen() {
 
         <div className="ai-tab-list" role="tablist" aria-label="AI 配置类别">
           {tabs.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={tab === id}
-              className={tab === id ? "is-selected" : ""}
-              onClick={() => setTab(id)}
-            >
+            <button key={id} type="button" role="tab" aria-selected={tab === id} className={tab === id ? "is-selected" : ""} onClick={() => setTab(id)}>
               <Icon size={18} aria-hidden="true" />
               {label}
               <span>
-                {id === "providers"
-                  ? configuration.providers.length
-                  : id === "models"
-                    ? configuration.models.length
-                    : configuration.botProfiles.length}
+                {id === "providers" ? configuration.providers.length : id === "models" ? configuration.models.length : configuration.botProfiles.length}
               </span>
             </button>
           ))}
@@ -75,7 +66,9 @@ export function AiManagementScreen() {
           <div className="ai-load-state is-error" role="alert">
             <strong>无法打开 AI 管理页面</strong>
             <span>{loadError}</span>
-            <button type="button" onClick={() => void reload()}>重试</button>
+            <button type="button" onClick={() => void reload()}>
+              重试
+            </button>
           </div>
         ) : (
           <section className="ai-tab-panel" role="tabpanel">

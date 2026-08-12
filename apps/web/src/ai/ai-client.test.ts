@@ -5,10 +5,11 @@ vi.mock("@werewolf/shared", async (importOriginal) => {
   return {
     ...actual,
     hostBootstrapSchema: {
-      parse: (value: unknown) => value as {
-        sessionToken: string;
-        lobby: Record<string, never>;
-      }
+      parse: (value: unknown) =>
+        value as {
+          sessionToken: string;
+          lobby: Record<string, never>;
+        }
     }
   };
 });
@@ -32,13 +33,13 @@ describe("AI admin client", () => {
   });
 
   it("gets host bootstrap before calling AI routes with a bearer token", async () => {
-    fetchMock
-      .mockResolvedValueOnce(jsonResponse({ sessionToken: token, lobby: {} }))
-      .mockResolvedValueOnce(jsonResponse({
+    fetchMock.mockResolvedValueOnce(jsonResponse({ sessionToken: token, lobby: {} })).mockResolvedValueOnce(
+      jsonResponse({
         providers: [],
         models: [],
         botProfiles: []
-      }));
+      })
+    );
 
     const client = createAiAdminClient(fetchMock);
     await expect(client.getOverview()).resolves.toEqual({
@@ -61,13 +62,16 @@ describe("AI admin client", () => {
 
   it("never includes a submitted credential in surfaced errors", async () => {
     const apiKey = "super-secret-provider-key";
-    fetchMock
-      .mockResolvedValueOnce(jsonResponse({ sessionToken: token, lobby: {} }))
-      .mockResolvedValueOnce(jsonResponse({
-        code: "PROVIDER_REJECTED",
-        message: `Provider rejected ${apiKey}`,
-        requestId: "request-1"
-      }, 400));
+    fetchMock.mockResolvedValueOnce(jsonResponse({ sessionToken: token, lobby: {} })).mockResolvedValueOnce(
+      jsonResponse(
+        {
+          code: "PROVIDER_REJECTED",
+          message: `Provider rejected ${apiKey}`,
+          requestId: "request-1"
+        },
+        400
+      )
+    );
 
     const client = createAiAdminClient(fetchMock);
     const result = client.createProvider({

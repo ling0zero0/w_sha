@@ -65,12 +65,7 @@ export class BudgetLedger {
 
     for (const check of checks) {
       const usage = this.getUsage(check.key);
-      if (
-        usage.settledTokens
-        + usage.reservedTokens
-        + request.tokens
-        > check.limit
-      ) {
+      if (usage.settledTokens + usage.reservedTokens + request.tokens > check.limit) {
         throw new BudgetExhaustedError(check.scope);
       }
     }
@@ -156,11 +151,7 @@ export class BudgetLedger {
   }
 }
 
-function scopeKeys(request: {
-  gameId: string;
-  modelId: string;
-  seatId: string;
-}): Pick<ActiveReservation, "gameKey" | "modelKey" | "seatKey"> {
+function scopeKeys(request: { gameId: string; modelId: string; seatId: string }): Pick<ActiveReservation, "gameKey" | "modelKey" | "seatKey"> {
   return {
     gameKey: `game:${request.gameId}`,
     modelKey: `model:${request.gameId}:${request.modelId}`,
@@ -172,9 +163,7 @@ function reservationKeys(reservation: ActiveReservation): string[] {
   return [reservation.gameKey, reservation.modelKey, reservation.seatKey];
 }
 
-function publicReservation(
-  reservation: ActiveReservation
-): BudgetReservation {
+function publicReservation(reservation: ActiveReservation): BudgetReservation {
   return {
     id: reservation.id,
     gameId: reservation.gameId,
@@ -198,15 +187,8 @@ function validateRequest(request: BudgetReservationRequest): void {
   validateTokens(request.limits.seatTokens, "seatTokens");
 }
 
-function validateTokens(
-  value: number,
-  name: string,
-  allowZero = false
-): void {
-  if (
-    !Number.isSafeInteger(value)
-    || value < (allowZero ? 0 : 1)
-  ) {
+function validateTokens(value: number, name: string, allowZero = false): void {
+  if (!Number.isSafeInteger(value) || value < (allowZero ? 0 : 1)) {
     throw new Error(`${name} must be a ${allowZero ? "nonnegative" : "positive"} integer`);
   }
 }

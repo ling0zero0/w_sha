@@ -146,18 +146,22 @@ export class AiConfigStore {
   }
 
   listProviders(): AiProviderView[] {
-    const rows = this.database.prepare(`
+    const rows = this.database
+      .prepare(`
       ${providerSelect}
       ORDER BY providers.name, providers.id
-    `).all() as unknown as ProviderRow[];
+    `)
+      .all() as unknown as ProviderRow[];
     return rows.map(parseProvider);
   }
 
   getProvider(id: string): AiProviderView | null {
-    const row = this.database.prepare(`
+    const row = this.database
+      .prepare(`
       ${providerSelect}
       WHERE providers.id = ?
-    `).get(id) as unknown as ProviderRow | undefined;
+    `)
+      .get(id) as unknown as ProviderRow | undefined;
     return row ? parseProvider(row) : null;
   }
 
@@ -165,24 +169,16 @@ export class AiConfigStore {
     const input = createAiProviderRequestSchema.parse(rawInput);
     const id = randomUUID();
     const now = new Date().toISOString();
-    const encrypted = input.apiKey === undefined
-      ? null
-      : this.sealCredential(id, input.apiKey);
+    const encrypted = input.apiKey === undefined ? null : this.sealCredential(id, input.apiKey);
 
     this.transaction(() => {
-      this.database.prepare(`
+      this.database
+        .prepare(`
         INSERT INTO ai_providers (
           id, name, protocol, base_url, enabled, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        id,
-        input.name,
-        input.protocol,
-        input.baseUrl,
-        booleanInteger(input.enabled),
-        now,
-        now
-      );
+      `)
+        .run(id, input.name, input.protocol, input.baseUrl, booleanInteger(input.enabled), now, now);
       if (encrypted) this.writeCredential(id, input.apiKey!, encrypted, now);
     });
 
@@ -193,31 +189,33 @@ export class AiConfigStore {
     const input = updateAiProviderRequestSchema.parse(rawInput);
     const current = this.requireProvider(id);
     const now = new Date().toISOString();
-    const encrypted = input.apiKey === undefined
-      ? null
-      : this.sealCredential(id, input.apiKey);
+    const encrypted = input.apiKey === undefined ? null : this.sealCredential(id, input.apiKey);
 
     this.transaction(() => {
-      this.database.prepare(`
+      this.database
+        .prepare(`
         UPDATE ai_providers
         SET name = ?, protocol = ?, base_url = ?, enabled = ?, updated_at = ?
         WHERE id = ?
-      `).run(
-        input.name ?? current.name,
-        input.protocol ?? current.protocol,
-        input.baseUrl ?? current.baseUrl,
-        booleanInteger(input.enabled ?? current.enabled),
-        now,
-        id
-      );
+      `)
+        .run(
+          input.name ?? current.name,
+          input.protocol ?? current.protocol,
+          input.baseUrl ?? current.baseUrl,
+          booleanInteger(input.enabled ?? current.enabled),
+          now,
+          id
+        );
 
       if (encrypted) {
         this.writeCredential(id, input.apiKey!, encrypted, now);
       } else if (input.clearCredential === true) {
-        this.database.prepare(`
+        this.database
+          .prepare(`
           DELETE FROM ai_provider_secrets
           WHERE provider_id = ?
-        `).run(id);
+        `)
+          .run(id);
       }
     });
 
@@ -226,12 +224,14 @@ export class AiConfigStore {
 
   deleteProvider(id: string): void {
     this.requireProvider(id);
-    const reference = this.database.prepare(`
+    const reference = this.database
+      .prepare(`
       SELECT id
       FROM ai_model_profiles
       WHERE provider_id = ?
       LIMIT 1
-    `).get(id) as { id: string } | undefined;
+    `)
+      .get(id) as { id: string } | undefined;
     if (reference) {
       throw new Error(`cannot delete AI provider ${id}: it is referenced by a model profile`);
     }
@@ -240,11 +240,13 @@ export class AiConfigStore {
 
   getProviderCredential(id: string): string | null {
     this.requireProvider(id);
-    const row = this.database.prepare(`
+    const row = this.database
+      .prepare(`
       SELECT key_version, ciphertext, nonce, auth_tag
       FROM ai_provider_secrets
       WHERE provider_id = ?
-    `).get(id) as unknown as ProviderSecretRow | undefined;
+    `)
+      .get(id) as unknown as ProviderSecretRow | undefined;
     if (!row) return null;
     if (!this.secretBox) {
       throw new Error("AI credential cannot be read without a secure secret box");
@@ -259,18 +261,22 @@ export class AiConfigStore {
   }
 
   listModelProfiles(): AiModelProfileView[] {
-    const rows = this.database.prepare(`
+    const rows = this.database
+      .prepare(`
       ${modelProfileSelect}
       ORDER BY name, id
-    `).all() as unknown as ModelProfileRow[];
+    `)
+      .all() as unknown as ModelProfileRow[];
     return rows.map(parseModelProfile);
   }
 
   getModelProfile(id: string): AiModelProfileView | null {
-    const row = this.database.prepare(`
+    const row = this.database
+      .prepare(`
       ${modelProfileSelect}
       WHERE id = ?
-    `).get(id) as unknown as ModelProfileRow | undefined;
+    `)
+      .get(id) as unknown as ModelProfileRow | undefined;
     return row ? parseModelProfile(row) : null;
   }
 
@@ -281,7 +287,8 @@ export class AiConfigStore {
     this.validateFallbackChain(id, input.fallbackModelProfileId);
     const now = new Date().toISOString();
 
-    this.database.prepare(`
+    this.database
+      .prepare(`
       INSERT INTO ai_model_profiles (
         id,
         revision,
@@ -298,29 +305,27 @@ export class AiConfigStore {
         created_at,
         updated_at
       ) VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
-      input.providerId,
-      input.name,
-      input.model,
-      booleanInteger(input.enabled),
-      input.temperature,
-      input.maxOutputTokens,
-      input.requestTimeoutMs,
-      input.maxAttemptsPerTurn,
-      input.gameTokenBudget,
-      input.fallbackModelProfileId,
-      now,
-      now
-    );
+    `)
+      .run(
+        id,
+        input.providerId,
+        input.name,
+        input.model,
+        booleanInteger(input.enabled),
+        input.temperature,
+        input.maxOutputTokens,
+        input.requestTimeoutMs,
+        input.maxAttemptsPerTurn,
+        input.gameTokenBudget,
+        input.fallbackModelProfileId,
+        now,
+        now
+      );
 
     return this.requireModelProfile(id);
   }
 
-  updateModelProfile(
-    id: string,
-    rawInput: UpdateAiModelProfileRequest
-  ): AiModelProfileView {
+  updateModelProfile(id: string, rawInput: UpdateAiModelProfileRequest): AiModelProfileView {
     const input = updateAiModelProfileRequestSchema.parse(rawInput);
     const current = this.requireModelProfile(id);
     const updated = aiModelProfileViewSchema.parse({
@@ -330,7 +335,8 @@ export class AiConfigStore {
     this.requireProvider(updated.providerId);
     this.validateFallbackChain(id, updated.fallbackModelProfileId);
 
-    this.database.prepare(`
+    this.database
+      .prepare(`
       UPDATE ai_model_profiles
       SET
         revision = revision + 1,
@@ -346,41 +352,46 @@ export class AiConfigStore {
         fallback_model_profile_id = ?,
         updated_at = ?
       WHERE id = ?
-    `).run(
-      updated.providerId,
-      updated.name,
-      updated.model,
-      booleanInteger(updated.enabled),
-      updated.temperature,
-      updated.maxOutputTokens,
-      updated.requestTimeoutMs,
-      updated.maxAttemptsPerTurn,
-      updated.gameTokenBudget,
-      updated.fallbackModelProfileId,
-      new Date().toISOString(),
-      id
-    );
+    `)
+      .run(
+        updated.providerId,
+        updated.name,
+        updated.model,
+        booleanInteger(updated.enabled),
+        updated.temperature,
+        updated.maxOutputTokens,
+        updated.requestTimeoutMs,
+        updated.maxAttemptsPerTurn,
+        updated.gameTokenBudget,
+        updated.fallbackModelProfileId,
+        new Date().toISOString(),
+        id
+      );
 
     return this.requireModelProfile(id);
   }
 
   deleteModelProfile(id: string): void {
     this.requireModelProfile(id);
-    const botReference = this.database.prepare(`
+    const botReference = this.database
+      .prepare(`
       SELECT id
       FROM ai_bot_profiles
       WHERE model_profile_id = ?
       LIMIT 1
-    `).get(id) as { id: string } | undefined;
+    `)
+      .get(id) as { id: string } | undefined;
     if (botReference) {
       throw new Error(`cannot delete AI model profile ${id}: it is referenced by a bot profile`);
     }
-    const fallbackReference = this.database.prepare(`
+    const fallbackReference = this.database
+      .prepare(`
       SELECT id
       FROM ai_model_profiles
       WHERE fallback_model_profile_id = ?
       LIMIT 1
-    `).get(id) as { id: string } | undefined;
+    `)
+      .get(id) as { id: string } | undefined;
     if (fallbackReference) {
       throw new Error(`cannot delete AI model profile ${id}: it is used as a fallback`);
     }
@@ -388,18 +399,22 @@ export class AiConfigStore {
   }
 
   listBotProfiles(): AiBotProfileView[] {
-    const rows = this.database.prepare(`
+    const rows = this.database
+      .prepare(`
       ${botProfileSelect}
       ORDER BY name, id
-    `).all() as unknown as BotProfileRow[];
+    `)
+      .all() as unknown as BotProfileRow[];
     return rows.map(parseBotProfile);
   }
 
   getBotProfile(id: string): AiBotProfileView | null {
-    const row = this.database.prepare(`
+    const row = this.database
+      .prepare(`
       ${botProfileSelect}
       WHERE id = ?
-    `).get(id) as unknown as BotProfileRow | undefined;
+    `)
+      .get(id) as unknown as BotProfileRow | undefined;
     return row ? parseBotProfile(row) : null;
   }
 
@@ -409,7 +424,8 @@ export class AiConfigStore {
     const id = randomUUID();
     const now = new Date().toISOString();
 
-    this.database.prepare(`
+    this.database
+      .prepare(`
       INSERT INTO ai_bot_profiles (
         id,
         name,
@@ -424,27 +440,25 @@ export class AiConfigStore {
         created_at,
         updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-    `).run(
-      id,
-      input.name,
-      input.defaultNickname,
-      input.description,
-      input.personalityPrompt,
-      input.speakingStyle,
-      input.strategy,
-      input.modelProfileId,
-      booleanInteger(input.enabled),
-      now,
-      now
-    );
+    `)
+      .run(
+        id,
+        input.name,
+        input.defaultNickname,
+        input.description,
+        input.personalityPrompt,
+        input.speakingStyle,
+        input.strategy,
+        input.modelProfileId,
+        booleanInteger(input.enabled),
+        now,
+        now
+      );
 
     return this.requireBotProfile(id);
   }
 
-  updateBotProfile(
-    id: string,
-    rawInput: UpdateAiBotProfileRequest
-  ): AiBotProfileView {
+  updateBotProfile(id: string, rawInput: UpdateAiBotProfileRequest): AiBotProfileView {
     const input = updateAiBotProfileRequestSchema.parse(rawInput);
     const current = this.requireBotProfile(id);
     const updated = aiBotProfileViewSchema.parse({
@@ -453,7 +467,8 @@ export class AiConfigStore {
     });
     this.requireModelProfile(updated.modelProfileId);
 
-    this.database.prepare(`
+    this.database
+      .prepare(`
       UPDATE ai_bot_profiles
       SET
         name = ?,
@@ -467,18 +482,19 @@ export class AiConfigStore {
         revision = revision + 1,
         updated_at = ?
       WHERE id = ?
-    `).run(
-      updated.name,
-      updated.defaultNickname,
-      updated.description,
-      updated.personalityPrompt,
-      updated.speakingStyle,
-      updated.strategy,
-      updated.modelProfileId,
-      booleanInteger(updated.enabled),
-      new Date().toISOString(),
-      id
-    );
+    `)
+      .run(
+        updated.name,
+        updated.defaultNickname,
+        updated.description,
+        updated.personalityPrompt,
+        updated.speakingStyle,
+        updated.strategy,
+        updated.modelProfileId,
+        booleanInteger(updated.enabled),
+        new Date().toISOString(),
+        id
+      );
 
     return this.requireBotProfile(id);
   }
@@ -513,13 +529,9 @@ export class AiConfigStore {
     return this.secretBox.seal(credentialPurpose(providerId), apiKey);
   }
 
-  private writeCredential(
-    providerId: string,
-    apiKey: string,
-    encrypted: EncryptedSecret,
-    updatedAt: string
-  ): void {
-    this.database.prepare(`
+  private writeCredential(providerId: string, apiKey: string, encrypted: EncryptedSecret, updatedAt: string): void {
+    this.database
+      .prepare(`
       INSERT INTO ai_provider_secrets (
         provider_id,
         key_version,
@@ -536,21 +548,19 @@ export class AiConfigStore {
         auth_tag = excluded.auth_tag,
         credential_hint = excluded.credential_hint,
         updated_at = excluded.updated_at
-    `).run(
-      providerId,
-      encrypted.keyVersion,
-      Buffer.from(encrypted.ciphertext, "base64"),
-      Buffer.from(encrypted.nonce, "base64"),
-      Buffer.from(encrypted.authTag, "base64"),
-      credentialHint(apiKey),
-      updatedAt
-    );
+    `)
+      .run(
+        providerId,
+        encrypted.keyVersion,
+        Buffer.from(encrypted.ciphertext, "base64"),
+        Buffer.from(encrypted.nonce, "base64"),
+        Buffer.from(encrypted.authTag, "base64"),
+        credentialHint(apiKey),
+        updatedAt
+      );
   }
 
-  private validateFallbackChain(
-    modelProfileId: string,
-    fallbackModelProfileId: string | null
-  ): void {
+  private validateFallbackChain(modelProfileId: string, fallbackModelProfileId: string | null): void {
     if (fallbackModelProfileId === null) return;
 
     const visited = new Set<string>([modelProfileId]);

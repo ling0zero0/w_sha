@@ -3,17 +3,7 @@ import { useEffect, useState } from "react";
 import type { Role } from "@werewolf/shared";
 import { roleImages, roleLabels } from "./role-meta";
 
-export function RoleArtwork({
-  role,
-  className = "",
-  alt,
-  hidden = false
-}: {
-  role: Role;
-  className?: string;
-  alt?: string;
-  hidden?: boolean;
-}) {
+export function RoleArtwork({ role, className = "", alt, hidden = false }: { role: Role; className?: string; alt?: string; hidden?: boolean }) {
   const image = roleImages[role];
   const [failed, setFailed] = useState(false);
 

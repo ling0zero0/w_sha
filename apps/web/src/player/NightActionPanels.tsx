@@ -1,13 +1,7 @@
 import type { FormEvent } from "react";
 import { Check } from "lucide-react";
 import { useEffect, useState } from "react";
-import type {
-  PrivateGuardAction,
-  PrivateHunterAction,
-  PrivateWitchAction,
-  PrivateWolfAction,
-  ChatSendRequest
-} from "@werewolf/shared";
+import type { PrivateGuardAction, PrivateHunterAction, PrivateWitchAction, PrivateWolfAction, ChatSendRequest } from "@werewolf/shared";
 import { ChatTimeline } from "../shared/ChatTimeline";
 
 export function GuardActionPanel({
@@ -34,9 +28,7 @@ export function GuardActionPanel({
       {action.submitted ? (
         <div className="role-confirmed">
           <Check size={18} aria-hidden="true" />
-          {action.protectedPlayer
-            ? `已守护 ${action.protectedPlayer.number} 号 · ${action.protectedPlayer.nickname}`
-            : "守护目标已提交"}
+          {action.protectedPlayer ? `已守护 ${action.protectedPlayer.number} 号 · ${action.protectedPlayer.nickname}` : "守护目标已提交"}
         </div>
       ) : (
         <>
@@ -49,7 +41,8 @@ export function GuardActionPanel({
                 disabled={paused || !action.active}
                 onClick={() => setTarget(candidate.id)}
               >
-                <span>{String(candidate.number).padStart(2, "0")}</span>{candidate.nickname}
+                <span>{String(candidate.number).padStart(2, "0")}</span>
+                {candidate.nickname}
               </button>
             ))}
           </div>
@@ -58,13 +51,12 @@ export function GuardActionPanel({
             type="button"
             disabled={!connected || paused || !action.active || !target}
             onClick={() => target && onSubmit(target)}
-          >提交守护目标</button>
-          <button
-            className="night-secondary-button"
-            type="button"
-            disabled={!connected || paused || !action.active}
-            onClick={() => onSubmit(null)}
-          >今晚空守</button>
+          >
+            提交守护目标
+          </button>
+          <button className="night-secondary-button" type="button" disabled={!connected || paused || !action.active} onClick={() => onSubmit(null)}>
+            今晚空守
+          </button>
         </>
       )}
     </div>
@@ -96,9 +88,7 @@ export function HunterActionPanel({
       {action.submitted ? (
         <div className="hunter-action-result">
           <Check size={18} aria-hidden="true" />
-          {action.shotPlayer
-            ? `已选择 ${action.shotPlayer.number} 号 · ${action.shotPlayer.nickname}`
-            : "已放弃开枪"}
+          {action.shotPlayer ? `已选择 ${action.shotPlayer.number} 号 · ${action.shotPlayer.nickname}` : "已放弃开枪"}
         </div>
       ) : (
         <>
@@ -111,13 +101,18 @@ export function HunterActionPanel({
                 disabled={!connected || paused || !action.active}
                 onClick={() => setTarget(candidate.id)}
               >
-                <span>{String(candidate.number).padStart(2, "0")}</span>{candidate.nickname}
+                <span>{String(candidate.number).padStart(2, "0")}</span>
+                {candidate.nickname}
               </button>
             ))}
           </div>
           <div className="hunter-action-buttons">
-            <button type="button" disabled={!connected || paused || !action.active || !target} onClick={() => target && onSubmit(target)}>确认开枪</button>
-            <button type="button" disabled={!connected || paused || !action.active} onClick={() => onSubmit(null)}>放弃开枪</button>
+            <button type="button" disabled={!connected || paused || !action.active || !target} onClick={() => target && onSubmit(target)}>
+              确认开枪
+            </button>
+            <button type="button" disabled={!connected || paused || !action.active} onClick={() => onSubmit(null)}>
+              放弃开枪
+            </button>
           </div>
         </>
       )}
@@ -139,16 +134,14 @@ export function WitchActionPanel({
   return (
     <div className="night-role-panel witch-action-panel">
       <h2>女巫行动</h2>
-      <p>{action.attackedPlayer
-        ? `今晚 ${action.attackedPlayer.number} 号 · ${action.attackedPlayer.nickname} 被狼人袭击。`
-        : "今晚无人被狼人袭击。"}</p>
+      <p>{action.attackedPlayer ? `今晚 ${action.attackedPlayer.number} 号 · ${action.attackedPlayer.nickname} 被狼人袭击。` : "今晚无人被狼人袭击。"}</p>
       <div className="witch-tools">
-        <button
-          type="button"
-          disabled={paused || !action.antidoteAvailable || !action.attackedPlayer}
-          onClick={() => onSubmit("save")}
-        >使用解药</button>
-        <button type="button" disabled={paused} className="secondary-night-action" onClick={() => onSubmit("none")}>不使用药物</button>
+        <button type="button" disabled={paused || !action.antidoteAvailable || !action.attackedPlayer} onClick={() => onSubmit("save")}>
+          使用解药
+        </button>
+        <button type="button" disabled={paused} className="secondary-night-action" onClick={() => onSubmit("none")}>
+          不使用药物
+        </button>
       </div>
       {action.poisonAvailable ? (
         <div className="poison-choice">
@@ -162,7 +155,8 @@ export function WitchActionPanel({
                 disabled={paused}
                 onClick={() => setPoisonTarget(candidate.id)}
               >
-                <span>{String(candidate.number).padStart(2, "0")}</span>{candidate.nickname}
+                <span>{String(candidate.number).padStart(2, "0")}</span>
+                {candidate.nickname}
               </button>
             ))}
           </div>
@@ -171,22 +165,16 @@ export function WitchActionPanel({
             type="button"
             disabled={paused || !poisonTarget}
             onClick={() => poisonTarget && onSubmit("poison", poisonTarget)}
-          >确认使用毒药</button>
+          >
+            确认使用毒药
+          </button>
         </div>
       ) : null}
     </div>
   );
 }
 
-export function WolfChatPanel({
-  action,
-  paused,
-  onSend
-}: {
-  action: PrivateWolfAction;
-  paused: boolean;
-  onSend: (payload: ChatSendRequest) => void;
-}) {
+export function WolfChatPanel({ action, paused, onSend }: { action: PrivateWolfAction; paused: boolean; onSend: (payload: ChatSendRequest) => void }) {
   const [message, setMessage] = useState("");
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -199,20 +187,47 @@ export function WolfChatPanel({
 
   return (
     <section className="wolf-chat" aria-label="狼人私密聊天">
-      <header><span>狼人私密协作</span><small>{paused ? "阶段已暂停" : action.chatEnabled ? "仅狼人可见" : "本夜聊天已关闭"}</small></header>
+      <header>
+        <span>狼人私密协作</span>
+        <small>{paused ? "阶段已暂停" : action.chatEnabled ? "仅狼人可见" : "本夜聊天已关闭"}</small>
+      </header>
       <ChatTimeline messages={action.messages} emptyText="还没有消息，可以先发送快捷建议。" className="wolf-messages" />
       <div className="wolf-quick-messages">
-        <button type="button" disabled={paused || !action.chatEnabled} onClick={() => onSend({ channel: "wolf-private", content: { kind: "quick", code: "agree" } })}>赞同</button>
-        <button type="button" disabled={paused || !action.chatEnabled} onClick={() => onSend({ channel: "wolf-private", content: { kind: "quick", code: "disagree" } })}>反对</button>
-        <button type="button" disabled={paused || !action.chatEnabled} onClick={() => onSend({ channel: "wolf-private", content: { kind: "quick", code: "no-kill" } })}>建议空刀</button>
+        <button
+          type="button"
+          disabled={paused || !action.chatEnabled}
+          onClick={() => onSend({ channel: "wolf-private", content: { kind: "quick", code: "agree" } })}
+        >
+          赞同
+        </button>
+        <button
+          type="button"
+          disabled={paused || !action.chatEnabled}
+          onClick={() => onSend({ channel: "wolf-private", content: { kind: "quick", code: "disagree" } })}
+        >
+          反对
+        </button>
+        <button
+          type="button"
+          disabled={paused || !action.chatEnabled}
+          onClick={() => onSend({ channel: "wolf-private", content: { kind: "quick", code: "no-kill" } })}
+        >
+          建议空刀
+        </button>
         <button
           type="button"
           disabled={paused || !action.chatEnabled || !action.target || action.target === "no-kill"}
-          onClick={() => action.target && action.target !== "no-kill" && onSend({
-            channel: "wolf-private",
-            content: { kind: "target-suggestion", target: action.target }
-          })}
-        >建议当前目标</button>
+          onClick={() =>
+            action.target &&
+            action.target !== "no-kill" &&
+            onSend({
+              channel: "wolf-private",
+              content: { kind: "target-suggestion", target: action.target }
+            })
+          }
+        >
+          建议当前目标
+        </button>
       </div>
       <form className="wolf-chat-form" onSubmit={submit}>
         <input
@@ -223,7 +238,9 @@ export function WolfChatPanel({
           aria-label="狼人私密消息"
           onChange={(event) => setMessage(event.target.value)}
         />
-        <button type="submit" disabled={paused || !action.chatEnabled || !message.trim()}>发送</button>
+        <button type="submit" disabled={paused || !action.chatEnabled || !message.trim()}>
+          发送
+        </button>
       </form>
     </section>
   );

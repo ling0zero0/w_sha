@@ -1,11 +1,5 @@
 import { ListOrdered, MessagesSquare, Play } from "lucide-react";
-import type {
-  ChatMode,
-  NormalizedRoleConfiguration,
-  Role,
-  RoleConfiguration,
-  StartReadiness
-} from "@werewolf/shared";
+import type { ChatMode, NormalizedRoleConfiguration, Role, RoleConfiguration, StartReadiness } from "@werewolf/shared";
 import { useEffect, useState } from "react";
 
 const roleFields: Array<{ key: Role; label: string; max?: number }> = [
@@ -90,8 +84,12 @@ export function RoleConfigurationPanel({
         ))}
       </div>
       <div className="readiness-summary">
-        <span>参赛人数 <strong data-testid="participant-count">{readiness.participantCount}</strong></span>
-        <span>身份总数 <strong data-testid="configured-role-count">{readiness.configuredRoleCount}</strong></span>
+        <span>
+          参赛人数 <strong data-testid="participant-count">{readiness.participantCount}</strong>
+        </span>
+        <span>
+          身份总数 <strong data-testid="configured-role-count">{readiness.configuredRoleCount}</strong>
+        </span>
       </div>
       <div className="chat-mode-setting">
         <div>
@@ -125,7 +123,9 @@ export function RoleConfigurationPanel({
       </div>
       {readiness.issues.length > 0 ? (
         <ul className="readiness-issues" aria-label="开局阻塞原因">
-          {readiness.issues.map((issue) => <li key={issue.code}>{issue.message}</li>)}
+          {readiness.issues.map((issue) => (
+            <li key={issue.code}>{issue.message}</li>
+          ))}
         </ul>
       ) : (
         <p className="readiness-success">身份数量和最低阵营要求均已满足</p>
@@ -136,7 +136,8 @@ export function RoleConfigurationPanel({
         disabled={!connected || !readiness.ready}
         onClick={() => window.confirm("开始后将锁定名单并随机分配身份，确定开始吗？") && onStart()}
       >
-        <Play size={17} aria-hidden="true" />开始游戏
+        <Play size={17} aria-hidden="true" />
+        开始游戏
       </button>
     </section>
   );

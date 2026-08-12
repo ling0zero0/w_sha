@@ -46,19 +46,23 @@ describe("AI audit store", () => {
       createdAt: completedAt
     });
 
-    expect(store.listAttempts()).toMatchObject([{
-      id: decisionId,
-      status: "success",
-      latencyMs: 125,
-      botProfileRevision: 3,
-      modelProfileRevision: 4
-    }]);
-    expect(store.listUsage()).toMatchObject([{
-      decisionId,
-      inputTokens: 80,
-      outputTokens: 12,
-      totalTokens: 92
-    }]);
+    expect(store.listAttempts()).toMatchObject([
+      {
+        id: decisionId,
+        status: "success",
+        latencyMs: 125,
+        botProfileRevision: 3,
+        modelProfileRevision: 4
+      }
+    ]);
+    expect(store.listUsage()).toMatchObject([
+      {
+        decisionId,
+        inputTokens: 80,
+        outputTokens: 12,
+        totalTokens: 92
+      }
+    ]);
     expect(JSON.stringify(store.listAttempts())).not.toContain("prompt");
     expect(JSON.stringify(store.listAttempts())).not.toContain("response");
   });
@@ -86,8 +90,6 @@ describe("AI audit store", () => {
     store.recordAttempt({ ...base, status: "budget-exhausted", errorCode: "BUDGET_EXHAUSTED" });
     store.recordAttempt({ ...base, status: "fallback", errorCode: "TIMEOUT" });
 
-    expect(store.listAttempts().map((attempt) => attempt.status)).toEqual(
-      expect.arrayContaining(["fallback", "budget-exhausted"])
-    );
+    expect(store.listAttempts().map((attempt) => attempt.status)).toEqual(expect.arrayContaining(["fallback", "budget-exhausted"]));
   });
 });

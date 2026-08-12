@@ -18,10 +18,7 @@ export default defineConfig({
         target: `http://127.0.0.1:${process.env.PORT ?? 3000}`,
         configure(proxy) {
           proxy.on("proxyReq", (proxyRequest, request) => {
-            proxyRequest.setHeader(
-              "x-werewolf-proxy-client-ip",
-              request.socket.remoteAddress ?? ""
-            );
+            proxyRequest.setHeader("x-werewolf-proxy-client-ip", request.socket.remoteAddress ?? "");
           });
         }
       },

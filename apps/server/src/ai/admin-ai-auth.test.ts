@@ -27,30 +27,47 @@ describe("AI admin authorization", () => {
   });
 
   it("rejects missing source and authorization headers", () => {
-    expect(isAuthorizedAiAdmin({
-      directAddress: "127.0.0.1",
-      authorization: `Bearer ${hostSession}`
-    }, hostSession)).toBe(false);
-    expect(isAuthorizedAiAdmin({
-      directAddress: "127.0.0.1",
-      origin: "http://127.0.0.1:5173"
-    }, hostSession)).toBe(false);
+    expect(
+      isAuthorizedAiAdmin(
+        {
+          directAddress: "127.0.0.1",
+          authorization: `Bearer ${hostSession}`
+        },
+        hostSession
+      )
+    ).toBe(false);
+    expect(
+      isAuthorizedAiAdmin(
+        {
+          directAddress: "127.0.0.1",
+          origin: "http://127.0.0.1:5173"
+        },
+        hostSession
+      )
+    ).toBe(false);
   });
 
-  it.each(["file://127.0.0.1/", "ftp://127.0.0.1/"])(
-    "rejects a non-HTTP loopback source: %s",
-    (source) => {
-      expect(isAuthorizedAiAdmin(request({ origin: source }), hostSession)).toBe(false);
-    }
-  );
+  it.each(["file://127.0.0.1/", "ftp://127.0.0.1/"])("rejects a non-HTTP loopback source: %s", (source) => {
+    expect(isAuthorizedAiAdmin(request({ origin: source }), hostSession)).toBe(false);
+  });
 
   it("honors the Vite proxy client address only for a loopback proxy", () => {
-    expect(isAuthorizedAiAdmin(request({
-      proxyClientAddress: "192.168.1.44"
-    }), hostSession)).toBe(false);
-    expect(isAuthorizedAiAdmin(request({
-      directAddress: "192.168.1.44",
-      proxyClientAddress: "127.0.0.1"
-    }), hostSession)).toBe(false);
+    expect(
+      isAuthorizedAiAdmin(
+        request({
+          proxyClientAddress: "192.168.1.44"
+        }),
+        hostSession
+      )
+    ).toBe(false);
+    expect(
+      isAuthorizedAiAdmin(
+        request({
+          directAddress: "192.168.1.44",
+          proxyClientAddress: "127.0.0.1"
+        }),
+        hostSession
+      )
+    ).toBe(false);
   });
 });

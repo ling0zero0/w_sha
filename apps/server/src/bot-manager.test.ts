@@ -1,17 +1,7 @@
-import type {
-  BotIntent,
-  BotKind,
-  PlayerId,
-  PlayerLobbyView
-} from "@werewolf/shared";
+import type { BotIntent, BotKind, PlayerId, PlayerLobbyView } from "@werewolf/shared";
 import { describe, expect, it, vi } from "vitest";
 import { executeBotIntent } from "./bot-executor.js";
-import {
-  BotManager,
-  type BotAdapter,
-  type BotAdapterFactory,
-  type BotTurnContext
-} from "./bot-manager.js";
+import { BotManager, type BotAdapter, type BotAdapterFactory, type BotTurnContext } from "./bot-manager.js";
 import { LobbyRoom } from "./room.js";
 
 function createRoom(): LobbyRoom {
@@ -31,15 +21,17 @@ function addBots(room: LobbyRoom, count: number): PlayerId[] {
 }
 
 function configureThreePlayers(room: LobbyRoom): void {
-  expect(room.updateRoleConfiguration({
-    wolf: 1,
-    villager: 1,
-    seer: 1,
-    witch: 0,
-    guard: 0,
-    hunter: 0,
-    idiot: 0
-  })).toMatchObject({ ok: true });
+  expect(
+    room.updateRoleConfiguration({
+      wolf: 1,
+      villager: 1,
+      seer: 1,
+      witch: 0,
+      guard: 0,
+      hunter: 0,
+      idiot: 0
+    })
+  ).toMatchObject({ ok: true });
 }
 
 async function waitFor(predicate: () => boolean, timeoutMs = 1_000): Promise<void> {
@@ -53,12 +45,7 @@ async function waitFor(predicate: () => boolean, timeoutMs = 1_000): Promise<voi
 class CallbackAdapter implements BotAdapter {
   readonly kind: BotKind = "deterministic";
 
-  constructor(
-    private readonly callback: (
-      view: PlayerLobbyView,
-      context: BotTurnContext
-    ) => Promise<BotIntent | null>
-  ) {}
+  constructor(private readonly callback: (view: PlayerLobbyView, context: BotTurnContext) => Promise<BotIntent | null>) {}
 
   onView(view: PlayerLobbyView, context: BotTurnContext): Promise<BotIntent | null> {
     return this.callback(view, context);
@@ -88,11 +75,16 @@ describe("bot seats", () => {
       ok: false,
       code: "NICKNAME_TAKEN"
     });
-    expect(room.requestTakeover({
-      roomCode: "123456",
-      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
-      nickname: "Atlas"
-    }, "socket-1")).toMatchObject({ ok: false, code: "PLAYER_NOT_FOUND" });
+    expect(
+      room.requestTakeover(
+        {
+          roomCode: "123456",
+          joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+          nickname: "Atlas"
+        },
+        "socket-1"
+      )
+    ).toMatchObject({ ok: false, code: "PLAYER_NOT_FOUND" });
 
     const restored = new LobbyRoom({
       localAddress: "192.168.1.20",
@@ -106,15 +98,17 @@ describe("bot seats", () => {
     });
 
     addBots(room, 3);
-    expect(room.updateRoleConfiguration({
-      wolf: 2,
-      villager: 1,
-      seer: 1,
-      witch: 0,
-      guard: 0,
-      hunter: 0,
-      idiot: 0
-    })).toMatchObject({ ok: true });
+    expect(
+      room.updateRoleConfiguration({
+        wolf: 2,
+        villager: 1,
+        seer: 1,
+        witch: 0,
+        guard: 0,
+        hunter: 0,
+        idiot: 0
+      })
+    ).toMatchObject({ ok: true });
     expect(room.startGame()).toMatchObject({ ok: true });
     for (const { playerId } of room.getBotSeats()) {
       expect(room.confirmRole(playerId)).toMatchObject({ ok: true });
@@ -141,10 +135,11 @@ describe("BotManager", () => {
     let received: PlayerLobbyView | null = null;
     const manager = new BotManager({
       room,
-      adapterFactory: () => new CallbackAdapter(async (view) => {
-        received = structuredClone(view);
-        return null;
-      }),
+      adapterFactory: () =>
+        new CallbackAdapter(async (view) => {
+          received = structuredClone(view);
+          return null;
+        }),
       execute: () => false
     });
 
@@ -164,23 +159,19 @@ describe("BotManager", () => {
     const targetId = playerIds[0]!;
     let release: ((intent: BotIntent) => void) | null = null;
     const started = vi.fn();
-    const factory: BotAdapterFactory = (_kind, playerId) => new CallbackAdapter(async () => {
-      if (playerId !== targetId) return null;
-      started();
-      return new Promise<BotIntent>((resolve) => {
-        release = resolve;
+    const factory: BotAdapterFactory = (_kind, playerId) =>
+      new CallbackAdapter(async () => {
+        if (playerId !== targetId) return null;
+        started();
+        return new Promise<BotIntent>((resolve) => {
+          release = resolve;
+        });
       });
-    });
     const manager = new BotManager({
       room,
       adapterFactory: factory,
       timeoutMs: 500,
-      execute: (playerId, intent, revision) => executeBotIntent(
-        room,
-        playerId,
-        intent,
-        revision
-      ).accepted
+      execute: (playerId, intent, revision) => executeBotIntent(room, playerId, intent, revision).accepted
     });
 
     manager.notify();
@@ -199,17 +190,13 @@ describe("BotManager", () => {
     const timeoutManager = new BotManager({
       room: timeoutRoom,
       timeoutMs: 10,
-      adapterFactory: (_kind, playerId) => new CallbackAdapter(async () => {
-        if (playerId !== timeoutIds[0]) return null;
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        return { type: "confirm-role" };
-      }),
-      execute: (playerId, intent, revision) => executeBotIntent(
-        timeoutRoom,
-        playerId,
-        intent,
-        revision
-      ).accepted
+      adapterFactory: (_kind, playerId) =>
+        new CallbackAdapter(async () => {
+          if (playerId !== timeoutIds[0]) return null;
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          return { type: "confirm-role" };
+        }),
+      execute: (playerId, intent, revision) => executeBotIntent(timeoutRoom, playerId, intent, revision).accepted
     });
     timeoutManager.notify();
     await new Promise((resolve) => setTimeout(resolve, 30));
@@ -254,18 +241,14 @@ describe("BotManager", () => {
     const manager = new BotManager({
       room,
       onError,
-      adapterFactory: (_kind, playerId) => new CallbackAdapter(async () => {
-        if (playerId !== targetId) return null;
-        calls += 1;
-        if (calls === 1) throw new Error("adapter failed");
-        return { type: "confirm-role" };
-      }),
-      execute: (playerId, intent, revision) => executeBotIntent(
-        room,
-        playerId,
-        intent,
-        revision
-      ).accepted
+      adapterFactory: (_kind, playerId) =>
+        new CallbackAdapter(async () => {
+          if (playerId !== targetId) return null;
+          calls += 1;
+          if (calls === 1) throw new Error("adapter failed");
+          return { type: "confirm-role" };
+        }),
+      execute: (playerId, intent, revision) => executeBotIntent(room, playerId, intent, revision).accepted
     });
 
     manager.notify();
@@ -287,11 +270,8 @@ describe("BotManager", () => {
     const attempts = vi.fn();
     const manager = new BotManager({
       room,
-      adapterFactory: (_kind, playerId) => new CallbackAdapter(async (view) => (
-        playerId === targetId && !view.privateRole?.confirmed
-          ? { type: "confirm-role" }
-          : null
-      )),
+      adapterFactory: (_kind, playerId) =>
+        new CallbackAdapter(async (view) => (playerId === targetId && !view.privateRole?.confirmed ? { type: "confirm-role" } : null)),
       execute: (playerId, intent, revision) => {
         if (playerId !== targetId) return false;
         attempts();
@@ -324,10 +304,14 @@ describe("BotManager", () => {
         async onView(_view, context) {
           started();
           await new Promise<void>((resolve) => {
-            context.signal.addEventListener("abort", () => {
-              aborted = true;
-              resolve();
-            }, { once: true });
+            context.signal.addEventListener(
+              "abort",
+              () => {
+                aborted = true;
+                resolve();
+              },
+              { once: true }
+            );
           });
           return null;
         },
@@ -349,15 +333,17 @@ describe("BotManager", () => {
   it("runs a deterministic all-bot game through the normal state machine", async () => {
     const room = createRoom();
     addBots(room, 5);
-    expect(room.updateRoleConfiguration({
-      wolf: 1,
-      villager: 2,
-      seer: 1,
-      witch: 1,
-      guard: 0,
-      hunter: 0,
-      idiot: 0
-    })).toMatchObject({ ok: true });
+    expect(
+      room.updateRoleConfiguration({
+        wolf: 1,
+        villager: 2,
+        seer: 1,
+        witch: 1,
+        guard: 0,
+        hunter: 0,
+        idiot: 0
+      })
+    ).toMatchObject({ ok: true });
     expect(room.startGame()).toMatchObject({ ok: true });
 
     let manager: BotManager;

@@ -66,10 +66,7 @@ export class LlmBotAdapter implements BotAdapter {
   get turnTimeoutMs(): number {
     const resolved = this.resolveConfiguration();
     if (!resolved) return 2_000;
-    const modelTimeoutMs = resolved.models.reduce(
-      (total, model) => total + model.requestTimeoutMs * model.maxAttemptsPerTurn,
-      0
-    );
+    const modelTimeoutMs = resolved.models.reduce((total, model) => total + model.requestTimeoutMs * model.maxAttemptsPerTurn, 0);
     return Math.min(modelTimeoutMs + 1_000, 2_147_483_647);
   }
 
@@ -102,14 +99,7 @@ export class LlmBotAdapter implements BotAdapter {
 
     const resolved = this.resolveConfiguration();
     if (!resolved) {
-      return this.useFallback(
-        view,
-        context,
-        "configuration-unavailable",
-        undefined,
-        plan.decisionKey,
-        null
-      );
+      return this.useFallback(view, context, "configuration-unavailable", undefined, plan.decisionKey, null);
     }
 
     const prompt = buildBotPrompt({
@@ -195,10 +185,7 @@ export class LlmBotAdapter implements BotAdapter {
         }
 
         if (response.ok) {
-          const used = Math.min(
-            reservation.reservedTokens,
-            response.usage.totalTokens ?? response.usage.outputTokens ?? reservation.reservedTokens
-          );
+          const used = Math.min(reservation.reservedTokens, response.usage.totalTokens ?? response.usage.outputTokens ?? reservation.reservedTokens);
           this.budgetLedger.settle(reservation.id, used);
           const parsed = botIntentSchema.safeParse(response.decision.intent);
           const allowed = parsed.success && plan.allowedIntentTypes.includes(parsed.data.type);
@@ -241,14 +228,7 @@ export class LlmBotAdapter implements BotAdapter {
     }
 
     this.handledDecisionKeys.add(plan.decisionKey);
-    return this.useFallback(
-      view,
-      context,
-      "model-failed",
-      lastModelErrorCode,
-      plan.decisionKey,
-      resolved
-    );
+    return this.useFallback(view, context, "model-failed", lastModelErrorCode, plan.decisionKey, resolved);
   }
 
   async dispose(): Promise<void> {
@@ -279,9 +259,7 @@ export class LlmBotAdapter implements BotAdapter {
     while (current && !seen.has(current.id)) {
       seen.add(current.id);
       if (current.enabled) result.push(current);
-      current = current.fallbackModelProfileId
-        ? this.options.store.getModelProfile(current.fallbackModelProfileId)
-        : null;
+      current = current.fallbackModelProfileId ? this.options.store.getModelProfile(current.fallbackModelProfileId) : null;
     }
     return result;
   }
@@ -291,9 +269,7 @@ export class LlmBotAdapter implements BotAdapter {
     if (!provider?.enabled || !this.options.providers.has(provider.protocol)) return null;
     let apiKey: string | null = null;
     try {
-      apiKey = provider.credentialConfigured
-        ? this.options.store.getProviderCredential(provider.id)
-        : null;
+      apiKey = provider.credentialConfigured ? this.options.store.getProviderCredential(provider.id) : null;
     } catch {
       return null;
     }
@@ -381,14 +357,13 @@ export class LlmBotAdapter implements BotAdapter {
   }
 }
 
-function matchesLock(
-  configuration: ResolvedConfiguration,
-  lock: BotConfigurationLock
-): boolean {
-  return configuration.profile.revision === lock.botProfileRevision
-    && configuration.model.id === lock.modelProfileId
-    && configuration.model.revision === lock.modelProfileRevision
-    && modelChainRevision(configuration.models) === lock.modelChainRevision;
+function matchesLock(configuration: ResolvedConfiguration, lock: BotConfigurationLock): boolean {
+  return (
+    configuration.profile.revision === lock.botProfileRevision &&
+    configuration.model.id === lock.modelProfileId &&
+    configuration.model.revision === lock.modelProfileRevision &&
+    modelChainRevision(configuration.models) === lock.modelChainRevision
+  );
 }
 
 function modelChainRevision(models: readonly AiModelProfile[]): string {

@@ -72,16 +72,20 @@ export type ChatView = z.infer<typeof chatViewSchema>;
 export const gameSessionIdSchema = z.uuid();
 export type GameSessionId = z.infer<typeof gameSessionIdSchema>;
 
-export const chatHistoryRequestSchema = z.object({
-  afterSequence: z.number().int().nonnegative().default(0),
-  limit: z.number().int().min(1).max(100).default(100)
-}).strict();
+export const chatHistoryRequestSchema = z
+  .object({
+    afterSequence: z.number().int().nonnegative().default(0),
+    limit: z.number().int().min(1).max(100).default(100)
+  })
+  .strict();
 export type ChatHistoryRequest = z.infer<typeof chatHistoryRequestSchema>;
 
-export const chatHistoryPageSchema = z.object({
-  sessionId: gameSessionIdSchema,
-  messages: z.array(chatMessageSchema),
-  latestSequence: z.number().int().nonnegative(),
-  hasMore: z.boolean()
-}).strict();
+export const chatHistoryPageSchema = z
+  .object({
+    sessionId: gameSessionIdSchema,
+    messages: z.array(chatMessageSchema),
+    latestSequence: z.number().int().nonnegative(),
+    hasMore: z.boolean()
+  })
+  .strict();
 export type ChatHistoryPage = z.infer<typeof chatHistoryPageSchema>;

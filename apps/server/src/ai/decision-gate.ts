@@ -1,8 +1,4 @@
-import type {
-  BotIntent,
-  PlayerId,
-  PlayerLobbyView
-} from "@werewolf/shared";
+import type { BotIntent, PlayerId, PlayerLobbyView } from "@werewolf/shared";
 
 export type BotIntentType = BotIntent["type"];
 
@@ -30,11 +26,7 @@ interface LlmDecision {
 export function planBotDecision(input: BotDecisionGateInput): BotDecisionPlan {
   const { view } = input;
 
-  if (
-    view.phase === "role-reveal"
-    && view.privateRole
-    && !view.privateRole.confirmed
-  ) {
+  if (view.phase === "role-reveal" && view.privateRole && !view.privateRole.confirmed) {
     return deterministic({ type: "confirm-role" });
   }
 
@@ -46,12 +38,7 @@ export function planBotDecision(input: BotDecisionGateInput): BotDecisionPlan {
     });
   }
   if (wolfPlan) return finalizeLlmPlan(input, wolfPlan);
-  if (
-    view.wolfAction?.chatEnabled
-    && !view.wolfAction.locked
-    && view.wolfAction.target !== null
-    && !view.wolfAction.confirmed
-  ) {
+  if (view.wolfAction?.chatEnabled && !view.wolfAction.locked && view.wolfAction.target !== null && !view.wolfAction.confirmed) {
     return deterministic({
       type: "wolf-confirm-vote",
       payload: { confirmed: true }
@@ -137,20 +124,12 @@ export function planBotDecision(input: BotDecisionGateInput): BotDecisionPlan {
   return { kind: "skip" };
 }
 
-function planWolfDecision(
-  view: PlayerLobbyView
-): LlmDecision | "no-kill" | null {
+function planWolfDecision(view: PlayerLobbyView): LlmDecision | "no-kill" | null {
   const action = view.wolfAction;
   if (!action?.chatEnabled || action.locked || action.target !== null) return null;
 
-  const teammateIds = new Set(
-    view.privateRole?.wolfTeammates.map((player) => player.id) ?? []
-  );
-  const candidateIds = action.candidates
-    .map((candidate) => candidate.id)
-    .filter((candidateId) => (
-      candidateId !== view.selfId && !teammateIds.has(candidateId)
-    ));
+  const teammateIds = new Set(view.privateRole?.wolfTeammates.map((player) => player.id) ?? []);
+  const candidateIds = action.candidates.map((candidate) => candidate.id).filter((candidateId) => candidateId !== view.selfId && !teammateIds.has(candidateId));
 
   if (candidateIds.length === 0) return "no-kill";
   return {
@@ -160,10 +139,7 @@ function planWolfDecision(
   };
 }
 
-function finalizeLlmPlan(
-  input: BotDecisionGateInput,
-  decision: LlmDecision
-): BotDecisionPlan {
+function finalizeLlmPlan(input: BotDecisionGateInput, decision: LlmDecision): BotDecisionPlan {
   const decisionKey = buildDecisionKey(input.gameId, input.view, decision);
   if (input.handledDecisionKeys?.has(decisionKey)) return { kind: "skip" };
   return {
@@ -173,11 +149,7 @@ function finalizeLlmPlan(
   };
 }
 
-function buildDecisionKey(
-  gameId: string,
-  view: PlayerLobbyView,
-  decision: LlmDecision
-): string {
+function buildDecisionKey(gameId: string, view: PlayerLobbyView, decision: LlmDecision): string {
   const candidateSummary = [...decision.candidateIds].sort().join(",");
   return [
     "v1",
@@ -201,40 +173,29 @@ function ids(players: readonly { id: PlayerId }[]): PlayerId[] {
 }
 
 function isCurrentSpeaker(view: PlayerLobbyView): boolean {
-  return (
-    (view.phase === "last-words" || view.phase === "day-speech")
-    && view.dayState?.currentSpeaker?.id === view.selfId
-  );
+  return (view.phase === "last-words" || view.phase === "day-speech") && view.dayState?.currentSpeaker?.id === view.selfId;
 }
 
 function hasSpokenThisTurn(view: PlayerLobbyView): boolean {
   const day = currentDay(view);
-  return view.publicChat.messages.some((message) => (
-    message.channel === "day-public"
-    && message.day === day
-    && message.phase === view.phase
-    && message.sender.kind !== "system"
-    && message.sender.id === view.selfId
-  ));
+  return view.publicChat.messages.some(
+    (message) =>
+      message.channel === "day-public" &&
+      message.day === day &&
+      message.phase === view.phase &&
+      message.sender.kind !== "system" &&
+      message.sender.id === view.selfId
+  );
 }
 
 function currentDay(view: PlayerLobbyView): number {
-  const messages = [
-    ...view.publicChat.messages,
-    ...(view.wolfAction?.messages ?? [])
-  ];
+  const messages = [...view.publicChat.messages, ...(view.wolfAction?.messages ?? [])];
   return messages.reduce((latest, message) => Math.max(latest, message.day), 1);
 }
 
 function latestAuthorizedChatSequence(view: PlayerLobbyView): number {
-  const messages = [
-    ...view.publicChat.messages,
-    ...(view.wolfAction?.messages ?? [])
-  ];
-  return messages.reduce(
-    (latest, message) => Math.max(latest, message.sequence),
-    0
-  );
+  const messages = [...view.publicChat.messages, ...(view.wolfAction?.messages ?? [])];
+  return messages.reduce((latest, message) => Math.max(latest, message.sequence), 0);
 }
 
 function nightSubstage(view: PlayerLobbyView, action: string): string {

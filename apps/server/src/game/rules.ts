@@ -48,8 +48,8 @@ export function resolveNightDeaths(
 export function evaluateGameOutcome(players: readonly OutcomePlayer[]): GameOutcome | null {
   const alive = players.filter((player) => player.alive && player.connection !== "departed");
   const goodWin = !alive.some((player) => player.role === "wolf");
-  const wolfWin = !alive.some((player) => player.role === "villager")
-    || !alive.some((player) => ["seer", "witch", "guard", "hunter", "idiot"].includes(player.role ?? ""));
+  const wolfWin =
+    !alive.some((player) => player.role === "villager") || !alive.some((player) => ["seer", "witch", "guard", "hunter", "idiot"].includes(player.role ?? ""));
 
   if (!goodWin && !wolfWin) return null;
   return goodWin && wolfWin ? "draw" : goodWin ? "good-win" : "wolf-win";

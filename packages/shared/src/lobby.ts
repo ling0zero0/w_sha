@@ -34,9 +34,11 @@ export const hostLobbyViewSchema = lobbyViewBaseSchema.extend({
   startReadiness: startReadinessSchema,
   roleConfirmation: roleConfirmationProgressSchema,
   nightProgress: nightProgressSchema,
-  dawnResult: z.object({
-    deaths: z.array(lobbyPlayerSchema.pick({ id: true, number: true, nickname: true }))
-  }).nullable(),
+  dawnResult: z
+    .object({
+      deaths: z.array(lobbyPlayerSchema.pick({ id: true, number: true, nickname: true }))
+    })
+    .nullable(),
   dayState: publicDayStateSchema,
   gameResult: gameResultSchema,
   publicChat: chatViewSchema.default({ canSend: false, messages: [] })
@@ -103,7 +105,9 @@ export const takeoverReceiptSchema = z.object({
 });
 export type TakeoverReceipt = z.infer<typeof takeoverReceiptSchema>;
 
-export const hostUpdateChatModeRequestSchema = z.object({
-  chatMode: z.enum(["ordered", "open"])
-}).strict();
+export const hostUpdateChatModeRequestSchema = z
+  .object({
+    chatMode: z.enum(["ordered", "open"])
+  })
+  .strict();
 export type HostUpdateChatModeRequest = z.infer<typeof hostUpdateChatModeRequestSchema>;

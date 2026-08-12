@@ -24,12 +24,7 @@ import {
   roleSchema,
   serviceStatusSchema
 } from "./index.js";
-import type {
-  ClientToServerEvents,
-  NormalizedRoleConfiguration,
-  RoleConfiguration,
-  RoleConfigurationInput
-} from "./index.js";
+import type { ClientToServerEvents, NormalizedRoleConfiguration, RoleConfiguration, RoleConfigurationInput } from "./index.js";
 
 const legacyRoleConfiguration: RoleConfigurationInput = {
   wolf: 1,
@@ -37,12 +32,8 @@ const legacyRoleConfiguration: RoleConfigurationInput = {
   seer: 1,
   witch: 0
 };
-const updateRoleConfigurationPayload: Parameters<
-  ClientToServerEvents["host:update-role-configuration"]
->[0] = legacyRoleConfiguration;
-const updateChatModePayload: Parameters<
-  ClientToServerEvents["host:update-chat-mode"]
->[0] = { chatMode: "open" };
+const updateRoleConfigurationPayload: Parameters<ClientToServerEvents["host:update-role-configuration"]>[0] = legacyRoleConfiguration;
+const updateChatModePayload: Parameters<ClientToServerEvents["host:update-chat-mode"]>[0] = { chatMode: "open" };
 
 describe("shared transport schemas", () => {
   it("accepts the public service status", () => {
@@ -124,10 +115,12 @@ describe("shared transport schemas", () => {
       chatMode: "open"
     });
     expect(hostUpdateChatModeRequestSchema.safeParse({}).success).toBe(false);
-    expect(hostUpdateChatModeRequestSchema.safeParse({
-      chatMode: "ordered",
-      extra: true
-    }).success).toBe(false);
+    expect(
+      hostUpdateChatModeRequestSchema.safeParse({
+        chatMode: "ordered",
+        extra: true
+      }).success
+    ).toBe(false);
     expect(hostUpdateChatModeRequestSchema.safeParse({ chatMode: "free" }).success).toBe(false);
   });
 
@@ -150,12 +143,14 @@ describe("shared transport schemas", () => {
         deadlineAt: null,
         remainingMs: 45_000
       },
-      interventions: [{
-        id: "019bf178-7f24-7e40-b8dc-0c2dd948d5a7",
-        type: "pause",
-        createdAt: "2026-07-15T04:00:00.000Z",
-        detail: "主机暂停了当前阶段"
-      }]
+      interventions: [
+        {
+          id: "019bf178-7f24-7e40-b8dc-0c2dd948d5a7",
+          type: "pause",
+          createdAt: "2026-07-15T04:00:00.000Z",
+          detail: "主机暂停了当前阶段"
+        }
+      ]
     });
 
     expect(state.clock.remainingMs).toBe(45_000);
@@ -167,12 +162,14 @@ describe("shared transport schemas", () => {
     const state = publicGameStateSchema.parse({
       revision: 1,
       clock: { status: "idle", deadlineAt: null, remainingMs: 0 },
-      interventions: [{
-        id: "019bf178-7f24-7e40-b8dc-0c2dd948d5a7",
-        type: "depart-player",
-        createdAt: "2026-07-15T04:00:00.000Z",
-        detail: "主机将 2 号玩家阿岚判定为离场"
-      }]
+      interventions: [
+        {
+          id: "019bf178-7f24-7e40-b8dc-0c2dd948d5a7",
+          type: "depart-player",
+          createdAt: "2026-07-15T04:00:00.000Z",
+          detail: "主机将 2 号玩家阿岚判定为离场"
+        }
+      ]
     });
 
     expect(state.interventions[0]?.type).toBe("depart-player");
@@ -185,26 +182,32 @@ describe("shared transport schemas", () => {
   });
 
   it("validates host life corrections", () => {
-    expect(hostCorrectPlayerLifeRequestSchema.parse({
-      playerId: "019bf178-7f24-7e40-b8dc-0c2dd948d5a7",
-      alive: false
-    })).toMatchObject({ alive: false });
-    expect(() => hostCorrectPlayerLifeRequestSchema.parse({
-      playerId: "019bf178-7f24-7e40-b8dc-0c2dd948d5a7",
-      alive: "false"
-    })).toThrow();
+    expect(
+      hostCorrectPlayerLifeRequestSchema.parse({
+        playerId: "019bf178-7f24-7e40-b8dc-0c2dd948d5a7",
+        alive: false
+      })
+    ).toMatchObject({ alive: false });
+    expect(() =>
+      hostCorrectPlayerLifeRequestSchema.parse({
+        playerId: "019bf178-7f24-7e40-b8dc-0c2dd948d5a7",
+        alive: "false"
+      })
+    ).toThrow();
   });
 
   it("validates records disclosed only with the final game result", () => {
     const result = gameResultSchema.parse({
       outcome: "terminated",
-      revealedPlayers: [{
-        id: "019bf178-7f24-7e40-b8dc-0c2dd948d5a7",
-        number: 1,
-        nickname: "林野",
-        role: "seer",
-        alive: true
-      }],
+      revealedPlayers: [
+        {
+          id: "019bf178-7f24-7e40-b8dc-0c2dd948d5a7",
+          number: 1,
+          nickname: "林野",
+          role: "seer",
+          alive: true
+        }
+      ],
       records: [{ type: "seer-inspection", day: 1, detail: "1 号林野查验 2 号阿岚：狼人" }]
     });
 
@@ -212,14 +215,8 @@ describe("shared transport schemas", () => {
   });
 
   it("validates the extended role configuration", () => {
-    expect(["guard", "hunter", "idiot"].map((role) => roleSchema.parse(role))).toEqual([
-      "guard",
-      "hunter",
-      "idiot"
-    ]);
-    const normalized: NormalizedRoleConfiguration = roleConfigurationSchema.parse(
-      updateRoleConfigurationPayload
-    );
+    expect(["guard", "hunter", "idiot"].map((role) => roleSchema.parse(role))).toEqual(["guard", "hunter", "idiot"]);
+    const normalized: NormalizedRoleConfiguration = roleConfigurationSchema.parse(updateRoleConfigurationPayload);
     const configuration: RoleConfiguration = normalized;
     expect(configuration).toEqual({
       wolf: 1,
@@ -239,15 +236,17 @@ describe("shared transport schemas", () => {
       hunter: 0,
       idiot: 0
     });
-    expect(roleConfigurationSchema.parse({
-      wolf: 2,
-      villager: 3,
-      seer: 1,
-      witch: 1,
-      guard: 1,
-      hunter: 1,
-      idiot: 1
-    })).toEqual({
+    expect(
+      roleConfigurationSchema.parse({
+        wolf: 2,
+        villager: 3,
+        seer: 1,
+        witch: 1,
+        guard: 1,
+        hunter: 1,
+        idiot: 1
+      })
+    ).toEqual({
       wolf: 2,
       villager: 3,
       seer: 1,
@@ -256,34 +255,40 @@ describe("shared transport schemas", () => {
       hunter: 1,
       idiot: 1
     });
-    expect(() => roleConfigurationSchema.parse({
-      wolf: -1,
-      villager: 3,
-      seer: 1,
-      witch: 0,
-      guard: 0,
-      hunter: 0,
-      idiot: 0
-    })).toThrow();
+    expect(() =>
+      roleConfigurationSchema.parse({
+        wolf: -1,
+        villager: 3,
+        seer: 1,
+        witch: 0,
+        guard: 0,
+        hunter: 0,
+        idiot: 0
+      })
+    ).toThrow();
     for (const role of ["guard", "hunter", "idiot"] as const) {
-      expect(() => roleConfigurationSchema.parse({
+      expect(() =>
+        roleConfigurationSchema.parse({
+          wolf: 1,
+          villager: 3,
+          seer: 1,
+          witch: 0,
+          [role]: 2
+        })
+      ).toThrow();
+    }
+    expect(() =>
+      roleConfigurationSchema.parse({
         wolf: 1,
         villager: 3,
         seer: 1,
         witch: 0,
-        [role]: 2
-      })).toThrow();
-    }
-    expect(() => roleConfigurationSchema.parse({
-      wolf: 1,
-      villager: 3,
-      seer: 1,
-      witch: 0,
-      guard: 0,
-      hunter: 1,
-      idiot: 0,
-      unknown: 1
-    })).toThrow();
+        guard: 0,
+        hunter: 1,
+        idiot: 0,
+        unknown: 1
+      })
+    ).toThrow();
   });
 
   it("validates strict guard and hunter action payloads", () => {
@@ -435,11 +440,7 @@ describe("shared chat schemas", () => {
 
     const parsed = messages.map((message) => chatMessageSchema.parse(message));
 
-    expect(parsed.map((message) => [
-      message.channel,
-      message.sender.kind,
-      message.content.kind
-    ])).toEqual([
+    expect(parsed.map((message) => [message.channel, message.sender.kind, message.content.kind])).toEqual([
       ["day-public", "player", "text"],
       ["wolf-private", "bot", "quick"],
       ["wolf-private", "player", "target-suggestion"],
@@ -450,10 +451,12 @@ describe("shared chat schemas", () => {
   });
 
   it("accepts only text content for day-public client messages", () => {
-    expect(chatSendRequestSchema.parse({
-      channel: "day-public",
-      content: { kind: "text", text: "  I am the seer  " }
-    })).toEqual({
+    expect(
+      chatSendRequestSchema.parse({
+        channel: "day-public",
+        content: { kind: "text", text: "  I am the seer  " }
+      })
+    ).toEqual({
       channel: "day-public",
       content: { kind: "text", text: "I am the seer" }
     });
@@ -463,37 +466,47 @@ describe("shared chat schemas", () => {
       { kind: "target-suggestion", target: targetId },
       { kind: "system", text: "Injected notice" }
     ]) {
-      expect(chatSendRequestSchema.safeParse({
-        channel: "day-public",
-        content
-      }).success).toBe(false);
+      expect(
+        chatSendRequestSchema.safeParse({
+          channel: "day-public",
+          content
+        }).success
+      ).toBe(false);
     }
   });
 
   it("accepts wolf-private text, quick replies, and target suggestions", () => {
-    expect(chatSendRequestSchema.parse({
-      channel: "wolf-private",
-      content: { kind: "text", text: ` ${"x".repeat(80)} ` }
-    }).content).toEqual({ kind: "text", text: "x".repeat(80) });
+    expect(
+      chatSendRequestSchema.parse({
+        channel: "wolf-private",
+        content: { kind: "text", text: ` ${"x".repeat(80)} ` }
+      }).content
+    ).toEqual({ kind: "text", text: "x".repeat(80) });
 
     for (const code of ["agree", "disagree", "no-kill"] as const) {
-      expect(chatSendRequestSchema.parse({
-        channel: "wolf-private",
-        content: { kind: "quick", code }
-      }).content).toEqual({ kind: "quick", code });
+      expect(
+        chatSendRequestSchema.parse({
+          channel: "wolf-private",
+          content: { kind: "quick", code }
+        }).content
+      ).toEqual({ kind: "quick", code });
     }
 
-    expect(chatSendRequestSchema.parse({
-      channel: "wolf-private",
-      content: { kind: "target-suggestion", target: targetId }
-    }).content).toEqual({ kind: "target-suggestion", target: targetId });
+    expect(
+      chatSendRequestSchema.parse({
+        channel: "wolf-private",
+        content: { kind: "target-suggestion", target: targetId }
+      }).content
+    ).toEqual({ kind: "target-suggestion", target: targetId });
   });
 
   it("rejects system client messages and invalid text boundaries", () => {
-    expect(chatSendRequestSchema.safeParse({
-      channel: "system",
-      content: { kind: "system", text: "Forged system message" }
-    }).success).toBe(false);
+    expect(
+      chatSendRequestSchema.safeParse({
+        channel: "system",
+        content: { kind: "system", text: "Forged system message" }
+      }).success
+    ).toBe(false);
 
     for (const request of [
       { channel: "day-public", content: { kind: "text", text: "   " } },
@@ -515,10 +528,12 @@ describe("shared chat schemas", () => {
         nickname: "Player 2"
       }
     ]) {
-      expect(chatSendRequestSchema.safeParse({
-        channel: "wolf-private",
-        content: { kind: "target-suggestion", target }
-      }).success).toBe(false);
+      expect(
+        chatSendRequestSchema.safeParse({
+          channel: "wolf-private",
+          content: { kind: "target-suggestion", target }
+        }).success
+      ).toBe(false);
     }
   });
 
@@ -528,38 +543,32 @@ describe("shared chat schemas", () => {
       limit: 100
     });
 
-    for (const request of [
-      { sessionId },
-      { channels: ["day-public"] },
-      { afterSequence: 0, limit: 100, extra: true }
-    ]) {
+    for (const request of [{ sessionId }, { channels: ["day-public"] }, { afterSequence: 0, limit: 100, extra: true }]) {
       expect(chatHistoryRequestSchema.safeParse(request).success).toBe(false);
     }
   });
 
   it("validates chat history pagination boundaries", () => {
-    expect(chatHistoryRequestSchema.parse({
-      afterSequence: 0,
-      limit: 1
-    })).toEqual({
+    expect(
+      chatHistoryRequestSchema.parse({
+        afterSequence: 0,
+        limit: 1
+      })
+    ).toEqual({
       afterSequence: 0,
       limit: 1
     });
-    expect(chatHistoryRequestSchema.parse({
-      afterSequence: Number.MAX_SAFE_INTEGER,
-      limit: 100
-    })).toEqual({
+    expect(
+      chatHistoryRequestSchema.parse({
+        afterSequence: Number.MAX_SAFE_INTEGER,
+        limit: 100
+      })
+    ).toEqual({
       afterSequence: Number.MAX_SAFE_INTEGER,
       limit: 100
     });
 
-    for (const request of [
-      { afterSequence: -1 },
-      { afterSequence: 0.5 },
-      { limit: 0 },
-      { limit: 101 },
-      { limit: 1.5 }
-    ]) {
+    for (const request of [{ afterSequence: -1 }, { afterSequence: 0.5 }, { limit: 0 }, { limit: 101 }, { limit: 1.5 }]) {
       expect(chatHistoryRequestSchema.safeParse(request).success).toBe(false);
     }
   });
@@ -587,13 +596,17 @@ describe("shared chat schemas", () => {
     };
 
     expect(chatHistoryPageSchema.parse(page)).toEqual(page);
-    expect(chatHistoryPageSchema.safeParse({
-      ...page,
-      latestSequence: -1
-    }).success).toBe(false);
-    expect(chatHistoryPageSchema.safeParse({
-      ...page,
-      extra: true
-    }).success).toBe(false);
+    expect(
+      chatHistoryPageSchema.safeParse({
+        ...page,
+        latestSequence: -1
+      }).success
+    ).toBe(false);
+    expect(
+      chatHistoryPageSchema.safeParse({
+        ...page,
+        extra: true
+      }).success
+    ).toBe(false);
   });
 });

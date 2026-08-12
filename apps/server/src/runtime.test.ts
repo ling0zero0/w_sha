@@ -26,11 +26,16 @@ function createRuntime() {
 describe("game runtime host control framework", () => {
   it("restores an active private game offline and paused with reconnect credentials intact", () => {
     const runtime = createRuntime();
-    const sessions = ["林野", "阿岚", "青禾", "南星"].map((nickname, index) => runtime.room.join({
-      roomCode: "123456",
-      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
-      nickname
-    }, `socket-${index}`));
+    const sessions = ["林野", "阿岚", "青禾", "南星"].map((nickname, index) =>
+      runtime.room.join(
+        {
+          roomCode: "123456",
+          joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+          nickname
+        },
+        `socket-${index}`
+      )
+    );
     if (sessions.some((session) => !session.ok)) throw new Error("test setup failed");
     runtime.room.updateRoleConfiguration({ wolf: 1, villager: 2, seer: 1, witch: 0 });
     runtime.room.startGame();
@@ -59,9 +64,11 @@ describe("game runtime host control framework", () => {
     expect(restored.getPublicGameState().clock).toMatchObject({ status: "paused", remainingMs: 60_000 });
     expect(restored.room.getPlayerView(wolf.selfId)?.wolfAction).toMatchObject({
       target: "no-kill",
-      messages: [expect.objectContaining({
-        content: { kind: "text", text: "恢复后仍应存在" }
-      })]
+      messages: [
+        expect.objectContaining({
+          content: { kind: "text", text: "恢复后仍应存在" }
+        })
+      ]
     });
     const original = sessions.find((session) => session.ok && session.data.lobby.selfId === wolf.selfId);
     if (!original?.ok) throw new Error("test setup failed");
@@ -73,11 +80,16 @@ describe("game runtime host control framework", () => {
 
   it("imports legacy v1 wolf chat into SQLite during recovery", () => {
     const runtime = createRuntime();
-    const sessions = ["林野", "阿岚", "青禾"].map((nickname, index) => runtime.room.join({
-      roomCode: "123456",
-      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
-      nickname
-    }, `socket-v1-${index}`));
+    const sessions = ["林野", "阿岚", "青禾"].map((nickname, index) =>
+      runtime.room.join(
+        {
+          roomCode: "123456",
+          joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+          nickname
+        },
+        `socket-v1-${index}`
+      )
+    );
     if (sessions.some((session) => !session.ok)) throw new Error("test setup failed");
     runtime.room.updateRoleConfiguration({ wolf: 1, villager: 1, seer: 1, witch: 0 });
     runtime.room.startGame(new Date("2026-07-19T08:00:00.000Z"));
@@ -94,30 +106,27 @@ describe("game runtime host control framework", () => {
     );
     if (!sent.ok || sent.data.content.kind !== "text") throw new Error("test setup failed");
     const current = runtime.createSnapshot(2_000);
-    const {
-      chatMessages: _chatMessages,
-      chatSequence: _chatSequence,
-      gameSessionId: _gameSessionId,
-      ...legacyRoom
-    } = current.room;
+    const { chatMessages: _chatMessages, chatSequence: _chatSequence, gameSessionId: _gameSessionId, ...legacyRoom } = current.room;
     const legacySnapshot: GameRuntimeSnapshot = {
       ...current,
       version: 1,
       room: {
         ...legacyRoom,
         version: 1,
-        wolfMessages: [{
-          id: sent.data.id,
-          sender: {
-            id: wolf.selfId,
-            number: sent.data.sender.kind === "system" ? 0 : sent.data.sender.number,
-            nickname: sent.data.sender.kind === "system" ? "法官" : sent.data.sender.nickname
-          },
-          kind: "text",
-          text: sent.data.content.text,
-          target: null,
-          createdAt: sent.data.createdAt
-        }]
+        wolfMessages: [
+          {
+            id: sent.data.id,
+            sender: {
+              id: wolf.selfId,
+              number: sent.data.sender.kind === "system" ? 0 : sent.data.sender.number,
+              nickname: sent.data.sender.kind === "system" ? "法官" : sent.data.sender.nickname
+            },
+            kind: "text",
+            text: sent.data.content.text,
+            target: null,
+            createdAt: sent.data.createdAt
+          }
+        ]
       }
     };
     const store = createChatStore();
@@ -129,18 +138,16 @@ describe("game runtime host control framework", () => {
       chatPersistence: store
     });
 
-    expect(restored.room.getChatHistory(
-      { kind: "player", playerId: wolf.selfId },
-      0,
-      100
-    )).toMatchObject({
+    expect(restored.room.getChatHistory({ kind: "player", playerId: wolf.selfId }, 0, 100)).toMatchObject({
       ok: true,
       data: {
-        messages: [{
-          sequence: 1,
-          channel: "wolf-private",
-          content: { kind: "text", text: "旧版狼聊" }
-        }],
+        messages: [
+          {
+            sequence: 1,
+            channel: "wolf-private",
+            content: { kind: "text", text: "旧版狼聊" }
+          }
+        ],
         latestSequence: 1,
         hasMore: false
       }
@@ -156,11 +163,16 @@ describe("game runtime host control framework", () => {
       joinToken: "abcdefghijklmnopqrstuvwxyz123456",
       chatPersistence: store
     });
-    const sessions = ["林野", "阿岚", "青禾"].map((nickname, index) => runtime.room.join({
-      roomCode: "123456",
-      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
-      nickname
-    }, `socket-v2-${index}`));
+    const sessions = ["林野", "阿岚", "青禾"].map((nickname, index) =>
+      runtime.room.join(
+        {
+          roomCode: "123456",
+          joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+          nickname
+        },
+        `socket-v2-${index}`
+      )
+    );
     if (sessions.some((session) => !session.ok)) throw new Error("test setup failed");
     runtime.room.updateRoleConfiguration({ wolf: 1, villager: 1, seer: 1, witch: 0 });
     runtime.room.startGame(new Date("2026-07-19T09:00:00.000Z"));
@@ -171,11 +183,9 @@ describe("game runtime host control framework", () => {
         return runtime.room.getPlayerView(session.data.lobby.selfId)!;
       })
       .find((view) => view.privateRole?.role === "wolf")!;
-    expect(runtime.room.sendChat(
-      wolf.selfId,
-      { channel: "wolf-private", content: { kind: "text", text: "数据库中的消息" } },
-      new Date("2026-07-19T09:00:01.000Z")
-    )).toMatchObject({ ok: true, data: { sequence: 1 } });
+    expect(
+      runtime.room.sendChat(wolf.selfId, { channel: "wolf-private", content: { kind: "text", text: "数据库中的消息" } }, new Date("2026-07-19T09:00:01.000Z"))
+    ).toMatchObject({ ok: true, data: { sequence: 1 } });
 
     const snapshot = runtime.createSnapshot(2_000);
     expect(snapshot).toMatchObject({
@@ -206,11 +216,16 @@ describe("game runtime host control framework", () => {
 
   it("records public host interventions without private game data", () => {
     const runtime = createRuntime();
-    const sessions = ["林野", "阿岚", "青禾"].map((nickname, index) => runtime.room.join({
-      roomCode: "123456",
-      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
-      nickname
-    }, `socket-${index}`));
+    const sessions = ["林野", "阿岚", "青禾"].map((nickname, index) =>
+      runtime.room.join(
+        {
+          roomCode: "123456",
+          joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+          nickname
+        },
+        `socket-${index}`
+      )
+    );
     if (sessions.some((session) => !session.ok)) throw new Error("test setup failed");
     runtime.room.updateRoleConfiguration({ wolf: 1, villager: 1, seer: 1, witch: 0 });
     runtime.room.startGame();
@@ -265,11 +280,14 @@ describe("game runtime host control framework", () => {
 
   it("records player departure as a public host intervention", () => {
     const runtime = createRuntime();
-    const joined = runtime.room.join({
-      roomCode: "123456",
-      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
-      nickname: "阿岚"
-    }, "socket-a");
+    const joined = runtime.room.join(
+      {
+        roomCode: "123456",
+        joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+        nickname: "阿岚"
+      },
+      "socket-a"
+    );
     if (!joined.ok) throw new Error("test setup failed");
 
     const departed = runtime.departPlayer(joined.data.lobby.selfId, 10_000);
@@ -280,10 +298,12 @@ describe("game runtime host control framework", () => {
         view: { players: [expect.objectContaining({ connection: "departed" })] },
         game: {
           revision: 1,
-          interventions: [expect.objectContaining({
-            type: "depart-player",
-            detail: "主机将 1 号玩家阿岚判定为离场"
-          })]
+          interventions: [
+            expect.objectContaining({
+              type: "depart-player",
+              detail: "主机将 1 号玩家阿岚判定为离场"
+            })
+          ]
         }
       }
     });
@@ -293,11 +313,16 @@ describe("game runtime host control framework", () => {
 
   it("skips a running night stage with a public intervention", () => {
     const runtime = createRuntime();
-    const sessions = ["林野", "阿岚", "青禾"].map((nickname, index) => runtime.room.join({
-      roomCode: "123456",
-      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
-      nickname
-    }, `socket-${index}`));
+    const sessions = ["林野", "阿岚", "青禾"].map((nickname, index) =>
+      runtime.room.join(
+        {
+          roomCode: "123456",
+          joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+          nickname
+        },
+        `socket-${index}`
+      )
+    );
     if (sessions.some((session) => !session.ok)) throw new Error("test setup failed");
     runtime.room.updateRoleConfiguration({ wolf: 1, villager: 1, seer: 1, witch: 0 });
     runtime.room.startGame();
@@ -313,10 +338,12 @@ describe("game runtime host control framework", () => {
       ok: true,
       data: {
         clock: { status: "ended" },
-        interventions: [expect.objectContaining({
-          type: "skip-phase",
-          detail: "主机跳过了当前夜间阶段"
-        })]
+        interventions: [
+          expect.objectContaining({
+            type: "skip-phase",
+            detail: "主机跳过了当前夜间阶段"
+          })
+        ]
       }
     });
     expect(runtime.room.getNightStage()).toBe("seer");
@@ -325,11 +352,16 @@ describe("game runtime host control framework", () => {
 
   it("skips a running day stage without exposing private ballots", () => {
     const runtime = createRuntime();
-    const sessions = ["林野", "阿岚", "青禾"].map((nickname, index) => runtime.room.join({
-      roomCode: "123456",
-      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
-      nickname
-    }, `socket-${index}`));
+    const sessions = ["林野", "阿岚", "青禾"].map((nickname, index) =>
+      runtime.room.join(
+        {
+          roomCode: "123456",
+          joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+          nickname
+        },
+        `socket-${index}`
+      )
+    );
     if (sessions.some((session) => !session.ok)) throw new Error("test setup failed");
     runtime.room.updateRoleConfiguration({ wolf: 1, villager: 1, seer: 1, witch: 0 });
     runtime.room.startGame();
@@ -352,10 +384,12 @@ describe("game runtime host control framework", () => {
     const skipped = runtime.skipDayPhase(10_000);
 
     expect(skipped).toMatchObject({ ok: true, data: { clock: { status: "ended" } } });
-    expect(runtime.getPublicInterventions()).toContainEqual(expect.objectContaining({
-      type: "skip-phase",
-      detail: "主机跳过了当前白天阶段"
-    }));
+    expect(runtime.getPublicInterventions()).toContainEqual(
+      expect.objectContaining({
+        type: "skip-phase",
+        detail: "主机跳过了当前白天阶段"
+      })
+    );
     expect(JSON.stringify(skipped)).not.toMatch(/dayVoteTarget|ballot|target/);
   });
 });

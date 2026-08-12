@@ -20,10 +20,12 @@ describe("surface routing", () => {
   });
 
   it("reads a validated invitation from the URL", () => {
-    expect(getJoinInvitation({
-      pathname: "/join/123456",
-      search: "?t=abcdefghijklmnopqrstuvwxyz123456"
-    })).toEqual({
+    expect(
+      getJoinInvitation({
+        pathname: "/join/123456",
+        search: "?t=abcdefghijklmnopqrstuvwxyz123456"
+      })
+    ).toEqual({
       roomCode: "123456",
       joinToken: "abcdefghijklmnopqrstuvwxyz123456"
     });

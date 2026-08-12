@@ -24,12 +24,7 @@ describe("ActionLedger", () => {
     expect(ledger.lookup("host", "host:pause-phase", actionId, fingerprint)).toEqual({
       kind: "conflict"
     });
-    expect(ledger.lookup(
-      "host",
-      "host:adjust-phase-time",
-      actionId,
-      actionFingerprint({ deltaMs: -15_000 })
-    )).toEqual({ kind: "conflict" });
+    expect(ledger.lookup("host", "host:adjust-phase-time", actionId, actionFingerprint({ deltaMs: -15_000 }))).toEqual({ kind: "conflict" });
   });
 
   it("expires entries after the configured TTL", () => {
@@ -66,8 +61,7 @@ describe("ActionLedger", () => {
   });
 
   it("uses the same fingerprint for objects with different key order", () => {
-    expect(actionFingerprint({ b: 2, a: { d: 4, c: 3 } }))
-      .toBe(actionFingerprint({ a: { c: 3, d: 4 }, b: 2 }));
+    expect(actionFingerprint({ b: 2, a: { d: 4, c: 3 } })).toBe(actionFingerprint({ a: { c: 3, d: 4 }, b: 2 }));
     expect(actionFingerprint(undefined)).not.toBe(actionFingerprint(null));
   });
 
@@ -76,24 +70,14 @@ describe("ActionLedger", () => {
     const actionId = "66666666-6666-4666-8666-666666666666";
     const fingerprint = actionFingerprint({ nickname: "接管目标" });
 
-    ledger.record(
-      "player:lifecycle",
-      "player:request-takeover",
-      actionId,
-      fingerprint,
-      result,
-      { kind: "takeover", state: "pending" }
-    );
-    expect(ledger.setMetadata("player:lifecycle", actionId, {
-      kind: "takeover",
-      state: "approved"
-    })).toBe(true);
-    expect(ledger.lookup(
-      "player:lifecycle",
-      "player:request-takeover",
-      actionId,
-      fingerprint
-    )).toEqual({
+    ledger.record("player:lifecycle", "player:request-takeover", actionId, fingerprint, result, { kind: "takeover", state: "pending" });
+    expect(
+      ledger.setMetadata("player:lifecycle", actionId, {
+        kind: "takeover",
+        state: "approved"
+      })
+    ).toBe(true);
+    expect(ledger.lookup("player:lifecycle", "player:request-takeover", actionId, fingerprint)).toEqual({
       kind: "replay",
       result,
       metadata: { kind: "takeover", state: "approved" }
@@ -112,31 +96,17 @@ describe("ActionLedger", () => {
     };
 
     const first = new ActionLedger({ databasePath, secretBox });
-    first.record(
-      "player:lifecycle",
-      "player:join",
-      actionId,
-      fingerprint,
-      persistedResult,
-      { kind: "session", credential: "sensitive-session" }
-    );
+    first.record("player:lifecycle", "player:join", actionId, fingerprint, persistedResult, { kind: "session", credential: "sensitive-session" });
     first.close();
 
     const database = new DatabaseSync(databasePath);
-    const row = database.prepare(
-      "SELECT encrypted_payload FROM action_ledger WHERE action_id = ?"
-    ).get(actionId) as { encrypted_payload: string };
+    const row = database.prepare("SELECT encrypted_payload FROM action_ledger WHERE action_id = ?").get(actionId) as { encrypted_payload: string };
     database.close();
     expect(row.encrypted_payload).not.toContain("sensitive-reconnect-token");
     expect(row.encrypted_payload).not.toContain("sensitive-session");
 
     const restored = new ActionLedger({ databasePath, secretBox });
-    expect(restored.lookup(
-      "player:lifecycle",
-      "player:join",
-      actionId,
-      fingerprint
-    )).toEqual({
+    expect(restored.lookup("player:lifecycle", "player:join", actionId, fingerprint)).toEqual({
       kind: "replay",
       result: persistedResult,
       metadata: { kind: "session", credential: "sensitive-session" }
@@ -149,11 +119,7 @@ describe("ActionLedger", () => {
     const directory = mkdtempSync(join(tmpdir(), "werewolf-action-ledger-capacity-"));
     const databasePath = join(directory, "runtime.sqlite");
     const secretBox = new AesGcmSecretBox(randomBytes(32));
-    const actionIds = [
-      "88888888-8888-4888-8888-888888888888",
-      "99999999-9999-4999-8999-999999999999",
-      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
-    ] as const;
+    const actionIds = ["88888888-8888-4888-8888-888888888888", "99999999-9999-4999-8999-999999999999", "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"] as const;
     const fingerprint = actionFingerprint({ value: true });
 
     try {

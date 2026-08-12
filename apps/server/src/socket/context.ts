@@ -31,19 +31,9 @@ export interface SocketData {
   pendingTakeoverRequestId?: string;
 }
 
-export type GameSocketServer = Server<
-  ClientToServerEvents,
-  ServerToClientEvents,
-  Record<string, never>,
-  SocketData
->;
+export type GameSocketServer = Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
 
-export type GameSocket = Socket<
-  ClientToServerEvents,
-  ServerToClientEvents,
-  Record<string, never>,
-  SocketData
->;
+export type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
 
 export interface SocketHandlerContext {
   automaticPhaseProgression: boolean;
@@ -68,9 +58,11 @@ export interface ParsedAction<T> {
   payload: T;
 }
 
-const actionEnvelopeSchema = z.object({
-  actionId: actionIdSchema
-}).passthrough();
+const actionEnvelopeSchema = z
+  .object({
+    actionId: actionIdSchema
+  })
+  .passthrough();
 
 export function parseActionPayload<T>(schema: ZodType<T>, rawPayload: unknown): ParsedAction<T> {
   if (isObject(rawPayload) && "actionId" in rawPayload) {
@@ -148,22 +140,15 @@ export function handlePlayerActionRequest<T, P>(
   action: (playerId: PlayerId, payload: P) => RoomActionResult<T>,
   afterSuccess: (result: RoomActionResult<T>) => void
 ): void {
-  if (!playerId) return ack({
-    ok: false,
-    code: "INVALID_RECONNECT_CREDENTIALS",
-    message: "玩家会话无效，请重新连接"
-  });
+  if (!playerId)
+    return ack({
+      ok: false,
+      code: "INVALID_RECONNECT_CREDENTIALS",
+      message: "玩家会话无效，请重新连接"
+    });
   try {
     const parsed = parseActionPayload(schema, rawPayload);
-    executeIdempotentAction(
-      ledger,
-      `player:${playerId}`,
-      event,
-      parsed,
-      ack,
-      () => action(playerId, parsed.payload),
-      afterSuccess
-    );
+    executeIdempotentAction(ledger, `player:${playerId}`, event, parsed, ack, () => action(playerId, parsed.payload), afterSuccess);
   } catch (error) {
     ack(invalidRequest(error));
   }
@@ -227,11 +212,12 @@ export function handlePlayerViewAction<T>(
   action: () => { ok: true; data: T } | RoomActionFailure,
   afterSuccess: () => void
 ): void {
-  if (!playerId) return ack({
-    ok: false,
-    code: "INVALID_RECONNECT_CREDENTIALS",
-    message: "玩家会话无效，请重新连接"
-  });
+  if (!playerId)
+    return ack({
+      ok: false,
+      code: "INVALID_RECONNECT_CREDENTIALS",
+      message: "玩家会话无效，请重新连接"
+    });
   try {
     const result = action();
     ack(result);

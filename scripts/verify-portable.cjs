@@ -1,22 +1,22 @@
-'use strict';
+"use strict";
 
-const fs = require('node:fs');
-const net = require('node:net');
-const path = require('node:path');
-const { spawn } = require('node:child_process');
+const fs = require("node:fs");
+const net = require("node:net");
+const path = require("node:path");
+const { spawn } = require("node:child_process");
 
-const productRoot = path.resolve(process.argv[2] ?? '');
-const nodePath = path.join(productRoot, 'node.exe');
-const entryPath = path.join(productRoot, 'app', 'server', 'dist', 'index.js');
-const webRoot = path.join(productRoot, 'app', 'public');
-const verificationRoot = path.join(productRoot, '.verification');
-const databasePath = path.join(verificationRoot, 'werewolf.sqlite');
+const productRoot = path.resolve(process.argv[2] ?? "");
+const nodePath = path.join(productRoot, "node.exe");
+const entryPath = path.join(productRoot, "app", "server", "dist", "index.js");
+const webRoot = path.join(productRoot, "app", "public");
+const verificationRoot = path.join(productRoot, ".verification");
+const databasePath = path.join(verificationRoot, "werewolf.sqlite");
 
 async function getAvailablePort() {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
       const address = server.address();
       server.close(() => resolve(address.port));
     });
@@ -34,45 +34,46 @@ async function waitFor(url, child) {
     }
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
-  throw new Error('Packaged server did not become ready.');
+  throw new Error("Packaged server did not become ready.");
 }
 
 async function stopChild(child) {
   if (child.exitCode !== null) return;
-  child.kill('SIGTERM');
-  await Promise.race([
-    new Promise((resolve) => child.once('exit', resolve)),
-    new Promise((resolve) => setTimeout(resolve, 3_000))
-  ]);
-  if (child.exitCode === null) child.kill('SIGKILL');
+  child.kill("SIGTERM");
+  await Promise.race([new Promise((resolve) => child.once("exit", resolve)), new Promise((resolve) => setTimeout(resolve, 3_000))]);
+  if (child.exitCode === null) child.kill("SIGKILL");
 }
 
 async function main() {
   if (!fs.existsSync(nodePath) || !fs.existsSync(entryPath) || !fs.existsSync(webRoot)) {
-    throw new Error('Portable package is incomplete.');
+    throw new Error("Portable package is incomplete.");
   }
 
   fs.rmSync(verificationRoot, { recursive: true, force: true });
   fs.mkdirSync(verificationRoot, { recursive: true });
   const port = await getAvailablePort();
-  let output = '';
+  let output = "";
   const child = spawn(nodePath, [entryPath], {
     cwd: productRoot,
     windowsHide: true,
     env: {
       ...process.env,
-      HOST: '127.0.0.1',
+      HOST: "127.0.0.1",
       PORT: String(port),
       WEB_PORT: String(port),
-      NODE_ENV: 'production',
-      OPEN_BROWSER: '0',
+      NODE_ENV: "production",
+      OPEN_BROWSER: "0",
       WEB_ROOT: webRoot,
       DATABASE_PATH: databasePath
     },
-    stdio: ['ignore', 'pipe', 'pipe']
+    stdio: ["ignore", "pipe", "pipe"]
   });
-  child.stdout.on('data', (chunk) => { output += chunk; });
-  child.stderr.on('data', (chunk) => { output += chunk; });
+  child.stdout.on("data", (chunk) => {
+    output += chunk;
+  });
+  child.stderr.on("data", (chunk) => {
+    output += chunk;
+  });
 
   try {
     const baseUrl = `http://127.0.0.1:${port}`;
@@ -84,10 +85,10 @@ async function main() {
       headers: { referer: `${baseUrl}/` }
     });
 
-    if (!home.ok || !homeBody.includes('id="root"')) throw new Error('Packaged home page is invalid.');
-    if (!join.ok || !(await join.text()).includes('id="root"')) throw new Error('Packaged join route is invalid.');
-    if (!hostApi.ok || !(await hostApi.json()).sessionToken) throw new Error('Packaged host API is invalid.');
-    if (!fs.existsSync(databasePath)) throw new Error('Packaged database was not created.');
+    if (!home.ok || !homeBody.includes('id="root"')) throw new Error("Packaged home page is invalid.");
+    if (!join.ok || !(await join.text()).includes('id="root"')) throw new Error("Packaged join route is invalid.");
+    if (!hostApi.ok || !(await hostApi.json()).sessionToken) throw new Error("Packaged host API is invalid.");
+    if (!fs.existsSync(databasePath)) throw new Error("Packaged database was not created.");
   } catch (error) {
     if (output) console.error(output);
     throw error;
@@ -96,7 +97,7 @@ async function main() {
     fs.rmSync(verificationRoot, { recursive: true, force: true });
   }
 
-  console.log('Portable package verification passed.');
+  console.log("Portable package verification passed.");
 }
 
 main().catch((error) => {

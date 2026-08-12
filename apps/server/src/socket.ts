@@ -22,12 +22,7 @@ import { BudgetLedger } from "./ai/budget-ledger.js";
 import { LlmBotAdapter } from "./ai/llm-bot-adapter.js";
 import { DeterministicBotAdapter } from "./bot-manager.js";
 import type { TimedStage } from "./room.js";
-import {
-  invalidRequest,
-  type GameSocketServer,
-  type SocketData,
-  type SocketHandlerContext
-} from "./socket/context.js";
+import { invalidRequest, type GameSocketServer, type SocketData, type SocketHandlerContext } from "./socket/context.js";
 import { registerHostHandlers } from "./socket/host-handlers.js";
 import { registerPlayerHandlers } from "./socket/player-handlers.js";
 import { ActionLedger } from "./socket/action-ledger.js";
@@ -72,12 +67,7 @@ export function attachSocketServer(
     publicPort: runtime.room.webPort,
     additionalOrigins: additionalSocketOrigins
   });
-  const io: GameSocketServer = new Server<
-    ClientToServerEvents,
-    ServerToClientEvents,
-    Record<string, never>,
-    SocketData
-  >(server, {
+  const io: GameSocketServer = new Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>(server, {
     cors: {
       origin: (origin, callback) => {
         callback(null, socketOriginPolicy.isAllowed(origin));
@@ -114,9 +104,7 @@ export function attachSocketServer(
     const timing = activeStageTiming[stage];
     const minimumRemainingThreshold = timing.maximumMs - timing.minimumMs;
     const completed = runtime.room.isTimedStageComplete();
-    const delayMs = completed
-      ? Math.max(0, clock.remainingMs - minimumRemainingThreshold)
-      : clock.remainingMs;
+    const delayMs = completed ? Math.max(0, clock.remainingMs - minimumRemainingThreshold) : clock.remainingMs;
     phaseTimer = setTimeout(() => {
       phaseTimer = null;
       if (runtime.room.getTimedStageKey() !== stageKey) return;
@@ -154,11 +142,13 @@ export function attachSocketServer(
   }
 
   function nightActionPaused(): RoomActionFailure | null {
-    return runtime.isPhasePaused() ? {
-      ok: false,
-      code: "INVALID_PHASE_CONTROL",
-      message: "当前阶段已暂停，暂时不能操作"
-    } : null;
+    return runtime.isPhasePaused()
+      ? {
+          ok: false,
+          code: "INVALID_PHASE_CONTROL",
+          message: "当前阶段已暂停，暂时不能操作"
+        }
+      : null;
   }
 
   function clearOfflineTimer(playerId: PlayerId): void {
@@ -234,13 +224,7 @@ export function attachSocketServer(
   botManager = new BotManager({
     room: runtime.room,
     execute: (playerId, intent, expectedRevision) => {
-      const result = executeBotIntent(
-        runtime.room,
-        playerId,
-        intent,
-        expectedRevision,
-        runtime.isPhasePaused()
-      );
+      const result = executeBotIntent(runtime.room, playerId, intent, expectedRevision, runtime.isPhasePaused());
       if (!result.accepted) return false;
       if (result.chatMessage) emitChatMessage(result.chatMessage);
       syncPhaseClock();
@@ -260,18 +244,13 @@ export function attachSocketServer(
         providers: aiServices.providers,
         budgetLedger: aiBudgetLedger,
         ...(aiServices.auditStore ? { auditStore: aiServices.auditStore } : {}),
-        ...(aiServices.gameTokenBudget === undefined
-          ? {}
-          : { gameTokenBudget: aiServices.gameTokenBudget }),
+        ...(aiServices.gameTokenBudget === undefined ? {} : { gameTokenBudget: aiServices.gameTokenBudget }),
         ...(lockedConfiguration ? { lockedConfiguration } : {}),
         onConfigurationLocked: (lock) => {
           runtime.room.lockBotConfiguration(playerId, lock);
           persistSnapshot();
         },
-        onFallback: (reason, modelErrorCode) => logger.warn(
-          { playerId, reason, modelErrorCode },
-          "LLM bot used deterministic fallback"
-        )
+        onFallback: (reason, modelErrorCode) => logger.warn({ playerId, reason, modelErrorCode }, "LLM bot used deterministic fallback")
       });
     },
     onError: (error, playerId) => {
@@ -330,13 +309,8 @@ export function attachSocketServer(
 
     socket.on("disconnect", (reason) => {
       const changedPlayer = runtime.room.setReconnecting(socket.id);
-      const preservedTakeoverRequestId = socket.data.pendingTakeoverActionId
-        ? socket.data.pendingTakeoverRequestId ?? null
-        : null;
-      const removedTakeoverRequest = runtime.room.cancelTakeoverRequests(
-        socket.id,
-        preservedTakeoverRequestId
-      );
+      const preservedTakeoverRequestId = socket.data.pendingTakeoverActionId ? (socket.data.pendingTakeoverRequestId ?? null) : null;
+      const removedTakeoverRequest = runtime.room.cancelTakeoverRequests(socket.id, preservedTakeoverRequestId);
       if (changedPlayer) {
         emitLobbyViews();
         clearOfflineTimer(changedPlayer);

@@ -1,12 +1,5 @@
 import { randomBytes } from "node:crypto";
-import {
-  copyFileSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  unlinkSync,
-  writeFileSync
-} from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { AesGcmSecretBox } from "./secret-box.js";
 import { protectForCurrentWindowsUser, unprotectForCurrentWindowsUser } from "./windows-dpapi.js";
@@ -20,10 +13,7 @@ interface StoredMasterKey {
   protectedAtRest: boolean;
 }
 
-export function loadOrCreateSecretBox(
-  databasePath: string,
-  configuredKey?: string
-): AesGcmSecretBox {
+export function loadOrCreateSecretBox(databasePath: string, configuredKey?: string): AesGcmSecretBox {
   if (configuredKey) return AesGcmSecretBox.fromBase64(configuredKey);
   if (databasePath === ":memory:") return new AesGcmSecretBox(randomBytes(32));
 
@@ -60,9 +50,7 @@ function readSecretBox(path: string): StoredMasterKey {
   if (protectedAtRest && !isWindows()) {
     throw new Error("Windows DPAPI protected master key requires Windows");
   }
-  const encodedKey = protectedAtRest
-    ? unprotectForCurrentWindowsUser(storedValue.slice(windowsDpapiPrefix.length))
-    : storedValue;
+  const encodedKey = protectedAtRest ? unprotectForCurrentWindowsUser(storedValue.slice(windowsDpapiPrefix.length)) : storedValue;
   return {
     box: AesGcmSecretBox.fromBase64(encodedKey),
     encodedKey,
@@ -106,9 +94,7 @@ function replaceStoredKey(path: string, encodedKey: string): void {
 }
 
 function formatStoredKey(encodedKey: string): string {
-  return isWindows()
-    ? `${windowsDpapiPrefix}${protectForCurrentWindowsUser(encodedKey)}`
-    : encodedKey;
+  return isWindows() ? `${windowsDpapiPrefix}${protectForCurrentWindowsUser(encodedKey)}` : encodedKey;
 }
 
 function isWindows(): boolean {

@@ -27,11 +27,14 @@ describe("SQLite runtime snapshots", () => {
     });
 
     store.save(runtime.createSnapshot(), new Date("2026-07-16T00:00:00.000Z"));
-    runtime.room.join({
-      roomCode: "123456",
-      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
-      nickname: "林野"
-    }, "socket-a");
+    runtime.room.join(
+      {
+        roomCode: "123456",
+        joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+        nickname: "林野"
+      },
+      "socket-a"
+    );
     store.save(runtime.createSnapshot(), new Date("2026-07-16T00:00:01.000Z"));
 
     expect(store.load()?.room.players).toHaveLength(1);
@@ -51,11 +54,13 @@ describe("SQLite runtime snapshots", () => {
     });
     const botProfileId = "11111111-1111-4111-8111-111111111111";
 
-    expect(runtime.room.addBot({
-      nickname: "LLM Bot",
-      botKind: "llm",
-      botProfileId
-    })).toMatchObject({ ok: true });
+    expect(
+      runtime.room.addBot({
+        nickname: "LLM Bot",
+        botKind: "llm",
+        botProfileId
+      })
+    ).toMatchObject({ ok: true });
     const botId = runtime.room.getBotSeats()[0]!.playerId;
     runtime.room.lockBotConfiguration(botId, {
       botProfileRevision: 2,
@@ -70,15 +75,17 @@ describe("SQLite runtime snapshots", () => {
       version: 3,
       room: {
         version: 3,
-        players: [{
-          controller: "bot",
-          botKind: "llm",
-          botProfileId,
-          aiConfigurationLocked: true,
-          aiBotProfileRevision: 2,
-          aiModelProfileId: "22222222-2222-4222-8222-222222222222",
-          aiModelProfileRevision: 3
-        }]
+        players: [
+          {
+            controller: "bot",
+            botKind: "llm",
+            botProfileId,
+            aiConfigurationLocked: true,
+            aiBotProfileRevision: 2,
+            aiModelProfileId: "22222222-2222-4222-8222-222222222222",
+            aiModelProfileRevision: 3
+          }
+        ]
       }
     });
 
@@ -112,11 +119,14 @@ describe("SQLite runtime snapshots", () => {
       joinToken: "abcdefghijklmnopqrstuvwxyz123456"
     });
     const first = runtime.createSnapshot();
-    runtime.room.join({
-      roomCode: "123456",
-      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
-      nickname: "鏋楅噹"
-    }, "socket-a");
+    runtime.room.join(
+      {
+        roomCode: "123456",
+        joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+        nickname: "鏋楅噹"
+      },
+      "socket-a"
+    );
     const latest = runtime.createSnapshot();
 
     store.schedule(first, new Date("2026-07-16T00:00:00.000Z"));
@@ -134,24 +144,31 @@ describe("SQLite runtime snapshots", () => {
       roomCode: "123456",
       joinToken: "abcdefghijklmnopqrstuvwxyz123456"
     });
-    runtime.room.join({
-      roomCode: "123456",
-      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
-      nickname: "鏋楅噹"
-    }, "socket-a");
+    runtime.room.join(
+      {
+        roomCode: "123456",
+        joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+        nickname: "鏋楅噹"
+      },
+      "socket-a"
+    );
     const snapshot = runtime.createSnapshot();
 
-    expect(() => gameRuntimeSnapshotSchema.parse({
-      ...snapshot,
-      clockRemainingMs: -1
-    })).toThrow();
-    expect(() => gameRuntimeSnapshotSchema.parse({
-      ...snapshot,
-      room: {
-        ...snapshot.room,
-        players: [{ ...snapshot.room.players[0], reconnectTokenHash: "not-a-base64-hash" }]
-      }
-    })).toThrow();
+    expect(() =>
+      gameRuntimeSnapshotSchema.parse({
+        ...snapshot,
+        clockRemainingMs: -1
+      })
+    ).toThrow();
+    expect(() =>
+      gameRuntimeSnapshotSchema.parse({
+        ...snapshot,
+        room: {
+          ...snapshot.room,
+          players: [{ ...snapshot.room.players[0], reconnectTokenHash: "not-a-base64-hash" }]
+        }
+      })
+    ).toThrow();
   });
 
   it("validates snapshots before save or schedule can write them", () => {
@@ -185,11 +202,14 @@ describe("SQLite runtime snapshots", () => {
     });
     const firstSnapshot = runtime.createSnapshot();
     firstStore.save(firstSnapshot, new Date("2026-07-16T00:00:00.000Z"));
-    runtime.room.join({
-      roomCode: "123456",
-      joinToken: "abcdefghijklmnopqrstuvwxyz123456",
-      nickname: "鏋楅噹"
-    }, "socket-a");
+    runtime.room.join(
+      {
+        roomCode: "123456",
+        joinToken: "abcdefghijklmnopqrstuvwxyz123456",
+        nickname: "鏋楅噹"
+      },
+      "socket-a"
+    );
     firstStore.save(runtime.createSnapshot(), new Date("2026-07-16T00:00:01.000Z"));
     expect(firstStore.checkIntegrity()).toBe(true);
     firstStore.close();

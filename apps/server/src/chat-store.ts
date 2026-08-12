@@ -13,9 +13,7 @@ import {
   type RoleConfigurationInput
 } from "@werewolf/shared";
 
-export type ChatReader =
-  | { kind: "host" }
-  | { kind: "player"; canReadWolfPrivate: boolean };
+export type ChatReader = { kind: "host" } | { kind: "player"; canReadWolfPrivate: boolean };
 
 export interface GameSession {
   id: string;
@@ -95,10 +93,12 @@ function sessionMetadataEqual(
     chatMode: ChatMode;
   }
 ): boolean {
-  return session.roomCode === input.roomCode
-    && session.startedAt === input.startedAt
-    && session.chatMode === input.chatMode
-    && JSON.stringify(session.roleConfiguration) === JSON.stringify(input.roleConfiguration);
+  return (
+    session.roomCode === input.roomCode &&
+    session.startedAt === input.startedAt &&
+    session.chatMode === input.chatMode &&
+    JSON.stringify(session.roleConfiguration) === JSON.stringify(input.roleConfiguration)
+  );
 }
 
 function parseMessage(row: MessageRow): ChatMessage {
@@ -118,12 +118,7 @@ function messagesEqual(left: ChatMessage, right: ChatMessage): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-const sessionOutcomes = new Set<NonNullable<GameResult>["outcome"]>([
-  "good-win",
-  "wolf-win",
-  "draw",
-  "terminated"
-]);
+const sessionOutcomes = new Set<NonNullable<GameResult>["outcome"]>(["good-win", "wolf-win", "draw", "terminated"]);
 
 export class ChatStore {
   private readonly database: DatabaseSync;
@@ -160,8 +155,7 @@ export class ChatStore {
       CREATE INDEX IF NOT EXISTS chat_messages_session_channel_sequence_idx
       ON chat_messages (session_id, channel, sequence);
     `);
-    const sessionColumns = this.database.prepare("PRAGMA table_info(game_sessions)").all() as unknown as
-      Array<{ name: string }>;
+    const sessionColumns = this.database.prepare("PRAGMA table_info(game_sessions)").all() as unknown as Array<{ name: string }>;
     if (!sessionColumns.some((column) => column.name === "chat_mode")) {
       this.database.exec(`
         ALTER TABLE game_sessions
@@ -178,7 +172,8 @@ export class ChatStore {
     assertIsoDateTime(input.startedAt, "startedAt");
 
     try {
-      this.database.prepare(`
+      this.database
+        .prepare(`
         INSERT INTO game_sessions (
           id,
           room_code,
@@ -186,13 +181,8 @@ export class ChatStore {
           role_configuration_json,
           chat_mode
         ) VALUES (?, ?, ?, ?, ?)
-      `).run(
-        input.id,
-        roomCode,
-        input.startedAt,
-        JSON.stringify(roleConfiguration),
-        chatMode
-      );
+      `)
+        .run(input.id, roomCode, input.startedAt, JSON.stringify(roleConfiguration), chatMode);
 
       return {
         id: input.id,
@@ -204,32 +194,39 @@ export class ChatStore {
         chatMode
       };
     } catch (error) {
-      const existingRow = this.database.prepare(`
+      const existingRow = this.database
+        .prepare(`
         SELECT id, room_code, started_at, ended_at, outcome, role_configuration_json, chat_mode
         FROM game_sessions
         WHERE id = ?
-      `).get(input.id) as unknown as SessionRow | undefined;
+      `)
+        .get(input.id) as unknown as SessionRow | undefined;
       if (!existingRow) {
         throw new Error(`could not create chat session ${input.id}`, { cause: error });
       }
 
       const existing = parseSession(existingRow);
-      if (sessionMetadataEqual(existing, {
-        roomCode,
-        startedAt: input.startedAt,
-        roleConfiguration,
-        chatMode
-      })) return existing;
+      if (
+        sessionMetadataEqual(existing, {
+          roomCode,
+          startedAt: input.startedAt,
+          roleConfiguration,
+          chatMode
+        })
+      )
+        return existing;
       throw new Error(`chat session id conflict: ${input.id}`, { cause: error });
     }
   }
 
   getSession(sessionId: string): GameSession | null {
-    const row = this.database.prepare(`
+    const row = this.database
+      .prepare(`
       SELECT id, room_code, started_at, ended_at, outcome, role_configuration_json, chat_mode
       FROM game_sessions
       WHERE id = ?
-    `).get(sessionId) as unknown as SessionRow | undefined;
+    `)
+      .get(sessionId) as unknown as SessionRow | undefined;
     return row ? parseSession(row) : null;
   }
 
@@ -237,18 +234,22 @@ export class ChatStore {
     assertIsoDateTime(input.endedAt, "endedAt");
     if (!sessionOutcomes.has(input.outcome)) throw new Error("invalid game outcome");
 
-    const result = this.database.prepare(`
+    const result = this.database
+      .prepare(`
       UPDATE game_sessions
       SET ended_at = ?, outcome = ?
       WHERE id = ?
-    `).run(input.endedAt, input.outcome, sessionId);
+    `)
+      .run(input.endedAt, input.outcome, sessionId);
     if (result.changes === 0) throw new Error(`chat session not found: ${sessionId}`);
 
-    const row = this.database.prepare(`
+    const row = this.database
+      .prepare(`
       SELECT id, room_code, started_at, ended_at, outcome, role_configuration_json, chat_mode
       FROM game_sessions
       WHERE id = ?
-    `).get(sessionId) as unknown as SessionRow;
+    `)
+      .get(sessionId) as unknown as SessionRow;
     return parseSession(row);
   }
 
@@ -259,11 +260,13 @@ export class ChatStore {
       this.insertMessage(sessionId, message);
       return message;
     } catch (error) {
-      const existingRow = this.database.prepare(`
+      const existingRow = this.database
+        .prepare(`
         SELECT id, session_id, sequence, channel, day, phase, sender_json, content_json, created_at
         FROM chat_messages
         WHERE id = ?
-      `).get(message.id) as MessageRow | undefined;
+      `)
+        .get(message.id) as MessageRow | undefined;
 
       if (existingRow) {
         const existing = parseMessage(existingRow);
@@ -273,10 +276,7 @@ export class ChatStore {
         throw new Error(`chat message id conflict: ${message.id}`, { cause: error });
       }
 
-      throw new Error(
-        `could not append chat message ${message.id} to session ${sessionId}`,
-        { cause: error }
-      );
+      throw new Error(`could not append chat message ${message.id} to session ${sessionId}`, { cause: error });
     }
   }
 
@@ -293,12 +293,10 @@ export class ChatStore {
     }
   }
 
-  loadRecentForRecovery(
-    sessionId: string,
-    limit = 300
-  ): ChatMessage[] {
+  loadRecentForRecovery(sessionId: string, limit = 300): ChatMessage[] {
     this.assertRecoveryLimit(limit);
-    const rows = this.database.prepare(`
+    const rows = this.database
+      .prepare(`
       SELECT id, sequence, channel, day, phase, sender_json, content_json, created_at
       FROM (
         SELECT id, sequence, channel, day, phase, sender_json, content_json, created_at
@@ -308,23 +306,20 @@ export class ChatStore {
         LIMIT ?
       )
       ORDER BY sequence ASC
-    `).all(sessionId, limit) as unknown as MessageRow[];
+    `)
+      .all(sessionId, limit) as unknown as MessageRow[];
     return rows.map(parseMessage);
   }
 
-  queryAfter(
-    sessionId: string,
-    reader: ChatReader,
-    afterSequence: number,
-    limit: number
-  ): ChatMessagePage {
+  queryAfter(sessionId: string, reader: ChatReader, afterSequence: number, limit: number): ChatMessagePage {
     if (!Number.isSafeInteger(afterSequence) || afterSequence < 0) {
       throw new Error("afterSequence must be a nonnegative safe integer");
     }
     this.assertQueryLimit(limit);
 
     const { clause, parameters } = this.readerClause(reader);
-    const rows = this.database.prepare(`
+    const rows = this.database
+      .prepare(`
       SELECT id, sequence, channel, day, phase, sender_json, content_json, created_at
       FROM chat_messages
       WHERE session_id = ?
@@ -332,23 +327,21 @@ export class ChatStore {
         AND ${clause}
       ORDER BY sequence ASC
       LIMIT ?
-    `).all(
-      sessionId,
-      afterSequence,
-      ...parameters,
-      limit + 1
-    ) as unknown as MessageRow[];
+    `)
+      .all(sessionId, afterSequence, ...parameters, limit + 1) as unknown as MessageRow[];
 
     const hasMore = rows.length > limit;
     const messages = rows.slice(0, limit).map(parseMessage);
     let latestSequence = messages.at(-1)?.sequence ?? afterSequence;
 
     if (!hasMore) {
-      const latestRow = this.database.prepare(`
+      const latestRow = this.database
+        .prepare(`
         SELECT MAX(sequence) AS latest_sequence
         FROM chat_messages
         WHERE session_id = ?
-      `).get(sessionId) as { latest_sequence: number | null };
+      `)
+        .get(sessionId) as { latest_sequence: number | null };
       latestSequence = Math.max(latestSequence, latestRow.latest_sequence ?? 0);
     }
 
@@ -360,7 +353,8 @@ export class ChatStore {
   }
 
   private insertMessage(sessionId: string, message: ChatMessage): void {
-    this.database.prepare(`
+    this.database
+      .prepare(`
       INSERT INTO chat_messages (
         id,
         session_id,
@@ -372,17 +366,18 @@ export class ChatStore {
         content_json,
         created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      message.id,
-      sessionId,
-      message.sequence,
-      message.channel,
-      message.day,
-      message.phase,
-      JSON.stringify(message.sender),
-      JSON.stringify(message.content),
-      message.createdAt
-    );
+    `)
+      .run(
+        message.id,
+        sessionId,
+        message.sequence,
+        message.channel,
+        message.day,
+        message.phase,
+        JSON.stringify(message.sender),
+        JSON.stringify(message.content),
+        message.createdAt
+      );
   }
 
   private readerClause(reader: ChatReader): { clause: string; parameters: string[] } {

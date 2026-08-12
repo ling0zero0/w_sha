@@ -1,9 +1,4 @@
-import type {
-  AiModelProfileId,
-  AiModelProfileView,
-  AiProviderView,
-  CreateAiModelProfileRequest
-} from "@werewolf/shared";
+import type { AiModelProfileId, AiModelProfileView, AiProviderView, CreateAiModelProfileRequest } from "@werewolf/shared";
 import { Cpu, FlaskConical, Plus, Save, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import type { AiAdminClient } from "./ai-client";
@@ -36,7 +31,10 @@ export function ModelPanel({ models, providers, client, onChanged }: ModelPanelP
     <div className="ai-resource-layout">
       <aside className="ai-resource-list" aria-label="模型列表">
         <div className="ai-list-heading">
-          <div><span>{models.length}</span><strong>模型</strong></div>
+          <div>
+            <span>{models.length}</span>
+            <strong>模型</strong>
+          </div>
           <button type="button" className="ai-icon-button" aria-label="新建模型" title="新建模型" onClick={() => setSelectedId("new")}>
             <Plus size={18} aria-hidden="true" />
           </button>
@@ -49,7 +47,10 @@ export function ModelPanel({ models, providers, client, onChanged }: ModelPanelP
             onClick={() => setSelectedId(model.id)}
           >
             <Cpu size={18} aria-hidden="true" />
-            <span><strong>{model.name}</strong><small>{model.model}</small></span>
+            <span>
+              <strong>{model.name}</strong>
+              <small>{model.model}</small>
+            </span>
             <i className={model.enabled ? "is-enabled" : ""} aria-label={model.enabled ? "已启用" : "已停用"} />
           </button>
         ))}
@@ -164,7 +165,14 @@ function ModelForm({
           <h2>{model?.name ?? "添加模型配置"}</h2>
         </div>
         {model ? (
-          <button type="button" className="ai-icon-button ai-delete-button" aria-label="删除模型" title="删除模型" disabled={saving || testing} onClick={() => void remove()}>
+          <button
+            type="button"
+            className="ai-icon-button ai-delete-button"
+            aria-label="删除模型"
+            title="删除模型"
+            disabled={saving || testing}
+            onClick={() => void remove()}
+          >
             <Trash2 size={18} aria-hidden="true" />
           </button>
         ) : null}
@@ -180,7 +188,11 @@ function ModelForm({
           <span>服务连接</span>
           <select required value={providerId} disabled={saving || providers.length === 0} onChange={(event) => setProviderId(event.target.value)}>
             <option value="">选择服务连接</option>
-            {providers.map((provider) => <option key={provider.id} value={provider.id}>{provider.name}</option>)}
+            {providers.map((provider) => (
+              <option key={provider.id} value={provider.id}>
+                {provider.name}
+              </option>
+            ))}
           </select>
         </label>
         <label className="ai-full-field">
@@ -202,27 +214,60 @@ function ModelForm({
         </label>
         <label>
           <span>单次最大输出 Token</span>
-          <input type="number" min="1" max="1000000" value={maxOutputTokens} disabled={saving} onChange={(event) => setMaxOutputTokens(Number(event.target.value))} />
+          <input
+            type="number"
+            min="1"
+            max="1000000"
+            value={maxOutputTokens}
+            disabled={saving}
+            onChange={(event) => setMaxOutputTokens(Number(event.target.value))}
+          />
         </label>
         <label>
           <span>请求超时（毫秒）</span>
-          <input type="number" min="1000" max="300000" step="1000" value={requestTimeoutMs} disabled={saving} onChange={(event) => setRequestTimeoutMs(Number(event.target.value))} />
+          <input
+            type="number"
+            min="1000"
+            max="300000"
+            step="1000"
+            value={requestTimeoutMs}
+            disabled={saving}
+            onChange={(event) => setRequestTimeoutMs(Number(event.target.value))}
+          />
         </label>
         <label>
           <span>每回合最大尝试</span>
-          <input type="number" min="1" max="2" value={maxAttemptsPerTurn} disabled={saving} onChange={(event) => setMaxAttemptsPerTurn(Number(event.target.value))} />
+          <input
+            type="number"
+            min="1"
+            max="2"
+            value={maxAttemptsPerTurn}
+            disabled={saving}
+            onChange={(event) => setMaxAttemptsPerTurn(Number(event.target.value))}
+          />
         </label>
         <label>
           <span>单局 Token 预算</span>
-          <input type="number" min="1" max="100000000" value={gameTokenBudget} disabled={saving} onChange={(event) => setGameTokenBudget(Number(event.target.value))} />
+          <input
+            type="number"
+            min="1"
+            max="100000000"
+            value={gameTokenBudget}
+            disabled={saving}
+            onChange={(event) => setGameTokenBudget(Number(event.target.value))}
+          />
         </label>
         <label>
           <span>回退模型</span>
           <select value={fallbackModelProfileId} disabled={saving} onChange={(event) => setFallbackModelProfileId(event.target.value)}>
             <option value="">无回退模型</option>
-            {models.filter((candidate) => candidate.id !== model?.id).map((candidate) => (
-              <option key={candidate.id} value={candidate.id}>{candidate.name}</option>
-            ))}
+            {models
+              .filter((candidate) => candidate.id !== model?.id)
+              .map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.name}
+                </option>
+              ))}
           </select>
         </label>
       </div>

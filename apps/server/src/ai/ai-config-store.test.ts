@@ -17,10 +17,7 @@ afterEach(() => {
   }
 });
 
-function createStore(
-  path = ":memory:",
-  secretBox: AesGcmSecretBox | null = new AesGcmSecretBox(randomBytes(32))
-): AiConfigStore {
+function createStore(path = ":memory:", secretBox: AesGcmSecretBox | null = new AesGcmSecretBox(randomBytes(32))): AiConfigStore {
   const store = new AiConfigStore(path, secretBox);
   stores.push(store);
   return store;
@@ -36,12 +33,7 @@ function createProvider(store: AiConfigStore, name = "Provider", apiKey?: string
   });
 }
 
-function createModel(
-  store: AiConfigStore,
-  providerId: string,
-  name = "Model",
-  fallbackModelProfileId: string | null = null
-) {
+function createModel(store: AiConfigStore, providerId: string, name = "Model", fallbackModelProfileId: string | null = null) {
   return store.createModelProfile({
     providerId,
     name,
@@ -87,19 +79,25 @@ describe("SQLite AI configuration store", () => {
 
     createStore(path);
     const migratedDatabase = new DatabaseSync(path);
-    const migration = migratedDatabase.prepare(`
+    const migration = migratedDatabase
+      .prepare(`
       SELECT version
       FROM schema_migrations
       WHERE version = 1
-    `).get() as { version: number };
-    const revisionColumn = migratedDatabase.prepare(`
+    `)
+      .get() as { version: number };
+    const revisionColumn = migratedDatabase
+      .prepare(`
       PRAGMA table_info(ai_model_profiles)
-    `).all() as Array<{ name: string }>;
-    const snapshot = migratedDatabase.prepare(`
+    `)
+      .all() as Array<{ name: string }>;
+    const snapshot = migratedDatabase
+      .prepare(`
       SELECT payload
       FROM runtime_snapshot
       WHERE id = 1
-    `).get() as { payload: string };
+    `)
+      .get() as { payload: string };
     migratedDatabase.close();
 
     expect(migration.version).toBe(1);
@@ -132,10 +130,12 @@ describe("SQLite AI configuration store", () => {
     });
     expect(first.getProviderCredential(provider.id)).toBe("sk-secret-value");
 
-    expect(first.updateProvider(provider.id, {
-      name: "Updated provider",
-      enabled: false
-    })).toMatchObject({
+    expect(
+      first.updateProvider(provider.id, {
+        name: "Updated provider",
+        enabled: false
+      })
+    ).toMatchObject({
       name: "Updated provider",
       enabled: false,
       credentialConfigured: true
@@ -190,11 +190,13 @@ describe("SQLite AI configuration store", () => {
     const provider = createProvider(store, "Encrypted provider", plaintext);
 
     const database = new DatabaseSync(path);
-    const row = database.prepare(`
+    const row = database
+      .prepare(`
       SELECT typeof(ciphertext) AS ciphertext_type, ciphertext, nonce, auth_tag
       FROM ai_provider_secrets
       WHERE provider_id = ?
-    `).get(provider.id) as unknown as {
+    `)
+      .get(provider.id) as unknown as {
       ciphertext_type: string;
       ciphertext: Uint8Array;
       nonce: Uint8Array;
@@ -220,10 +222,12 @@ describe("SQLite AI configuration store", () => {
       credentialHint: "...cret"
     });
     expect(store.getProviderCredential(provider.id)).toBe("new-secret");
-    expect(() => store.updateProvider(provider.id, {
-      name: "Existing provider",
-      apiKey: "must-roll-back"
-    })).toThrow();
+    expect(() =>
+      store.updateProvider(provider.id, {
+        name: "Existing provider",
+        apiKey: "must-roll-back"
+      })
+    ).toThrow();
     expect(store.getProvider(provider.id)?.name).toBe("Credential provider");
     expect(store.getProviderCredential(provider.id)).toBe("new-secret");
 
@@ -237,16 +241,16 @@ describe("SQLite AI configuration store", () => {
   it("rejects credential writes without a secure key before changing data", () => {
     const store = createStore(":memory:", null);
 
-    expect(() => createProvider(store, "Rejected provider", "secret")).toThrow(
-      "AI credential cannot be stored without a secure secret box"
-    );
+    expect(() => createProvider(store, "Rejected provider", "secret")).toThrow("AI credential cannot be stored without a secure secret box");
     expect(store.listProviders()).toEqual([]);
 
     const provider = createProvider(store, "Allowed provider");
-    expect(() => store.updateProvider(provider.id, {
-      name: "Should not persist",
-      apiKey: "secret"
-    })).toThrow("AI credential cannot be stored without a secure secret box");
+    expect(() =>
+      store.updateProvider(provider.id, {
+        name: "Should not persist",
+        apiKey: "secret"
+      })
+    ).toThrow("AI credential cannot be stored without a secure secret box");
     expect(store.getProvider(provider.id)?.name).toBe("Allowed provider");
   });
 
@@ -255,11 +259,7 @@ describe("SQLite AI configuration store", () => {
     const provider = createProvider(store, "Unique provider");
     expect(() => createProvider(store, "Unique provider")).toThrow();
 
-    expect(() => createModel(
-      store,
-      "00000000-0000-4000-8000-000000000001",
-      "Missing provider"
-    )).toThrow("AI provider not found");
+    expect(() => createModel(store, "00000000-0000-4000-8000-000000000001", "Missing provider")).toThrow("AI provider not found");
 
     const model = createModel(store, provider.id, "Referenced model");
     const bot = createBot(store, model.id, "Referenced bot");
@@ -281,12 +281,16 @@ describe("SQLite AI configuration store", () => {
     const second = createModel(store, provider.id, "Second", first.id);
     const third = createModel(store, provider.id, "Third", second.id);
 
-    expect(() => store.updateModelProfile(first.id, {
-      fallbackModelProfileId: first.id
-    })).toThrow();
-    expect(() => store.updateModelProfile(first.id, {
-      fallbackModelProfileId: third.id
-    })).toThrow("fallback chain must not contain a cycle");
+    expect(() =>
+      store.updateModelProfile(first.id, {
+        fallbackModelProfileId: first.id
+      })
+    ).toThrow();
+    expect(() =>
+      store.updateModelProfile(first.id, {
+        fallbackModelProfileId: third.id
+      })
+    ).toThrow("fallback chain must not contain a cycle");
     expect(store.getModelProfile(first.id)?.fallbackModelProfileId).toBeNull();
   });
 
@@ -295,9 +299,11 @@ describe("SQLite AI configuration store", () => {
     const provider = createProvider(store);
     const model = createModel(store, provider.id);
 
-    expect(() => store.updateModelProfile(model.id, {
-      gameTokenBudget: 100
-    })).toThrow("gameTokenBudget must cover at least one maximum-size response");
+    expect(() =>
+      store.updateModelProfile(model.id, {
+        gameTokenBudget: 100
+      })
+    ).toThrow("gameTokenBudget must cover at least one maximum-size response");
     expect(store.getModelProfile(model.id)?.gameTokenBudget).toBe(20_000);
   });
 });

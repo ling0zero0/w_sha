@@ -34,9 +34,7 @@ vi.mock("react", async (importOriginal) => {
       return [
         hookHarness.state,
         (next: unknown) => {
-          hookHarness.state = typeof next === "function"
-            ? (next as (current: unknown) => unknown)(hookHarness.state)
-            : next;
+          hookHarness.state = typeof next === "function" ? (next as (current: unknown) => unknown)(hookHarness.state) : next;
         }
       ];
     }
@@ -61,12 +59,7 @@ import { useHostLobby } from "./useHostLobby";
 
 const actionIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function message(
-  id: string,
-  sequence: number,
-  text: string,
-  channel: ChatMessage["channel"] = "day-public"
-): ChatMessage {
+function message(id: string, sequence: number, text: string, channel: ChatMessage["channel"] = "day-public"): ChatMessage {
   return {
     id,
     sequence,
@@ -105,13 +98,16 @@ describe("useHostLobby chat history", () => {
 
   it("requests an incremental page after the host view cursor and keeps only public channels", async () => {
     const recent = message("22222222-2222-4222-8222-222222222222", 4, "recent");
-    vi.stubGlobal("fetch", vi.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        sessionToken: "abcdefghijklmnopqrstuvwxyz123456",
-        lobby: lobby([recent])
-      })
-    })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          sessionToken: "abcdefghijklmnopqrstuvwxyz123456",
+          lobby: lobby([recent])
+        })
+      }))
+    );
 
     useHostLobby();
     await vi.waitFor(() => expect(hookHarness.listeners.has("host:state")).toBe(true));
@@ -123,12 +119,7 @@ describe("useHostLobby chat history", () => {
     expect(historyCall?.[1]).toEqual({ afterSequence: 4, limit: 100 });
 
     const publicMessage = message("33333333-3333-4333-8333-333333333333", 5, "public");
-    const privateMessage = message(
-      "44444444-4444-4444-8444-444444444444",
-      6,
-      "private",
-      "wolf-private"
-    );
+    const privateMessage = message("44444444-4444-4444-8444-444444444444", 6, "private", "wolf-private");
     const ack = historyCall?.[2] as ((result: unknown) => void) | undefined;
     ack?.({
       ok: true,
@@ -145,13 +136,16 @@ describe("useHostLobby chat history", () => {
   });
 
   it("emits the selected chat mode through the host event", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        sessionToken: "abcdefghijklmnopqrstuvwxyz123456",
-        lobby: lobby([])
-      })
-    })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          sessionToken: "abcdefghijklmnopqrstuvwxyz123456",
+          lobby: lobby([])
+        })
+      }))
+    );
 
     const host = useHostLobby();
     await vi.waitFor(() => expect(hookHarness.listeners.has("host:state")).toBe(true));
@@ -169,13 +163,16 @@ describe("useHostLobby chat history", () => {
   });
 
   it("emits a shared deterministic add-bot request", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        sessionToken: "abcdefghijklmnopqrstuvwxyz123456",
-        lobby: lobby([], "lobby")
-      })
-    })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          sessionToken: "abcdefghijklmnopqrstuvwxyz123456",
+          lobby: lobby([], "lobby")
+        })
+      }))
+    );
 
     const host = useHostLobby();
     await vi.waitFor(() => expect(hookHarness.listeners.has("host:state")).toBe(true));

@@ -3,13 +3,7 @@ import { mkdirSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { dirname } from "node:path";
 
-export type AiDecisionAttemptStatus =
-  | "success"
-  | "provider-unavailable"
-  | "provider-error"
-  | "invalid-response"
-  | "budget-exhausted"
-  | "fallback";
+export type AiDecisionAttemptStatus = "success" | "provider-unavailable" | "provider-error" | "invalid-response" | "budget-exhausted" | "fallback";
 
 export interface AiDecisionAttemptRecord {
   id: string;
@@ -103,7 +97,8 @@ export class AiAuditStore {
 
   recordAttempt(input: Omit<AiDecisionAttemptRecord, "id">): string {
     const id = randomUUID();
-    this.database.prepare(`
+    this.database
+      .prepare(`
       INSERT INTO ai_decision_attempts (
         id,
         game_session_id,
@@ -123,31 +118,33 @@ export class AiAuditStore {
         started_at,
         completed_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
-      input.gameSessionId,
-      input.playerId,
-      input.decisionKey,
-      input.roomRevision,
-      input.botProfileId,
-      input.botProfileRevision,
-      input.modelProfileId,
-      input.modelProfileRevision,
-      input.providerId,
-      input.model,
-      input.status,
-      input.intentType,
-      input.latencyMs,
-      input.errorCode,
-      input.startedAt,
-      input.completedAt
-    );
+    `)
+      .run(
+        id,
+        input.gameSessionId,
+        input.playerId,
+        input.decisionKey,
+        input.roomRevision,
+        input.botProfileId,
+        input.botProfileRevision,
+        input.modelProfileId,
+        input.modelProfileRevision,
+        input.providerId,
+        input.model,
+        input.status,
+        input.intentType,
+        input.latencyMs,
+        input.errorCode,
+        input.startedAt,
+        input.completedAt
+      );
     return id;
   }
 
   recordUsage(input: Omit<AiUsageEventRecord, "id">): string {
     const id = randomUUID();
-    this.database.prepare(`
+    this.database
+      .prepare(`
       INSERT INTO ai_usage_events (
         id,
         decision_id,
@@ -163,26 +160,28 @@ export class AiAuditStore {
         total_tokens,
         created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
-      input.decisionId,
-      input.gameSessionId,
-      input.playerId,
-      input.botProfileId,
-      input.modelProfileId,
-      input.modelProfileRevision,
-      input.providerId,
-      input.model,
-      input.inputTokens,
-      input.outputTokens,
-      input.totalTokens,
-      input.createdAt
-    );
+    `)
+      .run(
+        id,
+        input.decisionId,
+        input.gameSessionId,
+        input.playerId,
+        input.botProfileId,
+        input.modelProfileId,
+        input.modelProfileRevision,
+        input.providerId,
+        input.model,
+        input.inputTokens,
+        input.outputTokens,
+        input.totalTokens,
+        input.createdAt
+      );
     return id;
   }
 
   listAttempts(limit = 100): AiDecisionAttemptRecord[] {
-    const rows = this.database.prepare(`
+    const rows = this.database
+      .prepare(`
       SELECT
         id,
         game_session_id,
@@ -204,12 +203,14 @@ export class AiAuditStore {
       FROM ai_decision_attempts
       ORDER BY started_at DESC, id DESC
       LIMIT ?
-    `).all(normalizeLimit(limit)) as unknown as AiDecisionAttemptRow[];
+    `)
+      .all(normalizeLimit(limit)) as unknown as AiDecisionAttemptRow[];
     return rows.map(parseAttempt);
   }
 
   listUsage(limit = 100): AiUsageEventRecord[] {
-    const rows = this.database.prepare(`
+    const rows = this.database
+      .prepare(`
       SELECT
         id,
         decision_id,
@@ -227,7 +228,8 @@ export class AiAuditStore {
       FROM ai_usage_events
       ORDER BY created_at DESC, id DESC
       LIMIT ?
-    `).all(normalizeLimit(limit)) as unknown as AiUsageEventRow[];
+    `)
+      .all(normalizeLimit(limit)) as unknown as AiUsageEventRow[];
     return rows.map(parseUsage);
   }
 }

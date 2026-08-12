@@ -1,8 +1,4 @@
-import type {
-  AiBotProfile,
-  BotIntent,
-  PlayerLobbyView
-} from "@werewolf/shared";
+import type { AiBotProfile, BotIntent, PlayerLobbyView } from "@werewolf/shared";
 import type { BotIntentType } from "./decision-gate.js";
 
 export interface BuildBotPromptInput {
@@ -14,10 +10,7 @@ export interface BuildBotPromptInput {
 export interface BuiltBotPrompt {
   systemPrompt: string;
   userPrompt: string;
-  messages: [
-    { role: "system"; content: string },
-    { role: "user"; content: string }
-  ];
+  messages: [{ role: "system"; content: string }, { role: "user"; content: string }];
 }
 
 export function buildBotPrompt(input: BuildBotPromptInput): BuiltBotPrompt {
@@ -60,12 +53,14 @@ export function buildBotPrompt(input: BuildBotPromptInput): BuiltBotPrompt {
     JSON.stringify(allowedIntentTypes),
     "",
     "REQUIRED_OUTPUT_SCHEMA_JSON:",
-    JSON.stringify(exactObject({
-      protocolVersion: { const: 1 },
-      intent: {
-        oneOf: allowedIntentTypes.map((type) => intentSchema(type, input.view))
-      }
-    }))
+    JSON.stringify(
+      exactObject({
+        protocolVersion: { const: 1 },
+        intent: {
+          oneOf: allowedIntentTypes.map((type) => intentSchema(type, input.view))
+        }
+      })
+    )
   ].join("\n");
 
   return {
@@ -85,9 +80,7 @@ function withoutChatMessages(view: PlayerLobbyView): unknown {
       ...view.publicChat,
       messages: []
     },
-    wolfAction: view.wolfAction
-      ? { ...view.wolfAction, messages: [] }
-      : null
+    wolfAction: view.wolfAction ? { ...view.wolfAction, messages: [] } : null
   };
 }
 
@@ -98,10 +91,7 @@ function authorizedChatData(view: PlayerLobbyView): unknown {
   };
 }
 
-function intentSchema(
-  type: BotIntentType,
-  view: PlayerLobbyView
-): Record<string, unknown> {
+function intentSchema(type: BotIntentType, view: PlayerLobbyView): Record<string, unknown> {
   switch (type) {
     case "confirm-role":
     case "finish-speaking":
@@ -111,10 +101,7 @@ function intentSchema(
         type: { const: type },
         payload: exactObject({
           target: {
-            enum: [
-              ...wolfTargetIds(view),
-              "no-kill"
-            ]
+            enum: [...wolfTargetIds(view), "no-kill"]
           }
         })
       });
@@ -164,32 +151,25 @@ function intentSchema(
       });
     }
     case "seer-inspect":
-      return targetIntentSchema(
-        type,
-        view.seerAction?.candidates.map((candidate) => candidate.id) ?? []
-      );
+      return targetIntentSchema(type, view.seerAction?.candidates.map((candidate) => candidate.id) ?? []);
     case "guard-protect":
-      return nullableTargetIntentSchema(
-        type,
-        view.guardAction?.candidates.map((candidate) => candidate.id) ?? []
-      );
+      return nullableTargetIntentSchema(type, view.guardAction?.candidates.map((candidate) => candidate.id) ?? []);
     case "hunter-shoot":
-      return nullableTargetIntentSchema(
-        type,
-        view.hunterAction?.candidates.map((candidate) => candidate.id) ?? []
-      );
+      return nullableTargetIntentSchema(type, view.hunterAction?.candidates.map((candidate) => candidate.id) ?? []);
     case "witch-submit-action": {
       const choices: unknown[] = [exactObject({ action: { const: "none" } })];
       if (view.witchAction?.antidoteAvailable && view.witchAction.attackedPlayer) {
         choices.push(exactObject({ action: { const: "save" } }));
       }
       if (view.witchAction?.poisonAvailable) {
-        choices.push(exactObject({
-          action: { const: "poison" },
-          target: {
-            enum: view.witchAction.poisonCandidates.map((candidate) => candidate.id)
-          }
-        }));
+        choices.push(
+          exactObject({
+            action: { const: "poison" },
+            target: {
+              enum: view.witchAction.poisonCandidates.map((candidate) => candidate.id)
+            }
+          })
+        );
       }
       return exactObject({
         type: { const: type },
@@ -201,30 +181,21 @@ function intentSchema(
         type: { const: type },
         payload: exactObject({
           target: {
-            enum: [
-              ...view.dayVote?.candidates.map((candidate) => candidate.id) ?? [],
-              "abstain"
-            ]
+            enum: [...(view.dayVote?.candidates.map((candidate) => candidate.id) ?? []), "abstain"]
           }
         })
       });
   }
 }
 
-function targetIntentSchema(
-  type: BotIntent["type"],
-  targetIds: readonly string[]
-): Record<string, unknown> {
+function targetIntentSchema(type: BotIntent["type"], targetIds: readonly string[]): Record<string, unknown> {
   return exactObject({
     type: { const: type },
     payload: exactObject({ target: { enum: targetIds } })
   });
 }
 
-function nullableTargetIntentSchema(
-  type: BotIntent["type"],
-  targetIds: readonly string[]
-): Record<string, unknown> {
+function nullableTargetIntentSchema(type: BotIntent["type"], targetIds: readonly string[]): Record<string, unknown> {
   return exactObject({
     type: { const: type },
     payload: exactObject({
@@ -234,19 +205,13 @@ function nullableTargetIntentSchema(
 }
 
 function wolfTargetIds(view: PlayerLobbyView): string[] {
-  const teammateIds = new Set(
-    view.privateRole?.wolfTeammates.map((player) => player.id) ?? []
+  const teammateIds = new Set(view.privateRole?.wolfTeammates.map((player) => player.id) ?? []);
+  return (
+    view.wolfAction?.candidates.map((candidate) => candidate.id).filter((candidateId) => candidateId !== view.selfId && !teammateIds.has(candidateId)) ?? []
   );
-  return view.wolfAction?.candidates
-    .map((candidate) => candidate.id)
-    .filter((candidateId) => (
-      candidateId !== view.selfId && !teammateIds.has(candidateId)
-    )) ?? [];
 }
 
-function exactObject(
-  properties: Record<string, unknown>
-): Record<string, unknown> {
+function exactObject(properties: Record<string, unknown>): Record<string, unknown> {
   return {
     type: "object",
     properties,

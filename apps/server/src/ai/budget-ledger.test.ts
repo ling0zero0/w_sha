@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  BudgetExhaustedError,
-  BudgetLedger
-} from "./budget-ledger.js";
+import { BudgetExhaustedError, BudgetLedger } from "./budget-ledger.js";
 
 const limits = {
   gameTokens: 1_000,
@@ -32,13 +29,15 @@ describe("AI budget ledger", () => {
       reservedTokens: 400
     });
 
-    expect(() => ledger.reserve({
-      gameId: "game-1",
-      modelId: "model-1",
-      seatId: "seat-1",
-      tokens: 101,
-      limits
-    })).toThrow(BudgetExhaustedError);
+    expect(() =>
+      ledger.reserve({
+        gameId: "game-1",
+        modelId: "model-1",
+        seatId: "seat-1",
+        tokens: 101,
+        limits
+      })
+    ).toThrow(BudgetExhaustedError);
     expect(ledger.getGameUsage("game-1").reservedTokens).toBe(400);
     expect(ledger.getModelUsage("game-1", "model-1").reservedTokens).toBe(400);
     expect(ledger.getSeatUsage("game-1", "seat-1").reservedTokens).toBe(400);
@@ -88,13 +87,15 @@ describe("AI budget ledger", () => {
       limits
     });
 
-    expect(() => ledger.reserve({
-      gameId: "game-1",
-      modelId: "model-2",
-      seatId: "seat-1",
-      tokens: 51,
-      limits
-    })).toThrowError(expect.objectContaining({ scope: "seat" }));
+    expect(() =>
+      ledger.reserve({
+        gameId: "game-1",
+        modelId: "model-2",
+        seatId: "seat-1",
+        tokens: 51,
+        limits
+      })
+    ).toThrowError(expect.objectContaining({ scope: "seat" }));
     expect(ledger.getModelUsage("game-1", "model-2")).toEqual({
       settledTokens: 0,
       reservedTokens: 0
@@ -107,13 +108,15 @@ describe("AI budget ledger", () => {
       tokens: 250,
       limits
     });
-    expect(() => ledger.reserve({
-      gameId: "game-1",
-      modelId: "model-1",
-      seatId: "seat-3",
-      tokens: 1,
-      limits
-    })).toThrowError(expect.objectContaining({ scope: "model" }));
+    expect(() =>
+      ledger.reserve({
+        gameId: "game-1",
+        modelId: "model-1",
+        seatId: "seat-3",
+        tokens: 1,
+        limits
+      })
+    ).toThrowError(expect.objectContaining({ scope: "model" }));
   });
 
   it("rejects duplicate completion and over-settlement", () => {
@@ -126,14 +129,10 @@ describe("AI budget ledger", () => {
       limits
     });
 
-    expect(() => ledger.settle(reservation.id, 101)).toThrow(
-      "actual tokens cannot exceed reserved tokens"
-    );
+    expect(() => ledger.settle(reservation.id, 101)).toThrow("actual tokens cannot exceed reserved tokens");
     expect(ledger.getGameUsage("game-1").reservedTokens).toBe(100);
     ledger.settle(reservation.id, 100);
-    expect(() => ledger.release(reservation.id)).toThrow(
-      "budget reservation is not active"
-    );
+    expect(() => ledger.release(reservation.id)).toThrow("budget reservation is not active");
   });
 
   it("clears all scopes and reservations for a completed game", () => {

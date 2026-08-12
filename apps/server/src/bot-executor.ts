@@ -20,19 +20,10 @@ export interface BotExecutionResult {
   chatMessage: ChatMessage | null;
 }
 
-export function executeBotIntent(
-  room: LobbyRoom,
-  playerId: PlayerId,
-  rawIntent: BotIntent,
-  expectedRevision: number,
-  paused = false
-): BotExecutionResult {
+export function executeBotIntent(room: LobbyRoom, playerId: PlayerId, rawIntent: BotIntent, expectedRevision: number, paused = false): BotExecutionResult {
   const view = room.getPlayerView(playerId);
-  if (
-    !view
-    || view.revision !== expectedRevision
-    || !room.getBotSeats().some((seat) => seat.playerId === playerId)
-  ) return { accepted: false, chatMessage: null };
+  if (!view || view.revision !== expectedRevision || !room.getBotSeats().some((seat) => seat.playerId === playerId))
+    return { accepted: false, chatMessage: null };
 
   const intent = botIntentSchema.parse(rawIntent);
   if (paused && intent.type !== "confirm-role") {
@@ -53,9 +44,7 @@ export function executeBotIntent(
     case "chat-send": {
       const payload = chatSendRequestSchema.parse(intent.payload);
       const action = room.sendChat(playerId, payload);
-      return action.ok
-        ? { accepted: true, chatMessage: action.data }
-        : { accepted: false, chatMessage: null };
+      return action.ok ? { accepted: true, chatMessage: action.data } : { accepted: false, chatMessage: null };
     }
     case "seer-inspect": {
       const payload = seerInspectRequestSchema.parse(intent.payload);

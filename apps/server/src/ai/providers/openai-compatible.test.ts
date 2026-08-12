@@ -27,30 +27,31 @@ const decisionRequest = {
 
 describe("OpenAI-compatible model provider", () => {
   it("sends an authenticated manual-redirect request and normalizes output", async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({
-      choices: [{
-        message: {
-          content: JSON.stringify({
-            protocolVersion: 1,
-            intent: {
-              type: "day-select-vote",
-              payload: { target: null }
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                protocolVersion: 1,
+                intent: {
+                  type: "day-select-vote",
+                  payload: { target: null }
+                }
+              })
             }
-          })
+          }
+        ],
+        usage: {
+          prompt_tokens: 12,
+          completion_tokens: 7,
+          total_tokens: 19
         }
-      }],
-      usage: {
-        prompt_tokens: 12,
-        completion_tokens: 7,
-        total_tokens: 19
-      }
-    }));
+      })
+    );
     const provider = createProvider(fetchMock, "  top-secret  ");
 
-    const result = await provider.decide(
-      decisionRequest,
-      new AbortController().signal
-    );
+    const result = await provider.decide(decisionRequest, new AbortController().signal);
 
     expect(result).toMatchObject({
       ok: true,
@@ -70,9 +71,7 @@ describe("OpenAI-compatible model provider", () => {
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe("http://127.0.0.1:1234/v1/chat/completions");
     expect(init?.redirect).toBe("manual");
-    expect(new Headers(init?.headers).get("Authorization")).toBe(
-      "Bearer top-secret"
-    );
+    expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer top-secret");
     expect(JSON.parse(String(init?.body))).toMatchObject({
       model: "test-model",
       max_tokens: 128,
@@ -82,15 +81,14 @@ describe("OpenAI-compatible model provider", () => {
   });
 
   it("omits Authorization when no credential is configured", async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({
-      choices: [{ message: { content: "OK" } }]
-    }));
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        choices: [{ message: { content: "OK" } }]
+      })
+    );
     const provider = createProvider(fetchMock, null);
 
-    const result = await provider.testConnection(
-      model,
-      new AbortController().signal
-    );
+    const result = await provider.testConnection(model, new AbortController().signal);
 
     expect(result.ok).toBe(true);
     const [, init] = fetchMock.mock.calls[0]!;
@@ -105,38 +103,24 @@ describe("OpenAI-compatible model provider", () => {
     [500, "PROVIDER_ERROR", true],
     [503, "PROVIDER_ERROR", true],
     [302, "REQUEST_REJECTED", false]
-  ] as const)(
-    "classifies HTTP %i without exposing its body",
-    async (status, code, retryable) => {
-      const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(
-        "provider-secret-body",
-        { status }
-      ));
-      const provider = createProvider(fetchMock);
-
-      const result = await provider.testConnection(
-        model,
-        new AbortController().signal
-      );
-
-      expect(result).toMatchObject({
-        ok: false,
-        error: { code, retryable, httpStatus: status }
-      });
-      expect(JSON.stringify(result)).not.toContain("provider-secret-body");
-    }
-  );
-
-  it("classifies network failures without exposing exception details", async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockRejectedValue(
-      new Error("dns failure containing secret.internal")
-    );
+  ] as const)("classifies HTTP %i without exposing its body", async (status, code, retryable) => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response("provider-secret-body", { status }));
     const provider = createProvider(fetchMock);
 
-    const result = await provider.testConnection(
-      model,
-      new AbortController().signal
-    );
+    const result = await provider.testConnection(model, new AbortController().signal);
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code, retryable, httpStatus: status }
+    });
+    expect(JSON.stringify(result)).not.toContain("provider-secret-body");
+  });
+
+  it("classifies network failures without exposing exception details", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockRejectedValue(new Error("dns failure containing secret.internal"));
+    const provider = createProvider(fetchMock);
+
+    const result = await provider.testConnection(model, new AbortController().signal);
 
     expect(result).toMatchObject({
       ok: false,
@@ -157,10 +141,7 @@ describe("OpenAI-compatible model provider", () => {
       requestTimeoutMs: 10
     };
 
-    const timedOut = await provider.testConnection(
-      shortTimeoutModel,
-      new AbortController().signal
-    );
+    const timedOut = await provider.testConnection(shortTimeoutModel, new AbortController().signal);
 
     const caller = new AbortController();
     const cancelledPromise = provider.testConnection(model, caller.signal);
@@ -178,20 +159,19 @@ describe("OpenAI-compatible model provider", () => {
   });
 
   it.each([
-    "```json\n{\"protocolVersion\":1,\"intent\":null}\n```",
-    "{\"protocolVersion\":1,\"intent\":{\"type\":\"confirm-role\",\"actor\":\"x\"}}",
-    "{\"protocolVersion\":1,\"intent\":{\"type\":\"unknown\"}}",
+    '```json\n{"protocolVersion":1,"intent":null}\n```',
+    '{"protocolVersion":1,"intent":{"type":"confirm-role","actor":"x"}}',
+    '{"protocolVersion":1,"intent":{"type":"unknown"}}',
     "not json"
   ])("rejects invalid model decision content", async (content) => {
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({
-      choices: [{ message: { content } }]
-    }));
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        choices: [{ message: { content } }]
+      })
+    );
     const provider = createProvider(fetchMock);
 
-    const result = await provider.decide(
-      decisionRequest,
-      new AbortController().signal
-    );
+    const result = await provider.decide(decisionRequest, new AbortController().signal);
 
     expect(result).toMatchObject({
       ok: false,
@@ -204,15 +184,14 @@ describe("OpenAI-compatible model provider", () => {
   });
 
   it("rejects malformed successful provider envelopes", async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({
-      choices: []
-    }));
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        choices: []
+      })
+    );
     const provider = createProvider(fetchMock);
 
-    const result = await provider.testConnection(
-      model,
-      new AbortController().signal
-    );
+    const result = await provider.testConnection(model, new AbortController().signal);
 
     expect(result).toMatchObject({
       ok: false,
@@ -220,22 +199,22 @@ describe("OpenAI-compatible model provider", () => {
     });
   });
 
-  it.each([
-    "http://169.254.169.254/latest/meta-data",
-    "http://[::ffff:169.254.169.254]/latest/meta-data"
-  ])("rejects metadata and link-local provider endpoints before making a request: %s", (baseUrl) => {
-    expect(() => new OpenAiCompatibleProvider({
-      baseUrl,
-      apiKey: null,
-      fetch: vi.fn<typeof fetch>()
-    })).toThrow(/blocked metadata or link-local/);
-  });
+  it.each(["http://169.254.169.254/latest/meta-data", "http://[::ffff:169.254.169.254]/latest/meta-data"])(
+    "rejects metadata and link-local provider endpoints before making a request: %s",
+    (baseUrl) => {
+      expect(
+        () =>
+          new OpenAiCompatibleProvider({
+            baseUrl,
+            apiKey: null,
+            fetch: vi.fn<typeof fetch>()
+          })
+      ).toThrow(/blocked metadata or link-local/);
+    }
+  );
 });
 
-function createProvider(
-  fetchImplementation: typeof fetch,
-  apiKey: string | null = "secret"
-): OpenAiCompatibleProvider {
+function createProvider(fetchImplementation: typeof fetch, apiKey: string | null = "secret"): OpenAiCompatibleProvider {
   return new OpenAiCompatibleProvider({
     baseUrl: "http://127.0.0.1:1234/v1/",
     apiKey,
@@ -252,11 +231,16 @@ function jsonResponse(value: unknown): Response {
 }
 
 function abortableFetch(): typeof fetch {
-  return vi.fn<typeof fetch>((_input, init) => new Promise<Response>(
-    (_resolve, reject) => {
-      init?.signal?.addEventListener("abort", () => {
-        reject(new DOMException("aborted", "AbortError"));
-      }, { once: true });
-    }
-  ));
+  return vi.fn<typeof fetch>(
+    (_input, init) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener(
+          "abort",
+          () => {
+            reject(new DOMException("aborted", "AbortError"));
+          },
+          { once: true }
+        );
+      })
+  );
 }

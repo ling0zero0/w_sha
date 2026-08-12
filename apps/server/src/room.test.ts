@@ -5,10 +5,7 @@ import type { RoomChatPersistence } from "./room.js";
 
 const token = "abcdefghijklmnopqrstuvwxyz123456";
 
-function createRoom(
-  deferCompletedStages = false,
-  chatPersistence?: RoomChatPersistence
-) {
+function createRoom(deferCompletedStages = false, chatPersistence?: RoomChatPersistence) {
   return new LobbyRoom({
     localAddress: "192.168.1.20",
     webPort: 5173,
@@ -21,9 +18,7 @@ function createRoom(
 
 function startConfiguredRoom(configuration: RoleConfigurationInput, nicknames: string[]) {
   const room = createRoom();
-  const sessions = nicknames.map((nickname, index) =>
-    room.join({ roomCode: "123456", joinToken: token, nickname }, `socket-new-role-${index}`)
-  );
+  const sessions = nicknames.map((nickname, index) => room.join({ roomCode: "123456", joinToken: token, nickname }, `socket-new-role-${index}`));
   if (sessions.some((session) => !session.ok)) throw new Error("test setup failed");
   room.updateRoleConfiguration(configuration);
   const started = room.startGame();
@@ -129,10 +124,7 @@ describe("lobby room", () => {
       ok: false,
       code: "ALREADY_JOINED"
     });
-    expect(room.requestTakeover(
-      { roomCode: "123456", joinToken: token, nickname: "阿岚" },
-      "socket-a"
-    )).toMatchObject({
+    expect(room.requestTakeover({ roomCode: "123456", joinToken: token, nickname: "阿岚" }, "socket-a")).toMatchObject({
       ok: false,
       code: "ALREADY_JOINED"
     });
@@ -144,15 +136,9 @@ describe("lobby room", () => {
     const joined = room.join({ roomCode: "123456", joinToken: token, nickname: "林野" }, "socket-a");
     if (!joined.ok) throw new Error("test setup failed");
 
-    const requested = room.requestTakeover(
-      { roomCode: "123456", joinToken: token, nickname: "林野" },
-      "socket-b",
-      new Date("2026-07-15T08:00:00.000Z")
-    );
+    const requested = room.requestTakeover({ roomCode: "123456", joinToken: token, nickname: "林野" }, "socket-b", new Date("2026-07-15T08:00:00.000Z"));
     if (!requested.ok) throw new Error("test setup failed");
-    expect(room.getHostView().takeoverRequests).toEqual([
-      expect.objectContaining({ nickname: "林野", requestedAt: "2026-07-15T08:00:00.000Z" })
-    ]);
+    expect(room.getHostView().takeoverRequests).toEqual([expect.objectContaining({ nickname: "林野", requestedAt: "2026-07-15T08:00:00.000Z" })]);
 
     const resolved = room.resolveTakeover(requested.data.requestId, true);
     expect(resolved).toMatchObject({ ok: true, data: { approved: true, replacedSocketId: "socket-a" } });
@@ -166,10 +152,7 @@ describe("lobby room", () => {
     const room = createRoom();
     const joined = room.join({ roomCode: "123456", joinToken: token, nickname: "林野" }, "socket-a");
     if (!joined.ok) throw new Error("test setup failed");
-    const requested = room.requestTakeover(
-      { roomCode: "123456", joinToken: token, nickname: "林野" },
-      "socket-b"
-    );
+    const requested = room.requestTakeover({ roomCode: "123456", joinToken: token, nickname: "林野" }, "socket-b");
     if (!requested.ok) throw new Error("test setup failed");
     const resolved = room.resolveTakeover(requested.data.requestId, true);
     if (!resolved.ok || !resolved.data.session) throw new Error("test setup failed");
@@ -201,11 +184,13 @@ describe("lobby room", () => {
         socketId: "socket-b"
       }
     });
-    expect(room.getHostView().players.map((player) => ({
-      number: player.number,
-      nickname: player.nickname,
-      connection: player.connection
-    }))).toEqual([
+    expect(
+      room.getHostView().players.map((player) => ({
+        number: player.number,
+        nickname: player.nickname,
+        connection: player.connection
+      }))
+    ).toEqual([
       { number: 1, nickname: "林野", connection: "online" },
       { number: 2, nickname: "阿岚", connection: "departed" },
       { number: 3, nickname: "青禾", connection: "online" }
@@ -225,10 +210,7 @@ describe("lobby room", () => {
     const room = createRoom();
     const joined = room.join({ roomCode: "123456", joinToken: token, nickname: "林野" }, "socket-a");
     if (!joined.ok) throw new Error("test setup failed");
-    const requested = room.requestTakeover(
-      { roomCode: "123456", joinToken: token, nickname: "林野" },
-      "socket-b"
-    );
+    const requested = room.requestTakeover({ roomCode: "123456", joinToken: token, nickname: "林野" }, "socket-b");
     if (!requested.ok) throw new Error("test setup failed");
 
     const departed = room.markPlayerDeparted(joined.data.lobby.selfId);
@@ -239,10 +221,7 @@ describe("lobby room", () => {
       ok: false,
       code: "TAKEOVER_REQUEST_NOT_FOUND"
     });
-    expect(room.requestTakeover(
-      { roomCode: "123456", joinToken: token, nickname: "林野" },
-      "socket-c"
-    )).toMatchObject({ ok: false, code: "PLAYER_NOT_FOUND" });
+    expect(room.requestTakeover({ roomCode: "123456", joinToken: token, nickname: "林野" }, "socket-c")).toMatchObject({ ok: false, code: "PLAYER_NOT_FOUND" });
   });
 
   it("stores role configuration and derives readiness from non-departed players", () => {
@@ -314,9 +293,7 @@ describe("lobby room", () => {
 
   it("restores private identity and enters first night after all confirmations", () => {
     const room = createRoom();
-    const sessions = ["林野", "阿岚", "青禾"].map((nickname, index) =>
-      room.join({ roomCode: "123456", joinToken: token, nickname }, `socket-${index}`)
-    );
+    const sessions = ["林野", "阿岚", "青禾"].map((nickname, index) => room.join({ roomCode: "123456", joinToken: token, nickname }, `socket-${index}`));
     if (sessions.some((session) => !session.ok)) throw new Error("test setup failed");
     room.updateRoleConfiguration({ wolf: 1, villager: 1, seer: 1, witch: 0 });
     room.startGame();
@@ -479,17 +456,17 @@ describe("lobby room", () => {
     const dawn = room.getHostView();
     expect(dawn.phase).toBe("game-over");
     expect(dawn.gameResult?.outcome).toBe("wolf-win");
-    expect(dawn.gameResult?.revealedPlayers.filter((player) => !player.alive).map((player) => player.id).sort()).toEqual(
-      [villagers[0]!.selfId, villagers[1]!.selfId].sort()
-    );
+    expect(
+      dawn.gameResult?.revealedPlayers
+        .filter((player) => !player.alive)
+        .map((player) => player.id)
+        .sort()
+    ).toEqual([villagers[0]!.selfId, villagers[1]!.selfId].sort());
     expect(JSON.stringify(dawn)).not.toMatch(/wolfAttack|poisonTarget|deathCause/);
   });
 
   it("lets the guard block a wolf attack, empty-protect, and not protect the same player consecutively", () => {
-    const { room, views } = startConfiguredRoom(
-      { wolf: 1, villager: 2, seer: 0, witch: 0, guard: 1 },
-      ["林野", "阿岚", "青禾", "南星"]
-    );
+    const { room, views } = startConfiguredRoom({ wolf: 1, villager: 2, seer: 0, witch: 0, guard: 1 }, ["林野", "阿岚", "青禾", "南星"]);
     const wolf = views.find((view) => view.privateRole?.role === "wolf")!;
     const guard = views.find((view) => view.privateRole?.role === "guard")!;
     const victim = views.find((view) => view.privateRole?.role === "villager")!;
@@ -510,8 +487,7 @@ describe("lobby room", () => {
     room.selectWolfTarget(wolf.selfId, "no-kill");
     room.confirmWolfVote(wolf.selfId, true);
 
-    expect(room.getPlayerView(guard.selfId)?.guardAction?.candidates.map((candidate) => candidate.id))
-      .not.toContain(victim.selfId);
+    expect(room.getPlayerView(guard.selfId)?.guardAction?.candidates.map((candidate) => candidate.id)).not.toContain(victim.selfId);
     expect(room.protectAsGuard(guard.selfId, victim.selfId)).toMatchObject({
       ok: false,
       code: "INVALID_NIGHT_ACTION"
@@ -523,10 +499,7 @@ describe("lobby room", () => {
   });
 
   it("waits for a wolf-killed hunter to shoot before evaluating the winner", () => {
-    const { room, views } = startConfiguredRoom(
-      { wolf: 1, villager: 2, seer: 0, witch: 0, hunter: 1 },
-      ["林野", "阿岚", "青禾", "南星"]
-    );
+    const { room, views } = startConfiguredRoom({ wolf: 1, villager: 2, seer: 0, witch: 0, hunter: 1 }, ["林野", "阿岚", "青禾", "南星"]);
     const wolf = views.find((view) => view.privateRole?.role === "wolf")!;
     const hunter = views.find((view) => view.privateRole?.role === "hunter")!;
 
@@ -547,10 +520,7 @@ describe("lobby room", () => {
   });
 
   it("does not let a poisoned hunter shoot", () => {
-    const { room, views } = startConfiguredRoom(
-      { wolf: 1, villager: 2, seer: 0, witch: 1, hunter: 1 },
-      ["林野", "阿岚", "青禾", "南星", "石川"]
-    );
+    const { room, views } = startConfiguredRoom({ wolf: 1, villager: 2, seer: 0, witch: 1, hunter: 1 }, ["林野", "阿岚", "青禾", "南星", "石川"]);
     const wolf = views.find((view) => view.privateRole?.role === "wolf")!;
     const witch = views.find((view) => view.privateRole?.role === "witch")!;
     const hunter = views.find((view) => view.privateRole?.role === "hunter")!;
@@ -572,10 +542,7 @@ describe("lobby room", () => {
   });
 
   it("lets an exiled hunter shoot before resolving the winner", () => {
-    const { room, views } = startConfiguredRoom(
-      { wolf: 1, villager: 2, seer: 0, witch: 0, guard: 1, hunter: 1 },
-      ["林野", "阿岚", "青禾", "南星", "石川"]
-    );
+    const { room, views } = startConfiguredRoom({ wolf: 1, villager: 2, seer: 0, witch: 0, guard: 1, hunter: 1 }, ["林野", "阿岚", "青禾", "南星", "石川"]);
     const wolf = views.find((view) => view.privateRole?.role === "wolf")!;
     const guard = views.find((view) => view.privateRole?.role === "guard")!;
     const hunter = views.find((view) => view.privateRole?.role === "hunter")!;
@@ -603,10 +570,7 @@ describe("lobby room", () => {
   });
 
   it("reveals an exiled idiot, preserves the reveal, and removes their vote", () => {
-    const { room, views } = startConfiguredRoom(
-      { wolf: 1, villager: 2, seer: 0, witch: 0, idiot: 1 },
-      ["林野", "阿岚", "青禾", "南星"]
-    );
+    const { room, views } = startConfiguredRoom({ wolf: 1, villager: 2, seer: 0, witch: 0, idiot: 1 }, ["林野", "阿岚", "青禾", "南星"]);
     const wolf = views.find((view) => view.privateRole?.role === "wolf")!;
     const idiot = views.find((view) => view.privateRole?.role === "idiot")!;
 
@@ -629,10 +593,12 @@ describe("lobby room", () => {
     });
     expect(room.getHostView().players.find((player) => player.id === idiot.selfId)?.alive).toBe(true);
     const idiotNickname = room.getHostView().players.find((player) => player.id === idiot.selfId)!.nickname;
-    expect(room.createSnapshot().gameRecords).not.toContainEqual(expect.objectContaining({
-      type: "death",
-      detail: expect.stringContaining(idiotNickname)
-    }));
+    expect(room.createSnapshot().gameRecords).not.toContainEqual(
+      expect.objectContaining({
+        type: "death",
+        detail: expect.stringContaining(idiotNickname)
+      })
+    );
 
     room.continueFromExile();
     room.selectWolfTarget(wolf.selfId, "no-kill");
@@ -642,8 +608,7 @@ describe("lobby room", () => {
 
     expect(room.getPlayerView(idiot.selfId)?.dayVote).toMatchObject({ eligible: false, candidates: [] });
     const otherVoter = room.getHostView().dayState!.alivePlayerIds.find((id) => id !== idiot.selfId)!;
-    expect(room.getPlayerView(otherVoter)?.dayVote?.candidates.map((candidate) => candidate.id))
-      .not.toContain(idiot.selfId);
+    expect(room.getPlayerView(otherVoter)?.dayVote?.candidates.map((candidate) => candidate.id)).not.toContain(idiot.selfId);
     expect(room.selectDayVote(idiot.selfId, "abstain")).toMatchObject({ ok: false });
     expect(room.selectDayVote(otherVoter, idiot.selfId)).toMatchObject({ ok: false, code: "PLAYER_NOT_FOUND" });
 
@@ -716,31 +681,25 @@ describe("lobby room", () => {
       ok: false,
       code: "INVALID_NIGHT_ACTION"
     });
-    expect(room.sendWolfMessage(
-      wolves[0]!.selfId,
-      { kind: "text", text: "先观察票型" },
-      new Date("2026-07-15T12:00:00.000Z")
-    )).toMatchObject({ ok: true, data: { wolfAction: { messages: [
-      expect.objectContaining({ content: { kind: "text", text: "先观察票型" } })
-    ] } } });
-    expect(room.sendWolfMessage(
-      wolves[0]!.selfId,
-      { kind: "quick", code: "agree" },
-      new Date("2026-07-15T12:00:00.500Z")
-    )).toMatchObject({ ok: false, code: "CHAT_RATE_LIMITED" });
-    const suggestion = room.sendWolfMessage(
-      wolves[1]!.selfId,
-      { kind: "target-suggestion", target: nonWolf.selfId },
-      new Date("2026-07-15T12:00:00.500Z")
-    );
+    expect(room.sendWolfMessage(wolves[0]!.selfId, { kind: "text", text: "先观察票型" }, new Date("2026-07-15T12:00:00.000Z"))).toMatchObject({
+      ok: true,
+      data: { wolfAction: { messages: [expect.objectContaining({ content: { kind: "text", text: "先观察票型" } })] } }
+    });
+    expect(room.sendWolfMessage(wolves[0]!.selfId, { kind: "quick", code: "agree" }, new Date("2026-07-15T12:00:00.500Z"))).toMatchObject({
+      ok: false,
+      code: "CHAT_RATE_LIMITED"
+    });
+    const suggestion = room.sendWolfMessage(wolves[1]!.selfId, { kind: "target-suggestion", target: nonWolf.selfId }, new Date("2026-07-15T12:00:00.500Z"));
     expect(suggestion).toMatchObject({ ok: true });
     if (!suggestion.ok) throw new Error("test setup failed");
-    expect(suggestion.data.wolfAction?.messages).toContainEqual(expect.objectContaining({
-      content: expect.objectContaining({
-        kind: "target-suggestion",
-        target: expect.objectContaining({ id: nonWolf.selfId })
+    expect(suggestion.data.wolfAction?.messages).toContainEqual(
+      expect.objectContaining({
+        content: expect.objectContaining({
+          kind: "target-suggestion",
+          target: expect.objectContaining({ id: nonWolf.selfId })
+        })
       })
-    }));
+    );
     expect(JSON.stringify(room.getHostView())).not.toContain("先观察票型");
     expect(JSON.stringify(room.getPlayerView(nonWolf.selfId))).not.toContain("先观察票型");
 
@@ -749,26 +708,24 @@ describe("lobby room", () => {
     const restored = room.reconnect(firstWolfSession.data.credentials, "restored-wolf");
     expect(restored).toMatchObject({ ok: true });
     if (!restored.ok) throw new Error("test setup failed");
-    expect(restored.data.session.lobby.wolfAction?.messages).toContainEqual(expect.objectContaining({
-      content: { kind: "text", text: "先观察票型" }
-    }));
+    expect(restored.data.session.lobby.wolfAction?.messages).toContainEqual(
+      expect.objectContaining({
+        content: { kind: "text", text: "先观察票型" }
+      })
+    );
 
     room.selectWolfTarget(wolves[0]!.selfId, "no-kill");
     room.confirmWolfVote(wolves[0]!.selfId, true);
     room.selectWolfTarget(wolves[1]!.selfId, "no-kill");
     room.confirmWolfVote(wolves[1]!.selfId, true);
-    expect(room.sendWolfMessage(
-      wolves[0]!.selfId,
-      { kind: "quick", code: "agree" },
-      new Date("2026-07-15T12:00:02.000Z")
-    )).toMatchObject({ ok: false, code: "INVALID_NIGHT_ACTION" });
+    expect(room.sendWolfMessage(wolves[0]!.selfId, { kind: "quick", code: "agree" }, new Date("2026-07-15T12:00:02.000Z"))).toMatchObject({
+      ok: false,
+      code: "INVALID_NIGHT_ACTION"
+    });
   });
 
   it("increments chat sequence only for accepted messages and rate-limits each sender", () => {
-    const { room, views } = startConfiguredRoom(
-      { wolf: 2, villager: 1, seer: 1, witch: 0 },
-      ["林野", "阿岚", "青禾", "南星"]
-    );
+    const { room, views } = startConfiguredRoom({ wolf: 2, villager: 1, seer: 1, witch: 0 }, ["林野", "阿岚", "青禾", "南星"]);
     const wolves = views.filter((view) => view.privateRole?.role === "wolf");
     expect(wolves).toHaveLength(2);
 
@@ -797,8 +754,7 @@ describe("lobby room", () => {
     expect(rateLimited).toMatchObject({ ok: false, code: "CHAT_RATE_LIMITED" });
     expect(second).toMatchObject({ ok: true, data: { sequence: 2 } });
     expect(third).toMatchObject({ ok: true, data: { sequence: 3 } });
-    expect(room.getPlayerView(wolves[0]!.selfId)?.wolfAction?.messages.map((message) => message.sequence))
-      .toEqual([1, 2, 3]);
+    expect(room.getPlayerView(wolves[0]!.selfId)?.wolfAction?.messages.map((message) => message.sequence)).toEqual([1, 2, 3]);
   });
 
   it("does not advance chat sequence or commit memory when persistence fails", () => {
@@ -834,20 +790,16 @@ describe("lobby room", () => {
       })
       .find((view) => view.privateRole?.role === "wolf")!;
 
-    expect(() => room.sendChat(
-      wolf.selfId,
-      { channel: "wolf-private", content: { kind: "text", text: "不应提交" } },
-      new Date("2026-07-19T08:00:00.000Z")
-    )).toThrow("database unavailable");
+    expect(() =>
+      room.sendChat(wolf.selfId, { channel: "wolf-private", content: { kind: "text", text: "不应提交" } }, new Date("2026-07-19T08:00:00.000Z"))
+    ).toThrow("database unavailable");
     expect(room.getPlayerView(wolf.selfId)?.wolfAction?.messages).toEqual([]);
     expect(persistedMessages).toEqual([]);
 
     rejectAppend = false;
-    expect(room.sendChat(
-      wolf.selfId,
-      { channel: "wolf-private", content: { kind: "text", text: "持久化成功" } },
-      new Date("2026-07-19T08:00:00.000Z")
-    )).toMatchObject({
+    expect(
+      room.sendChat(wolf.selfId, { channel: "wolf-private", content: { kind: "text", text: "持久化成功" } }, new Date("2026-07-19T08:00:00.000Z"))
+    ).toMatchObject({
       ok: true,
       data: {
         sequence: 1,
@@ -864,10 +816,7 @@ describe("lobby room", () => {
   });
 
   it("allows a dead player to send public chat only during their own last words", () => {
-    const { room, views } = startConfiguredRoom(
-      { wolf: 1, villager: 2, seer: 1, witch: 1 },
-      ["林野", "阿岚", "青禾", "南星", "石川"]
-    );
+    const { room, views } = startConfiguredRoom({ wolf: 1, villager: 2, seer: 1, witch: 1 }, ["林野", "阿岚", "青禾", "南星", "石川"]);
     const wolf = views.find((view) => view.privateRole?.role === "wolf")!;
     const seer = views.find((view) => view.privateRole?.role === "seer")!;
     const witch = views.find((view) => view.privateRole?.role === "witch")!;
@@ -881,27 +830,22 @@ describe("lobby room", () => {
       phase: "dawn",
       players: expect.arrayContaining([expect.objectContaining({ id: victim.selfId, alive: false })])
     });
-    expect(room.sendChat(
-      victim.selfId,
-      { channel: "day-public", content: { kind: "text", text: "黎明阶段不能发言" } },
-      new Date("2026-07-15T12:00:00.000Z")
-    )).toMatchObject({ ok: false, code: "INVALID_PHASE_CONTROL" });
+    expect(
+      room.sendChat(victim.selfId, { channel: "day-public", content: { kind: "text", text: "黎明阶段不能发言" } }, new Date("2026-07-15T12:00:00.000Z"))
+    ).toMatchObject({ ok: false, code: "INVALID_PHASE_CONTROL" });
 
     expect(room.continueFromDawn()).toMatchObject({
       ok: true,
       data: { phase: "last-words", dayState: { currentSpeaker: { id: victim.selfId } } }
     });
     expect(room.getPlayerView(victim.selfId)?.publicChat.canSend).toBe(true);
-    expect(room.sendChat(
-      wolf.selfId,
-      { channel: "day-public", content: { kind: "text", text: "插话" } },
-      new Date("2026-07-15T12:00:01.000Z")
-    )).toMatchObject({ ok: false, code: "INVALID_PHASE_CONTROL" });
-    expect(room.sendChat(
-      victim.selfId,
-      { channel: "day-public", content: { kind: "text", text: "这是我的遗言" } },
-      new Date("2026-07-15T12:00:01.000Z")
-    )).toMatchObject({
+    expect(room.sendChat(wolf.selfId, { channel: "day-public", content: { kind: "text", text: "插话" } }, new Date("2026-07-15T12:00:01.000Z"))).toMatchObject({
+      ok: false,
+      code: "INVALID_PHASE_CONTROL"
+    });
+    expect(
+      room.sendChat(victim.selfId, { channel: "day-public", content: { kind: "text", text: "这是我的遗言" } }, new Date("2026-07-15T12:00:01.000Z"))
+    ).toMatchObject({
       ok: true,
       data: {
         phase: "last-words",
@@ -912,25 +856,26 @@ describe("lobby room", () => {
 
     expect(room.finishSpeaking(victim.selfId)).toMatchObject({ ok: true });
     expect(room.getPlayerView(victim.selfId)?.publicChat.canSend).toBe(false);
-    expect(room.sendChat(
-      victim.selfId,
-      { channel: "day-public", content: { kind: "text", text: "遗言轮次已经结束" } },
-      new Date("2026-07-15T12:00:02.000Z")
-    )).toMatchObject({ ok: false, code: "INVALID_PHASE_CONTROL" });
+    expect(
+      room.sendChat(victim.selfId, { channel: "day-public", content: { kind: "text", text: "遗言轮次已经结束" } }, new Date("2026-07-15T12:00:02.000Z"))
+    ).toMatchObject({ ok: false, code: "INVALID_PHASE_CONTROL" });
 
     while (room.getHostView().phase === "day-speech") room.skipCurrentDayStage();
     expect(room.getHostView().phase).toBe("day-vote");
-    expect(room.sendChat(
-      wolf.selfId,
-      { channel: "day-public", content: { kind: "text", text: "投票阶段不能公开聊天" } },
-      new Date("2026-07-15T12:00:03.000Z")
-    )).toMatchObject({ ok: false, code: "INVALID_PHASE_CONTROL" });
-    expect(room.getHostView().publicChat.messages).toContainEqual(expect.objectContaining({
-      sender: { kind: "player", id: victim.selfId, number: victim.players.find(
-        (player) => player.id === victim.selfId
-      )!.number, nickname: victim.players.find((player) => player.id === victim.selfId)!.nickname },
-      content: { kind: "text", text: "这是我的遗言" }
-    }));
+    expect(
+      room.sendChat(wolf.selfId, { channel: "day-public", content: { kind: "text", text: "投票阶段不能公开聊天" } }, new Date("2026-07-15T12:00:03.000Z"))
+    ).toMatchObject({ ok: false, code: "INVALID_PHASE_CONTROL" });
+    expect(room.getHostView().publicChat.messages).toContainEqual(
+      expect.objectContaining({
+        sender: {
+          kind: "player",
+          id: victim.selfId,
+          number: victim.players.find((player) => player.id === victim.selfId)!.number,
+          nickname: victim.players.find((player) => player.id === victim.selfId)!.nickname
+        },
+        content: { kind: "text", text: "这是我的遗言" }
+      })
+    );
   });
 
   it("restores public chat history when the current speaker reconnects", () => {
@@ -949,9 +894,7 @@ describe("lobby room", () => {
     room.continueFromDawn();
 
     const speakerId = room.getHostView().dayState?.currentSpeaker?.id;
-    const speakerIndex = sessions.findIndex(
-      (session) => session.ok && session.data.lobby.selfId === speakerId
-    );
+    const speakerIndex = sessions.findIndex((session) => session.ok && session.data.lobby.selfId === speakerId);
     const speakerSession = sessions[speakerIndex];
     if (speakerIndex < 0 || !speakerSession?.ok) throw new Error("test setup failed");
 
@@ -1044,9 +987,7 @@ describe("lobby room", () => {
 
   it("advances immediately when the current speaker finishes in deferred mode", () => {
     const room = createRoom(true);
-    const sessions = ["林野", "阿岚", "青禾"].map((nickname, index) =>
-      room.join({ roomCode: "123456", joinToken: token, nickname }, `socket-${index}`)
-    );
+    const sessions = ["林野", "阿岚", "青禾"].map((nickname, index) => room.join({ roomCode: "123456", joinToken: token, nickname }, `socket-${index}`));
     if (sessions.some((session) => !session.ok)) throw new Error("test setup failed");
     room.updateRoleConfiguration({ wolf: 1, villager: 1, seer: 1, witch: 0 });
     room.startGame();
@@ -1078,9 +1019,7 @@ describe("lobby room", () => {
 
   it("exiles nobody when the highest day vote is tied", () => {
     const room = createRoom();
-    const sessions = ["林野", "阿岚", "青禾"].map((nickname, index) =>
-      room.join({ roomCode: "123456", joinToken: token, nickname }, `socket-${index}`)
-    );
+    const sessions = ["林野", "阿岚", "青禾"].map((nickname, index) => room.join({ roomCode: "123456", joinToken: token, nickname }, `socket-${index}`));
     if (sessions.some((session) => !session.ok)) throw new Error("test setup failed");
     room.updateRoleConfiguration({ wolf: 1, villager: 1, seer: 1, witch: 0 });
     room.startGame();
@@ -1113,9 +1052,7 @@ describe("lobby room", () => {
 
   it("treats unconfirmed timeout ballots as abstentions and starts the next night", () => {
     const room = createRoom();
-    const sessions = ["林野", "阿岚", "青禾"].map((nickname, index) =>
-      room.join({ roomCode: "123456", joinToken: token, nickname }, `socket-${index}`)
-    );
+    const sessions = ["林野", "阿岚", "青禾"].map((nickname, index) => room.join({ roomCode: "123456", joinToken: token, nickname }, `socket-${index}`));
     if (sessions.some((session) => !session.ok)) throw new Error("test setup failed");
     room.updateRoleConfiguration({ wolf: 1, villager: 1, seer: 1, witch: 0 });
     room.startGame();
@@ -1190,9 +1127,7 @@ describe("lobby room", () => {
 
   it("returns to lobby or starts a clean rematch after game over", () => {
     const room = createRoom();
-    const sessions = ["林野", "阿岚", "青禾"].map((nickname, index) =>
-      room.join({ roomCode: "123456", joinToken: token, nickname }, `socket-${index}`)
-    );
+    const sessions = ["林野", "阿岚", "青禾"].map((nickname, index) => room.join({ roomCode: "123456", joinToken: token, nickname }, `socket-${index}`));
     if (sessions.some((session) => !session.ok)) throw new Error("test setup failed");
     room.updateRoleConfiguration({ wolf: 1, villager: 1, seer: 1, witch: 0 });
     room.startGame();
@@ -1217,9 +1152,7 @@ describe("lobby room", () => {
 
   it("keeps private actions hidden until game over and clears records for a rematch", () => {
     const room = createRoom();
-    const sessions = ["林野", "阿岚", "青禾"].map((nickname, index) =>
-      room.join({ roomCode: "123456", joinToken: token, nickname }, `socket-${index}`)
-    );
+    const sessions = ["林野", "阿岚", "青禾"].map((nickname, index) => room.join({ roomCode: "123456", joinToken: token, nickname }, `socket-${index}`));
     if (sessions.some((session) => !session.ok)) throw new Error("test setup failed");
     room.updateRoleConfiguration({ wolf: 1, villager: 1, seer: 1, witch: 0 });
     room.startGame();
@@ -1298,16 +1231,20 @@ describe("lobby room", () => {
 
     const result = room.getHostView();
     expect(result).toMatchObject({ phase: "game-over", gameResult: { outcome: "good-win" } });
-    expect(result.gameResult?.records).toContainEqual(expect.objectContaining({
-      type: "death",
-      day: 1,
-      detail: "夜间无人死亡"
-    }));
-    expect(result.gameResult?.records).toContainEqual(expect.objectContaining({
-      type: "death",
-      day: 2,
-      detail: expect.stringContaining("夜间死亡")
-    }));
+    expect(result.gameResult?.records).toContainEqual(
+      expect.objectContaining({
+        type: "death",
+        day: 1,
+        detail: "夜间无人死亡"
+      })
+    );
+    expect(result.gameResult?.records).toContainEqual(
+      expect.objectContaining({
+        type: "death",
+        day: 2,
+        detail: expect.stringContaining("夜间死亡")
+      })
+    );
     expect(room.selectWolfTarget(wolf.selfId, "no-kill")).toMatchObject({
       ok: false,
       code: "INVALID_NIGHT_ACTION"
@@ -1362,10 +1299,12 @@ describe("lobby room", () => {
     room.skipCurrentNightStage();
     room.continueFromDawn();
     let firstSpeaker = room.getHostView().dayState!.currentSpeaker!;
-    const firstRole = sessions.map((session) => {
-      if (!session.ok) throw new Error("test setup failed");
-      return room.getPlayerView(session.data.lobby.selfId)!;
-    }).find((view) => view.selfId === firstSpeaker.id)?.privateRole?.role;
+    const firstRole = sessions
+      .map((session) => {
+        if (!session.ok) throw new Error("test setup failed");
+        return room.getPlayerView(session.data.lobby.selfId)!;
+      })
+      .find((view) => view.selfId === firstSpeaker.id)?.privateRole?.role;
     if (firstRole === "wolf") {
       room.finishSpeaking(firstSpeaker.id);
       firstSpeaker = room.getHostView().dayState!.currentSpeaker!;

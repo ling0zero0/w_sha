@@ -7,20 +7,12 @@ export interface ModelProviderConnection {
   apiKey: string | null;
 }
 
-export type ModelProviderFactory = (
-  connection: ModelProviderConnection
-) => ModelProvider;
+export type ModelProviderFactory = (connection: ModelProviderConnection) => ModelProvider;
 
 export class ProviderRegistry {
-  private readonly factories = new Map<
-    AiProviderProtocol,
-    ModelProviderFactory
-  >();
+  private readonly factories = new Map<AiProviderProtocol, ModelProviderFactory>();
 
-  register(
-    protocol: AiProviderProtocol,
-    factory: ModelProviderFactory
-  ): void {
+  register(protocol: AiProviderProtocol, factory: ModelProviderFactory): void {
     if (this.factories.has(protocol)) {
       throw new Error(`model provider protocol already registered: ${protocol}`);
     }
@@ -31,10 +23,7 @@ export class ProviderRegistry {
     return this.factories.has(protocol);
   }
 
-  create(
-    protocol: AiProviderProtocol,
-    connection: ModelProviderConnection
-  ): ModelProvider {
+  create(protocol: AiProviderProtocol, connection: ModelProviderConnection): ModelProvider {
     const factory = this.factories.get(protocol);
     if (!factory) {
       throw new Error(`unsupported model provider protocol: ${protocol}`);
@@ -45,9 +34,6 @@ export class ProviderRegistry {
 
 export function createDefaultProviderRegistry(): ProviderRegistry {
   const registry = new ProviderRegistry();
-  registry.register(
-    "openai-compatible-chat",
-    createOpenAiCompatibleProvider
-  );
+  registry.register("openai-compatible-chat", createOpenAiCompatibleProvider);
   return registry;
 }

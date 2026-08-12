@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ModelProvider } from "./model-provider.js";
-import {
-  createDefaultProviderRegistry,
-  ProviderRegistry
-} from "./provider-registry.js";
+import { createDefaultProviderRegistry, ProviderRegistry } from "./provider-registry.js";
 
 describe("AI provider registry", () => {
   it("creates registered provider protocols", () => {
@@ -24,7 +21,7 @@ describe("AI provider registry", () => {
 
   it("rejects duplicate registrations", () => {
     const registry = new ProviderRegistry();
-    const factory = () => ({} as ModelProvider);
+    const factory = () => ({}) as ModelProvider;
     registry.register("openai-compatible-chat", factory);
 
     expect(() => {
@@ -36,9 +33,11 @@ describe("AI provider registry", () => {
     const registry = createDefaultProviderRegistry();
 
     expect(registry.has("openai-compatible-chat")).toBe(true);
-    expect(registry.create("openai-compatible-chat", {
-      baseUrl: "http://127.0.0.1:1234/v1",
-      apiKey: null
-    })).toBeInstanceOf(Object);
+    expect(
+      registry.create("openai-compatible-chat", {
+        baseUrl: "http://127.0.0.1:1234/v1",
+        apiKey: null
+      })
+    ).toBeInstanceOf(Object);
   });
 });

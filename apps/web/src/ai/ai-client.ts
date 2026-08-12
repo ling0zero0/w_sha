@@ -32,7 +32,10 @@ interface RuntimeSchema<T> {
 }
 
 export class AiAdminError extends Error {
-  constructor(message: string, readonly status: number) {
+  constructor(
+    message: string,
+    readonly status: number
+  ) {
     super(message);
     this.name = "AiAdminError";
   }
@@ -87,12 +90,7 @@ export function createAiAdminClient(fetchImplementation: Fetch = fetch): AiAdmin
     return sessionToken;
   }
 
-  async function request<T>(
-    path: string,
-    schema: RuntimeSchema<T> | null,
-    init: RequestInit = {},
-    credential?: string
-  ): Promise<T> {
+  async function request<T>(path: string, schema: RuntimeSchema<T> | null, init: RequestInit = {}, credential?: string): Promise<T> {
     try {
       const token = await getToken(init.signal ?? undefined);
       const response = await fetchImplementation(`/api/admin/ai${path}`, {
@@ -105,12 +103,9 @@ export function createAiAdminClient(fetchImplementation: Fetch = fetch): AiAdmin
       });
       const payload = response.status === 204 ? null : await readJson(response);
       if (!response.ok) {
-        throw new AiAdminError(
-          redactCredential(safeMessage(payload, "AI 管理请求失败"), credential),
-          response.status
-        );
+        throw new AiAdminError(redactCredential(safeMessage(payload, "AI 管理请求失败"), credential), response.status);
       }
-      return schema ? schema.parse(payload) : undefined as T;
+      return schema ? schema.parse(payload) : (undefined as T);
     } catch (error) {
       if (error instanceof AiAdminError) throw error;
       const message = error instanceof Error ? error.message : "AI 管理请求失败";
@@ -121,43 +116,58 @@ export function createAiAdminClient(fetchImplementation: Fetch = fetch): AiAdmin
   const json = (value: unknown) => JSON.stringify(value);
 
   return {
-    getOverview: (signal) => request("/overview", aiConfigurationViewSchema, {
-      ...(signal ? { signal } : {})
-    }),
+    getOverview: (signal) =>
+      request("/overview", aiConfigurationViewSchema, {
+        ...(signal ? { signal } : {})
+      }),
     createProvider: (value) => {
       const parsed = createAiProviderRequestSchema.parse(value);
-      return request("/providers", aiProviderViewSchema, {
-        method: "POST",
-        body: json(parsed)
-      }, parsed.apiKey);
+      return request(
+        "/providers",
+        aiProviderViewSchema,
+        {
+          method: "POST",
+          body: json(parsed)
+        },
+        parsed.apiKey
+      );
     },
     updateProvider: (id, value) => {
       const parsed = updateAiProviderRequestSchema.parse(value);
-      return request(`/providers/${id}`, aiProviderViewSchema, {
-        method: "PATCH",
-        body: json(parsed)
-      }, parsed.apiKey);
+      return request(
+        `/providers/${id}`,
+        aiProviderViewSchema,
+        {
+          method: "PATCH",
+          body: json(parsed)
+        },
+        parsed.apiKey
+      );
     },
     deleteProvider: (id) => request(`/providers/${id}`, null, { method: "DELETE" }),
     testProvider: (id) => request(`/providers/${id}/test`, null, { method: "POST" }),
-    createModel: (value) => request("/models", aiModelProfileViewSchema, {
-      method: "POST",
-      body: json(createAiModelProfileRequestSchema.parse(value))
-    }),
-    updateModel: (id, value) => request(`/models/${id}`, aiModelProfileViewSchema, {
-      method: "PATCH",
-      body: json(updateAiModelProfileRequestSchema.parse(value))
-    }),
+    createModel: (value) =>
+      request("/models", aiModelProfileViewSchema, {
+        method: "POST",
+        body: json(createAiModelProfileRequestSchema.parse(value))
+      }),
+    updateModel: (id, value) =>
+      request(`/models/${id}`, aiModelProfileViewSchema, {
+        method: "PATCH",
+        body: json(updateAiModelProfileRequestSchema.parse(value))
+      }),
     deleteModel: (id) => request(`/models/${id}`, null, { method: "DELETE" }),
     testModel: (id) => request(`/models/${id}/test`, null, { method: "POST" }),
-    createBotProfile: (value) => request("/bot-profiles", aiBotProfileViewSchema, {
-      method: "POST",
-      body: json(createAiBotProfileRequestSchema.parse(value))
-    }),
-    updateBotProfile: (id, value) => request(`/bot-profiles/${id}`, aiBotProfileViewSchema, {
-      method: "PATCH",
-      body: json(updateAiBotProfileRequestSchema.parse(value))
-    }),
+    createBotProfile: (value) =>
+      request("/bot-profiles", aiBotProfileViewSchema, {
+        method: "POST",
+        body: json(createAiBotProfileRequestSchema.parse(value))
+      }),
+    updateBotProfile: (id, value) =>
+      request(`/bot-profiles/${id}`, aiBotProfileViewSchema, {
+        method: "PATCH",
+        body: json(updateAiBotProfileRequestSchema.parse(value))
+      }),
     deleteBotProfile: (id) => request(`/bot-profiles/${id}`, null, { method: "DELETE" })
   };
 }

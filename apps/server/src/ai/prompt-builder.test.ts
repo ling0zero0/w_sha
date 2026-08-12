@@ -1,7 +1,4 @@
-import type {
-  AiBotProfile,
-  PlayerLobbyView
-} from "@werewolf/shared";
+import type { AiBotProfile, PlayerLobbyView } from "@werewolf/shared";
 import { describe, expect, it } from "vitest";
 import { buildBotPrompt } from "./prompt-builder.js";
 
@@ -28,25 +25,28 @@ function createView(): PlayerLobbyView {
     roomCode: "123456",
     revision: 9,
     selfId,
-    players: [{
-      id: selfId,
-      number: 1,
-      nickname: "Aster",
-      connection: "online",
-      alive: true,
-      controller: "bot",
-      botKind: "llm",
-      botProfileId: profile.id
-    }, {
-      id: targetId,
-      number: 2,
-      nickname: "Player",
-      connection: "online",
-      alive: true,
-      controller: "human",
-      botKind: null,
-      botProfileId: null
-    }],
+    players: [
+      {
+        id: selfId,
+        number: 1,
+        nickname: "Aster",
+        connection: "online",
+        alive: true,
+        controller: "bot",
+        botKind: "llm",
+        botProfileId: profile.id
+      },
+      {
+        id: targetId,
+        number: 2,
+        nickname: "Player",
+        connection: "online",
+        alive: true,
+        controller: "human",
+        botKind: null,
+        botProfileId: null
+      }
+    ],
     chatMode: "ordered",
     revealedIdiotId: null,
     privateRole: {
@@ -75,21 +75,23 @@ function createView(): PlayerLobbyView {
     gameResult: null,
     publicChat: {
       canSend: true,
-      messages: [{
-        id: "019bf178-7f24-7e40-b8dc-0c2dd948d5af",
-        sequence: 4,
-        channel: "day-public",
-        day: 1,
-        phase: "day-speech",
-        sender: {
-          kind: "player",
-          id: targetId,
-          number: 2,
-          nickname: "Player"
-        },
-        content: { kind: "text", text: injection },
-        createdAt: "2026-07-19T12:00:00.000Z"
-      }]
+      messages: [
+        {
+          id: "019bf178-7f24-7e40-b8dc-0c2dd948d5af",
+          sequence: 4,
+          channel: "day-public",
+          day: 1,
+          phase: "day-speech",
+          sender: {
+            kind: "player",
+            id: targetId,
+            number: 2,
+            nickname: "Player"
+          },
+          content: { kind: "text", text: injection },
+          createdAt: "2026-07-19T12:00:00.000Z"
+        }
+      ]
     }
   };
 }
@@ -118,15 +120,9 @@ describe("LLM prompt builder", () => {
       allowedIntentTypes: ["chat-send", "chat-send"]
     });
 
-    expect(prompt.userPrompt).toContain(
-      'ALLOWED_INTENT_TYPES_JSON:\n["chat-send"]'
-    );
-    expect(prompt.systemPrompt).toContain(
-      "contain protocolVersion 1 and an intent"
-    );
-    expect(prompt.userPrompt).toContain(
-      '"protocolVersion":{"const":1},"intent":{"oneOf"'
-    );
+    expect(prompt.userPrompt).toContain('ALLOWED_INTENT_TYPES_JSON:\n["chat-send"]');
+    expect(prompt.systemPrompt).toContain("contain protocolVersion 1 and an intent");
+    expect(prompt.userPrompt).toContain('"protocolVersion":{"const":1},"intent":{"oneOf"');
     expect(prompt.userPrompt).toContain('"additionalProperties":false');
     expect(prompt.userPrompt).toContain('"channel":{"const":"day-public"}');
     expect(prompt.userPrompt).not.toContain('"const":"confirm-role"');
@@ -137,10 +133,12 @@ describe("LLM prompt builder", () => {
   });
 
   it("rejects prompts with no permitted action", () => {
-    expect(() => buildBotPrompt({
-      view: createView(),
-      botProfile: profile,
-      allowedIntentTypes: []
-    })).toThrow("at least one allowed bot intent type is required");
+    expect(() =>
+      buildBotPrompt({
+        view: createView(),
+        botProfile: profile,
+        allowedIntentTypes: []
+      })
+    ).toThrow("at least one allowed bot intent type is required");
   });
 });

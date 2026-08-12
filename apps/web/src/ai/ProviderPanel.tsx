@@ -1,8 +1,4 @@
-import type {
-  AiProviderId,
-  AiProviderView,
-  CreateAiProviderRequest
-} from "@werewolf/shared";
+import type { AiProviderId, AiProviderView, CreateAiProviderRequest } from "@werewolf/shared";
 import { Check, FlaskConical, Plus, Save, Server, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import type { AiAdminClient } from "./ai-client";
@@ -22,9 +18,7 @@ const emptyProvider: CreateAiProviderRequest = {
 };
 
 export function ProviderPanel({ providers, client, onChanged }: ProviderPanelProps) {
-  const [selectedId, setSelectedId] = useState<AiProviderId | "new">(
-    providers[0]?.id ?? "new"
-  );
+  const [selectedId, setSelectedId] = useState<AiProviderId | "new">(providers[0]?.id ?? "new");
   const selected = providers.find((provider) => provider.id === selectedId);
 
   return (
@@ -35,13 +29,7 @@ export function ProviderPanel({ providers, client, onChanged }: ProviderPanelPro
             <span>{providers.length}</span>
             <strong>服务连接</strong>
           </div>
-          <button
-            type="button"
-            className="ai-icon-button"
-            aria-label="新建服务连接"
-            title="新建服务连接"
-            onClick={() => setSelectedId("new")}
-          >
+          <button type="button" className="ai-icon-button" aria-label="新建服务连接" title="新建服务连接" onClick={() => setSelectedId("new")}>
             <Plus size={18} aria-hidden="true" />
           </button>
         </div>

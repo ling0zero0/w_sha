@@ -90,18 +90,10 @@ interface RoomOptions {
   chatPersistence?: RoomChatPersistence;
 }
 
-export type ChatHistoryReader =
-  | { kind: "host" }
-  | { kind: "player"; playerId: PlayerId };
+export type ChatHistoryReader = { kind: "host" } | { kind: "player"; playerId: PlayerId };
 
 export interface RoomChatPersistence {
-  createSession(input: {
-    id: string;
-    roomCode: string;
-    startedAt: string;
-    roleConfiguration: RoleConfiguration;
-    chatMode: ChatMode;
-  }): void;
+  createSession(input: { id: string; roomCode: string; startedAt: string; roleConfiguration: RoleConfiguration; chatMode: ChatMode }): void;
   getSession?(sessionId: string): {
     id: string;
     roomCode: string;
@@ -131,8 +123,7 @@ export interface RoomChatPersistence {
   };
 }
 
-export type TimedStage = "role-reveal" | "wolf" | "seer" | "guard" | "witch" | "hunter" | "dawn"
-  | "last-words" | "day-speech" | "day-vote" | "exile-result";
+export type TimedStage = "role-reveal" | "wolf" | "seer" | "guard" | "witch" | "hunter" | "dawn" | "last-words" | "day-speech" | "day-vote" | "exile-result";
 
 export interface LobbyRoomSnapshot {
   version: 1 | 2 | 3;
@@ -169,9 +160,19 @@ export interface LobbyRoomSnapshot {
   gameRecords: GameRecord[];
   roleConfiguration: RoleConfiguration;
   players: Array<
-    Omit<InternalPlayer, "socketId" | "reconnectTokenHash" | "controller" | "botKind" | "botProfileId"
-      | "aiConfigurationLocked" | "aiBotProfileRevision" | "aiModelProfileId" | "aiModelProfileRevision" | "aiModelChainRevision">
-    & {
+    Omit<
+      InternalPlayer,
+      | "socketId"
+      | "reconnectTokenHash"
+      | "controller"
+      | "botKind"
+      | "botProfileId"
+      | "aiConfigurationLocked"
+      | "aiBotProfileRevision"
+      | "aiModelProfileId"
+      | "aiModelProfileRevision"
+      | "aiModelChainRevision"
+    > & {
       reconnectTokenHash: string;
       lastWolfMessageAtMs?: number | null;
       controller?: "human" | "bot";
@@ -297,9 +298,7 @@ export class LobbyRoom {
       wolfAttackTargetId: this.wolfAttackTargetId,
       witchActionSubmitted: this.witchActionSubmitted,
       dawnDeathIds: [...this.dawnDeathIds],
-      ...(this.chatPersistence
-        ? {}
-        : { chatMessages: this.chatMessages.map((message) => ({ ...message })) }),
+      ...(this.chatPersistence ? {} : { chatMessages: this.chatMessages.map((message) => ({ ...message })) }),
       chatSequence: this.chatSequence,
       gameSessionId: this.gameSessionId,
       gameSessionStartedAt: this.gameSessionStartedAt,
@@ -352,20 +351,17 @@ export class LobbyRoom {
     hasMore: boolean;
   }> {
     if (!this.gameSessionId) return failures.invalidPhaseControl();
-    const storeReader = reader.kind === "host"
-      ? reader
-      : {
-          kind: "player" as const,
-          canReadWolfPrivate: this.players.some(
-            (player) => player.id === reader.playerId
-              && player.role === "wolf"
-              && player.alive
-              && player.connection !== "departed"
-          )
-        };
-    if (reader.kind === "player" && !this.players.some(
-      (player) => player.id === reader.playerId && player.connection !== "departed"
-    )) return failures.playerNotFound();
+    const storeReader =
+      reader.kind === "host"
+        ? reader
+        : {
+            kind: "player" as const,
+            canReadWolfPrivate: this.players.some(
+              (player) => player.id === reader.playerId && player.role === "wolf" && player.alive && player.connection !== "departed"
+            )
+          };
+    if (reader.kind === "player" && !this.players.some((player) => player.id === reader.playerId && player.connection !== "departed"))
+      return failures.playerNotFound();
 
     const page = this.chatPersistence
       ? this.chatPersistence.queryAfter(this.gameSessionId, storeReader, afterSequence, limit)
@@ -391,18 +387,18 @@ export class LobbyRoom {
       localAddress: this.localAddress,
       takeoverRequests: this.takeoverRequests.map(({ socketId: _socketId, ...request }) => request),
       roleConfiguration: this.roleConfiguration,
-      startReadiness: evaluateStartReadiness(
-        this.roleConfiguration,
-        this.players.filter((player) => player.connection !== "departed").length
-      ),
+      startReadiness: evaluateStartReadiness(this.roleConfiguration, this.players.filter((player) => player.connection !== "departed").length),
       roleConfirmation: this.getRoleConfirmationProgress(),
       nightProgress: this.getNightProgress(),
-      dawnResult: this.phase === "dawn" ? {
-        deaths: this.dawnDeathIds.flatMap((id) => {
-          const candidate = this.toNightCandidate(id);
-          return candidate ? [candidate] : [];
-        })
-      } : null,
+      dawnResult:
+        this.phase === "dawn"
+          ? {
+              deaths: this.dawnDeathIds.flatMap((id) => {
+                const candidate = this.toNightCandidate(id);
+                return candidate ? [candidate] : [];
+              })
+            }
+          : null,
       dayState: this.getPublicDayState(),
       gameResult: this.getGameResult(),
       publicChat: {
@@ -423,90 +419,109 @@ export class LobbyRoom {
       chatMode: this.chatMode,
       revealedIdiotId: this.revealedIdiotId,
       selfId: playerId,
-      privateRole: player.role ? {
-        role: player.role,
-        confirmed: player.roleConfirmed,
-        wolfTeammates: player.role === "wolf"
-          ? this.players
-            .filter((candidate) => candidate.id !== player.id && candidate.role === "wolf" && candidate.alive)
-            .map(({ id, number, nickname }) => ({ id, number, nickname }))
-          : []
-      } : null,
+      privateRole: player.role
+        ? {
+            role: player.role,
+            confirmed: player.roleConfirmed,
+            wolfTeammates:
+              player.role === "wolf"
+                ? this.players
+                    .filter((candidate) => candidate.id !== player.id && candidate.role === "wolf" && candidate.alive)
+                    .map(({ id, number, nickname }) => ({ id, number, nickname }))
+                : []
+          }
+        : null,
       roleConfirmation: this.getRoleConfirmationProgress(),
       nightProgress: this.getNightProgress(),
-      wolfAction: this.phase === "first-night" && player.role === "wolf" && player.alive ? {
-        candidates: this.players
-          .filter((candidate) => candidate.alive && candidate.connection !== "departed")
-          .map(({ id, number, nickname }) => ({ id, number, nickname })),
-        target: player.wolfVoteTarget,
-        confirmed: player.wolfVoteConfirmed,
-        locked: this.wolfVoteLocked,
-        chatEnabled: this.nightStage === "wolf" && !this.wolfVoteLocked,
-        messages: this.getChannelMessages("wolf-private")
-      } : null,
-      seerAction: this.phase === "first-night" && player.role === "seer" && player.alive ? {
-        active: this.nightStage === "seer",
-        candidates: this.players
-          .filter((candidate) => candidate.alive && candidate.connection !== "departed" && candidate.id !== player.id)
-          .map(({ id, number, nickname }) => ({ id, number, nickname })),
-        inspectedPlayer: player.seerInspectedPlayerId
-          ? this.toNightCandidate(player.seerInspectedPlayerId)
+      wolfAction:
+        this.phase === "first-night" && player.role === "wolf" && player.alive
+          ? {
+              candidates: this.players
+                .filter((candidate) => candidate.alive && candidate.connection !== "departed")
+                .map(({ id, number, nickname }) => ({ id, number, nickname })),
+              target: player.wolfVoteTarget,
+              confirmed: player.wolfVoteConfirmed,
+              locked: this.wolfVoteLocked,
+              chatEnabled: this.nightStage === "wolf" && !this.wolfVoteLocked,
+              messages: this.getChannelMessages("wolf-private")
+            }
           : null,
-        result: player.seerInspectedPlayerId
-          ? this.players.find((candidate) => candidate.id === player.seerInspectedPlayerId)?.role === "wolf"
-            ? "wolf" : "good"
-          : null
-      } : null,
-      witchAction: this.phase === "first-night" && player.role === "witch" && player.alive ? {
-        active: this.nightStage === "witch",
-        attackedPlayer: this.wolfAttackTargetId ? this.toNightCandidate(this.wolfAttackTargetId) : null,
-        antidoteAvailable: player.witchAntidoteAvailable,
-        poisonAvailable: player.witchPoisonAvailable,
-        poisonCandidates: this.players
-          .filter((candidate) => candidate.alive && candidate.connection !== "departed" && candidate.id !== player.id)
-          .map(({ id, number, nickname }) => ({ id, number, nickname })),
-        submitted: this.witchActionSubmitted
-      } : null,
-      guardAction: this.phase === "first-night" && player.role === "guard" && player.alive ? {
-        active: this.nightStage === "guard",
-        candidates: this.players
-          .filter((candidate) => candidate.alive
-            && candidate.connection !== "departed"
-            && candidate.id !== this.lastGuardTargetId)
-          .map(({ id, number, nickname }) => ({ id, number, nickname })),
-        protectedPlayer: this.guardTargetId ? this.toNightCandidate(this.guardTargetId) : null,
-        submitted: this.guardActionSubmitted
-      } : null,
-      hunterAction: player.role === "hunter" ? {
-        active: this.pendingHunterResolution?.hunterId === player.id && !this.hunterActionSubmitted,
-        candidates: this.pendingHunterResolution?.hunterId === player.id && !this.hunterActionSubmitted
-          ? this.players
-            .filter((candidate) => candidate.alive && candidate.connection !== "departed" && candidate.id !== player.id)
-            .map(({ id, number, nickname }) => ({ id, number, nickname }))
-          : [],
-        shotPlayer: this.hunterShotPlayerId ? this.toNightCandidate(this.hunterShotPlayerId) : null,
-        submitted: this.hunterActionSubmitted
-      } : null,
-      dawnResult: this.phase === "dawn" ? {
-        deaths: this.dawnDeathIds.flatMap((id) => {
-          const candidate = this.toNightCandidate(id);
-          return candidate ? [candidate] : [];
-        })
-      } : null,
+      seerAction:
+        this.phase === "first-night" && player.role === "seer" && player.alive
+          ? {
+              active: this.nightStage === "seer",
+              candidates: this.players
+                .filter((candidate) => candidate.alive && candidate.connection !== "departed" && candidate.id !== player.id)
+                .map(({ id, number, nickname }) => ({ id, number, nickname })),
+              inspectedPlayer: player.seerInspectedPlayerId ? this.toNightCandidate(player.seerInspectedPlayerId) : null,
+              result: player.seerInspectedPlayerId
+                ? this.players.find((candidate) => candidate.id === player.seerInspectedPlayerId)?.role === "wolf"
+                  ? "wolf"
+                  : "good"
+                : null
+            }
+          : null,
+      witchAction:
+        this.phase === "first-night" && player.role === "witch" && player.alive
+          ? {
+              active: this.nightStage === "witch",
+              attackedPlayer: this.wolfAttackTargetId ? this.toNightCandidate(this.wolfAttackTargetId) : null,
+              antidoteAvailable: player.witchAntidoteAvailable,
+              poisonAvailable: player.witchPoisonAvailable,
+              poisonCandidates: this.players
+                .filter((candidate) => candidate.alive && candidate.connection !== "departed" && candidate.id !== player.id)
+                .map(({ id, number, nickname }) => ({ id, number, nickname })),
+              submitted: this.witchActionSubmitted
+            }
+          : null,
+      guardAction:
+        this.phase === "first-night" && player.role === "guard" && player.alive
+          ? {
+              active: this.nightStage === "guard",
+              candidates: this.players
+                .filter((candidate) => candidate.alive && candidate.connection !== "departed" && candidate.id !== this.lastGuardTargetId)
+                .map(({ id, number, nickname }) => ({ id, number, nickname })),
+              protectedPlayer: this.guardTargetId ? this.toNightCandidate(this.guardTargetId) : null,
+              submitted: this.guardActionSubmitted
+            }
+          : null,
+      hunterAction:
+        player.role === "hunter"
+          ? {
+              active: this.pendingHunterResolution?.hunterId === player.id && !this.hunterActionSubmitted,
+              candidates:
+                this.pendingHunterResolution?.hunterId === player.id && !this.hunterActionSubmitted
+                  ? this.players
+                      .filter((candidate) => candidate.alive && candidate.connection !== "departed" && candidate.id !== player.id)
+                      .map(({ id, number, nickname }) => ({ id, number, nickname }))
+                  : [],
+              shotPlayer: this.hunterShotPlayerId ? this.toNightCandidate(this.hunterShotPlayerId) : null,
+              submitted: this.hunterActionSubmitted
+            }
+          : null,
+      dawnResult:
+        this.phase === "dawn"
+          ? {
+              deaths: this.dawnDeathIds.flatMap((id) => {
+                const candidate = this.toNightCandidate(id);
+                return candidate ? [candidate] : [];
+              })
+            }
+          : null,
       dayState: this.getPublicDayState(),
-      dayVote: this.phase === "day-vote" && player.alive ? {
-        eligible: !player.idiotRevealed,
-        candidates: player.idiotRevealed
-          ? []
-          : this.players
-            .filter((candidate) => candidate.alive
-              && candidate.connection !== "departed"
-              && candidate.id !== player.id
-              && !candidate.idiotRevealed)
-            .map(({ id, number, nickname }) => ({ id, number, nickname })),
-        target: player.dayVoteTarget,
-        confirmed: player.dayVoteConfirmed
-      } : null,
+      dayVote:
+        this.phase === "day-vote" && player.alive
+          ? {
+              eligible: !player.idiotRevealed,
+              candidates: player.idiotRevealed
+                ? []
+                : this.players
+                    .filter((candidate) => candidate.alive && candidate.connection !== "departed" && candidate.id !== player.id && !candidate.idiotRevealed)
+                    .map(({ id, number, nickname }) => ({ id, number, nickname })),
+              target: player.dayVoteTarget,
+              confirmed: player.dayVoteConfirmed
+            }
+          : null,
       gameResult: this.getGameResult(),
       publicChat: {
         canSend: this.canSendPublicChat(player),
@@ -563,15 +578,10 @@ export class LobbyRoom {
 
   addBot(request: HostAddBotRequest): RoomActionResult<HostLobbyView>;
   addBot(nickname: string, botKind: "deterministic"): RoomActionResult<HostLobbyView>;
-  addBot(
-    requestOrNickname: HostAddBotRequest | string,
-    legacyBotKind?: "deterministic"
-  ): RoomActionResult<HostLobbyView> {
+  addBot(requestOrNickname: HostAddBotRequest | string, legacyBotKind?: "deterministic"): RoomActionResult<HostLobbyView> {
     if (this.phase !== "lobby") return failures.gameAlreadyStarted();
     const request = hostAddBotRequestSchema.parse(
-      typeof requestOrNickname === "string"
-        ? { nickname: requestOrNickname, botKind: legacyBotKind }
-        : requestOrNickname
+      typeof requestOrNickname === "string" ? { nickname: requestOrNickname, botKind: legacyBotKind } : requestOrNickname
     );
     const nickname = nicknameSchema.parse(request.nickname);
     const botKind = botKindSchema.parse(request.botKind);
@@ -614,11 +624,11 @@ export class LobbyRoom {
   reconnect(input: ReconnectPlayerRequest, socketId: string): RoomActionResult<ReconnectOutcome> {
     const player = this.players.find((candidate) => candidate.id === input.playerId);
     if (
-      input.roomCode !== this.roomCode
-      || !player
-      || player.controller === "bot"
-      || player.connection === "departed"
-      || !tokenMatches(input.reconnectToken, player.reconnectTokenHash)
+      input.roomCode !== this.roomCode ||
+      !player ||
+      player.controller === "bot" ||
+      player.connection === "departed" ||
+      !tokenMatches(input.reconnectToken, player.reconnectTokenHash)
     ) {
       return failures.invalidReconnectCredentials();
     }
@@ -661,15 +671,11 @@ export class LobbyRoom {
     if (input.roomCode !== this.roomCode || input.joinToken !== this.joinToken) {
       return failures.invalidCredentials();
     }
-    if (
-      this.players.some((player) => player.socketId === socketId)
-      || this.takeoverRequests.some((request) => request.socketId === socketId)
-    ) return failures.alreadyJoined();
+    if (this.players.some((player) => player.socketId === socketId) || this.takeoverRequests.some((request) => request.socketId === socketId))
+      return failures.alreadyJoined();
 
     const nickname = nicknameSchema.parse(input.nickname);
-    const player = this.players.find(
-      (candidate) => candidate.nickname.toLocaleLowerCase() === nickname.toLocaleLowerCase()
-    );
+    const player = this.players.find((candidate) => candidate.nickname.toLocaleLowerCase() === nickname.toLocaleLowerCase());
     if (!player || player.controller === "bot" || player.connection === "departed") {
       return failures.playerNotFound();
     }
@@ -689,11 +695,7 @@ export class LobbyRoom {
     return { ok: true, data: { requestId: request.id, nickname: request.nickname } };
   }
 
-  reattachTakeoverRequest(
-    requestId: string,
-    input: TakeoverPlayerRequest,
-    socketId: string
-  ): RoomActionResult<TakeoverReceipt> {
+  reattachTakeoverRequest(requestId: string, input: TakeoverPlayerRequest, socketId: string): RoomActionResult<TakeoverReceipt> {
     if (this.phase !== "lobby") return failures.gameAlreadyStarted();
     if (input.roomCode !== this.roomCode || input.joinToken !== this.joinToken) {
       return failures.invalidCredentials();
@@ -727,9 +729,8 @@ export class LobbyRoom {
     const index = this.takeoverRequests.findIndex((request) => request.id === requestId);
     if (index < 0) return failures.takeoverRequestNotFound();
     const pendingRequest = this.takeoverRequests[index]!;
-    if (approved && this.players.some(
-      (candidate) => candidate.id !== pendingRequest.playerId && candidate.socketId === pendingRequest.socketId
-    )) return failures.alreadyJoined();
+    if (approved && this.players.some((candidate) => candidate.id !== pendingRequest.playerId && candidate.socketId === pendingRequest.socketId))
+      return failures.alreadyJoined();
     const [request] = this.takeoverRequests.splice(index, 1);
     const player = this.players.find((candidate) => candidate.id === request!.playerId);
     if (!player || player.connection === "departed") return failures.playerNotFound();
@@ -760,9 +761,7 @@ export class LobbyRoom {
 
   cancelTakeoverRequests(socketId: string, preservedRequestId: string | null = null): boolean {
     const previousLength = this.takeoverRequests.length;
-    this.takeoverRequests = this.takeoverRequests.filter((request) => (
-      request.socketId !== socketId || request.id === preservedRequestId
-    ));
+    this.takeoverRequests = this.takeoverRequests.filter((request) => request.socketId !== socketId || request.id === preservedRequestId);
     if (this.takeoverRequests.length === previousLength) return false;
     this.revision += 1;
     return true;
@@ -819,9 +818,7 @@ export class LobbyRoom {
     if (player.connection === "departed") return failures.playerAlreadyDeparted();
 
     const socketId = player.socketId;
-    const takeoverSocketIds = this.takeoverRequests
-      .filter((request) => request.playerId === playerId)
-      .map((request) => request.socketId);
+    const takeoverSocketIds = this.takeoverRequests.filter((request) => request.playerId === playerId).map((request) => request.socketId);
     this.takeoverRequests = this.takeoverRequests.filter((request) => request.playerId !== playerId);
     player.socketId = null;
     player.connection = "departed";
@@ -889,8 +886,7 @@ export class LobbyRoom {
       chatMode: this.chatMode
     });
 
-    const roles = roleSchema.array().parse(Object.entries(this.roleConfiguration)
-      .flatMap(([role, count]) => Array.from({ length: count }, () => role)));
+    const roles = roleSchema.array().parse(Object.entries(this.roleConfiguration).flatMap(([role, count]) => Array.from({ length: count }, () => role)));
     for (let index = roles.length - 1; index > 0; index -= 1) {
       const target = randomInt(index + 1);
       [roles[index], roles[target]] = [roles[target]!, roles[index]!];
@@ -955,9 +951,12 @@ export class LobbyRoom {
     const player = this.getActiveWolf(playerId);
     if (!player) return failures.invalidNightAction();
     if (this.wolfVoteLocked) return failures.nightActionLocked();
-    if (target !== null && target !== "no-kill" && !this.players.some(
-      (candidate) => candidate.id === target && candidate.alive && candidate.connection !== "departed"
-    )) return failures.playerNotFound();
+    if (
+      target !== null &&
+      target !== "no-kill" &&
+      !this.players.some((candidate) => candidate.id === target && candidate.alive && candidate.connection !== "departed")
+    )
+      return failures.playerNotFound();
 
     player.wolfVoteTarget = target;
     player.wolfVoteConfirmed = false;
@@ -977,24 +976,14 @@ export class LobbyRoom {
     return { ok: true, data: this.getPlayerView(playerId)! };
   }
 
-  sendWolfMessage(
-    playerId: PlayerId,
-    input: WolfSendMessageRequest,
-    now = new Date()
-  ): RoomActionResult<PlayerLobbyView> {
-    const content = input.kind === "target-suggestion"
-      ? { kind: input.kind, target: input.target } as const
-      : input;
+  sendWolfMessage(playerId: PlayerId, input: WolfSendMessageRequest, now = new Date()): RoomActionResult<PlayerLobbyView> {
+    const content = input.kind === "target-suggestion" ? ({ kind: input.kind, target: input.target } as const) : input;
     const result = this.sendChat(playerId, { channel: "wolf-private", content }, now);
     if (!result.ok) return result;
     return { ok: true, data: this.getPlayerView(playerId)! };
   }
 
-  sendChat(
-    playerId: PlayerId,
-    input: ChatSendRequest,
-    now = new Date()
-  ): RoomActionResult<ChatMessage> {
+  sendChat(playerId: PlayerId, input: ChatSendRequest, now = new Date()): RoomActionResult<ChatMessage> {
     const player = this.players.find((candidate) => candidate.id === playerId);
     if (!player || player.connection === "departed") return failures.playerNotFound();
     if (input.channel === "wolf-private") {
@@ -1010,9 +999,7 @@ export class LobbyRoom {
     if ("target" in input.content) {
       const targetId = input.content.target;
       const target = this.toNightCandidate(targetId);
-      if (!target || !this.players.some(
-        (candidate) => candidate.id === targetId && candidate.connection !== "departed"
-      )) return failures.playerNotFound();
+      if (!target || !this.players.some((candidate) => candidate.id === targetId && candidate.connection !== "departed")) return failures.playerNotFound();
       content = { kind: "target-suggestion", target };
     } else {
       content = input.content;
@@ -1046,21 +1033,14 @@ export class LobbyRoom {
 
   getChatRecipientIds(channel: ChatChannel): PlayerId[] {
     if (channel === "day-public" || channel === "system") return this.getPlayerIds();
-    return this.players
-      .filter((player) => player.role === "wolf" && player.alive && player.connection !== "departed")
-      .map((player) => player.id);
+    return this.players.filter((player) => player.role === "wolf" && player.alive && player.connection !== "departed").map((player) => player.id);
   }
 
   inspectAsSeer(playerId: PlayerId, targetId: PlayerId): RoomActionResult<PlayerLobbyView> {
     const player = this.players.find((candidate) => candidate.id === playerId);
     const target = this.players.find((candidate) => candidate.id === targetId);
-    if (
-      this.phase !== "first-night"
-      || this.nightStage !== "seer"
-      || player?.role !== "seer"
-      || !player.alive
-      || player.connection === "departed"
-    ) return failures.invalidNightAction();
+    if (this.phase !== "first-night" || this.nightStage !== "seer" || player?.role !== "seer" || !player.alive || player.connection === "departed")
+      return failures.invalidNightAction();
     if (!target || !target.alive || target.connection === "departed") return failures.playerNotFound();
     if (target.id === player.id) return failures.invalidNightAction();
     if (player.seerInspectedPlayerId) return failures.nightActionLocked();
@@ -1077,13 +1057,8 @@ export class LobbyRoom {
 
   protectAsGuard(playerId: PlayerId, targetId: PlayerId | null): RoomActionResult<PlayerLobbyView> {
     const player = this.players.find((candidate) => candidate.id === playerId);
-    if (
-      this.phase !== "first-night"
-      || this.nightStage !== "guard"
-      || player?.role !== "guard"
-      || !player.alive
-      || player.connection === "departed"
-    ) return failures.invalidNightAction();
+    if (this.phase !== "first-night" || this.nightStage !== "guard" || player?.role !== "guard" || !player.alive || player.connection === "departed")
+      return failures.invalidNightAction();
     if (this.guardActionSubmitted) return failures.nightActionLocked();
 
     if (targetId !== null) {
@@ -1097,9 +1072,7 @@ export class LobbyRoom {
     const target = targetId ? this.toNightCandidate(targetId) : null;
     this.recordGameEvent(
       "guard-action",
-      target
-        ? `${player.number} 号 ${player.nickname} 守护 ${target.number} 号 ${target.nickname}`
-        : `${player.number} 号 ${player.nickname} 选择空守`
+      target ? `${player.number} 号 ${player.nickname} 守护 ${target.number} 号 ${target.nickname}` : `${player.number} 号 ${player.nickname} 选择空守`
     );
     if (!this.deferCompletedStages) this.advanceFromGuardStage();
     this.revision += 1;
@@ -1108,35 +1081,22 @@ export class LobbyRoom {
 
   submitWitchAction(playerId: PlayerId, input: WitchSubmitActionRequest): RoomActionResult<PlayerLobbyView> {
     const player = this.players.find((candidate) => candidate.id === playerId);
-    if (
-      this.phase !== "first-night"
-      || this.nightStage !== "witch"
-      || player?.role !== "witch"
-      || !player.alive
-      || player.connection === "departed"
-    ) return failures.invalidNightAction();
+    if (this.phase !== "first-night" || this.nightStage !== "witch" || player?.role !== "witch" || !player.alive || player.connection === "departed")
+      return failures.invalidNightAction();
     if (this.witchActionSubmitted) return failures.nightActionLocked();
 
     let poisonTargetId: PlayerId | null = null;
     let saved = false;
     if (input.action === "save") {
-      if (
-        !player.witchAntidoteAvailable
-        || !this.wolfAttackTargetId
-        || (this.wolfAttackTargetId === player.id && this.dayNumber > 1)
-      ) return failures.invalidNightAction();
+      if (!player.witchAntidoteAvailable || !this.wolfAttackTargetId || (this.wolfAttackTargetId === player.id && this.dayNumber > 1))
+        return failures.invalidNightAction();
       player.witchAntidoteAvailable = false;
       saved = true;
     }
     if (input.action === "poison") {
       const target = this.players.find((candidate) => candidate.id === input.target);
-      if (
-        !player.witchPoisonAvailable
-        || !target
-        || !target.alive
-        || target.connection === "departed"
-        || target.id === player.id
-      ) return failures.invalidNightAction();
+      if (!player.witchPoisonAvailable || !target || !target.alive || target.connection === "departed" || target.id === player.id)
+        return failures.invalidNightAction();
       player.witchPoisonAvailable = false;
       poisonTargetId = target.id;
     }
@@ -1171,17 +1131,14 @@ export class LobbyRoom {
       target.alive = false;
       if (this.pendingHunterResolution.origin === "night" && !this.dawnDeathIds.includes(target.id)) {
         this.dawnDeathIds.push(target.id);
-        this.dawnDeathIds.sort((left, right) => this.players.find((item) => item.id === left)!.number
-          - this.players.find((item) => item.id === right)!.number);
+        this.dawnDeathIds.sort((left, right) => this.players.find((item) => item.id === left)!.number - this.players.find((item) => item.id === right)!.number);
       }
     }
     this.hunterShotPlayerId = target?.id ?? null;
     this.hunterActionSubmitted = true;
     this.recordGameEvent(
       "hunter-shot",
-      target
-        ? `${player.number} 号 ${player.nickname} 开枪带走 ${target.number} 号 ${target.nickname}`
-        : `${player.number} 号 ${player.nickname} 放弃开枪`
+      target ? `${player.number} 号 ${player.nickname} 开枪带走 ${target.number} 号 ${target.nickname}` : `${player.number} 号 ${player.nickname} 放弃开枪`
     );
     if (!this.deferCompletedStages) this.completeHunterResolution();
     this.revision += 1;
@@ -1195,9 +1152,10 @@ export class LobbyRoom {
 
   getTimedStage(): TimedStage | null {
     if (this.pendingHunterResolution) return "hunter";
-    return this.getNightStage() ?? (["role-reveal", "dawn", "last-words", "day-speech", "day-vote", "exile-result"].includes(this.phase)
-      ? this.phase as TimedStage
-      : null);
+    return (
+      this.getNightStage() ??
+      (["role-reveal", "dawn", "last-words", "day-speech", "day-vote", "exile-result"].includes(this.phase) ? (this.phase as TimedStage) : null)
+    );
   }
 
   getTimedStageKey(): string | null {
@@ -1210,8 +1168,7 @@ export class LobbyRoom {
   }
 
   isCurrentSpeaker(playerId: PlayerId): boolean {
-    return (this.phase === "last-words" || this.phase === "day-speech")
-      && this.speechOrderIds[this.currentSpeakerIndex] === playerId;
+    return (this.phase === "last-words" || this.phase === "day-speech") && this.speechOrderIds[this.currentSpeakerIndex] === playerId;
   }
 
   private canSendPublicChat(player: InternalPlayer): boolean {
@@ -1230,9 +1187,7 @@ export class LobbyRoom {
     }
     if (stage === "wolf") return this.wolfVoteLocked;
     if (stage === "seer") {
-      const seer = this.players.find(
-        (player) => player.role === "seer" && player.alive && player.connection !== "departed"
-      );
+      const seer = this.players.find((player) => player.role === "seer" && player.alive && player.connection !== "departed");
       return !seer || seer.seerInspectedPlayerId !== null;
     }
     if (stage === "guard") return this.guardActionSubmitted;
@@ -1279,9 +1234,7 @@ export class LobbyRoom {
 
   continueFromDawn(): RoomActionResult<HostLobbyView> {
     if (this.phase !== "dawn" || this.pendingHunterResolution) return failures.invalidPhaseControl();
-    const lastWords = this.dawnDeathIds.filter((id) => this.players.some(
-      (player) => player.id === id && player.connection !== "departed"
-    ));
+    const lastWords = this.dawnDeathIds.filter((id) => this.players.some((player) => player.id === id && player.connection !== "departed"));
     if (lastWords.length > 0) {
       this.speechOrderIds = lastWords;
       this.currentSpeakerIndex = 0;
@@ -1369,20 +1322,24 @@ export class LobbyRoom {
     botProfileId: LobbyPlayer["botProfileId"];
     lockedConfiguration: BotConfigurationLock;
   }> {
-    return this.players.flatMap((player) => player.controller === "bot" && player.botKind
-      ? [{
-          playerId: player.id,
-          botKind: player.botKind,
-          botProfileId: player.botProfileId,
-          lockedConfiguration: {
-            locked: player.aiConfigurationLocked,
-            botProfileRevision: player.aiBotProfileRevision,
-            modelProfileId: player.aiModelProfileId,
-            modelProfileRevision: player.aiModelProfileRevision,
-            modelChainRevision: player.aiModelChainRevision
-          }
-        }]
-      : []);
+    return this.players.flatMap((player) =>
+      player.controller === "bot" && player.botKind
+        ? [
+            {
+              playerId: player.id,
+              botKind: player.botKind,
+              botProfileId: player.botProfileId,
+              lockedConfiguration: {
+                locked: player.aiConfigurationLocked,
+                botProfileRevision: player.aiBotProfileRevision,
+                modelProfileId: player.aiModelProfileId,
+                modelProfileRevision: player.aiModelProfileRevision,
+                modelChainRevision: player.aiModelChainRevision
+              }
+            }
+          ]
+        : []
+    );
   }
 
   lockBotConfiguration(playerId: PlayerId, lock: Omit<BotConfigurationLock, "locked">): void {
@@ -1414,22 +1371,24 @@ export class LobbyRoom {
   }
 
   private publicPlayers(): LobbyPlayer[] {
-    return this.players.map(({
-      socketId: _socketId,
-      reconnectTokenHash: _tokenHash,
-      role: _role,
-      roleConfirmed: _roleConfirmed,
-      wolfVoteTarget: _wolfVoteTarget,
-      wolfVoteConfirmed: _wolfVoteConfirmed,
-      seerInspectedPlayerId: _seerInspectedPlayerId,
-      witchAntidoteAvailable: _witchAntidoteAvailable,
-      witchPoisonAvailable: _witchPoisonAvailable,
-      lastChatMessageAtMs: _lastChatMessageAtMs,
-      dayVoteTarget: _dayVoteTarget,
-      dayVoteConfirmed: _dayVoteConfirmed,
-      idiotRevealed: _idiotRevealed,
-      ...player
-    }) => player);
+    return this.players.map(
+      ({
+        socketId: _socketId,
+        reconnectTokenHash: _tokenHash,
+        role: _role,
+        roleConfirmed: _roleConfirmed,
+        wolfVoteTarget: _wolfVoteTarget,
+        wolfVoteConfirmed: _wolfVoteConfirmed,
+        seerInspectedPlayerId: _seerInspectedPlayerId,
+        witchAntidoteAvailable: _witchAntidoteAvailable,
+        witchPoisonAvailable: _witchPoisonAvailable,
+        lastChatMessageAtMs: _lastChatMessageAtMs,
+        dayVoteTarget: _dayVoteTarget,
+        dayVoteConfirmed: _dayVoteConfirmed,
+        idiotRevealed: _idiotRevealed,
+        ...player
+      }) => player
+    );
   }
 
   private createSession(playerId: PlayerId, reconnectToken: string): PlayerSession {
@@ -1472,19 +1431,13 @@ export class LobbyRoom {
 
   private getActiveWolf(playerId: PlayerId): InternalPlayer | null {
     const player = this.players.find((candidate) => candidate.id === playerId);
-    return this.phase === "first-night"
-      && this.nightStage === "wolf"
-      && player?.role === "wolf"
-      && player.alive
-      && player.connection !== "departed"
+    return this.phase === "first-night" && this.nightStage === "wolf" && player?.role === "wolf" && player.alive && player.connection !== "departed"
       ? player
       : null;
   }
 
   private lockWolfVoteIfComplete(): boolean {
-    const onlineWolves = this.players.filter(
-      (player) => player.role === "wolf" && player.alive && player.connection === "online"
-    );
+    const onlineWolves = this.players.filter((player) => player.role === "wolf" && player.alive && player.connection === "online");
     if (onlineWolves.length > 0 && onlineWolves.every((player) => player.wolfVoteConfirmed)) {
       this.wolfVoteLocked = true;
       return true;
@@ -1520,13 +1473,7 @@ export class LobbyRoom {
   }
 
   private settleFirstNight(saved: boolean, poisonTargetId: PlayerId | null): void {
-    this.dawnDeathIds = resolveNightDeaths(
-      this.players,
-      this.wolfAttackTargetId,
-      saved,
-      poisonTargetId,
-      this.guardTargetId
-    );
+    this.dawnDeathIds = resolveNightDeaths(this.players, this.wolfAttackTargetId, saved, poisonTargetId, this.guardTargetId);
     const deaths = new Set(this.dawnDeathIds);
     for (const player of this.players) {
       if (deaths.has(player.id)) player.alive = false;
@@ -1562,9 +1509,7 @@ export class LobbyRoom {
   }
 
   private getPublicChatMessages(): ChatMessage[] {
-    return this.chatMessages
-      .filter((message) => message.channel === "day-public" || message.channel === "system")
-      .slice(-100);
+    return this.chatMessages.filter((message) => message.channel === "day-public" || message.channel === "system").slice(-100);
   }
 
   private queryInMemoryChatHistory(
@@ -1602,23 +1547,27 @@ export class LobbyRoom {
         const candidate = this.toNightCandidate(id);
         return candidate ? [candidate] : [];
       }),
-      voteProgress: this.phase === "day-vote" ? {
-        confirmed: eligibleVoters.filter((player) => player.dayVoteConfirmed).length,
-        total: eligibleVoters.length
-      } : null,
-      voteResult: this.dayVoteResult ? {
-        ballots: this.dayVoteResult.flatMap(({ voterId, targetId }) => {
-          const voter = this.toNightCandidate(voterId);
-          return voter ? [{ voter, target: targetId ? this.toNightCandidate(targetId) : null }] : [];
-        }),
-        exiledPlayer: this.exiledPlayerId ? this.toNightCandidate(this.exiledPlayerId) : null
-      } : null
+      voteProgress:
+        this.phase === "day-vote"
+          ? {
+              confirmed: eligibleVoters.filter((player) => player.dayVoteConfirmed).length,
+              total: eligibleVoters.length
+            }
+          : null,
+      voteResult: this.dayVoteResult
+        ? {
+            ballots: this.dayVoteResult.flatMap(({ voterId, targetId }) => {
+              const voter = this.toNightCandidate(voterId);
+              return voter ? [{ voter, target: targetId ? this.toNightCandidate(targetId) : null }] : [];
+            }),
+            exiledPlayer: this.exiledPlayerId ? this.toNightCandidate(this.exiledPlayerId) : null
+          }
+        : null
     };
   }
 
   private startDaySpeech(): void {
-    const aliveIds = this.players.filter((player) => player.alive && player.connection !== "departed")
-      .map((player) => player.id);
+    const aliveIds = this.players.filter((player) => player.alive && player.connection !== "departed").map((player) => player.id);
     this.speechOrderIds = randomInt(2) === 0 ? aliveIds : [...aliveIds].reverse();
     this.currentSpeakerIndex = this.speechOrderIds.length > 0 ? 0 : -1;
     this.currentSpeakerFinished = false;
@@ -1649,9 +1598,7 @@ export class LobbyRoom {
   }
 
   private settleDayVote(): void {
-    const voters = this.players.filter(
-      (player) => player.alive && player.connection !== "departed" && !player.idiotRevealed
-    );
+    const voters = this.players.filter((player) => player.alive && player.connection !== "departed" && !player.idiotRevealed);
     this.dayVoteResult = voters.map((player) => ({
       voterId: player.id,
       targetId: player.dayVoteConfirmed && player.dayVoteTarget !== "abstain" ? player.dayVoteTarget : null
@@ -1659,14 +1606,9 @@ export class LobbyRoom {
     for (const ballot of this.dayVoteResult) {
       const voter = this.toNightCandidate(ballot.voterId)!;
       const target = ballot.targetId ? this.toNightCandidate(ballot.targetId) : null;
-      this.recordGameEvent(
-        "day-vote",
-        `${voter.number} 号${voter.nickname}投给${target ? ` ${target.number} 号${target.nickname}` : "弃票"}`
-      );
+      this.recordGameEvent("day-vote", `${voter.number} 号${voter.nickname}投给${target ? ` ${target.number} 号${target.nickname}` : "弃票"}`);
     }
-    this.exiledPlayerId = resolvePlurality(
-      this.dayVoteResult.flatMap((ballot) => ballot.targetId ? [ballot.targetId] : [])
-    );
+    this.exiledPlayerId = resolvePlurality(this.dayVoteResult.flatMap((ballot) => (ballot.targetId ? [ballot.targetId] : [])));
     if (this.exiledPlayerId) {
       const exiled = this.players.find((player) => player.id === this.exiledPlayerId);
       if (exiled) {
@@ -1775,10 +1717,7 @@ export class LobbyRoom {
     this.phase = "game-over";
   }
 
-  private finishCurrentSession(
-    outcome: "good-win" | "wolf-win" | "draw" | "terminated",
-    now: Date
-  ): void {
+  private finishCurrentSession(outcome: "good-win" | "wolf-win" | "draw" | "terminated", now: Date): void {
     if (!this.gameSessionId) return;
     this.chatPersistence?.finishSession(this.gameSessionId, {
       outcome,
@@ -1790,13 +1729,19 @@ export class LobbyRoom {
     if (this.phase !== "game-over" || !this.gameOutcome) return null;
     return {
       outcome: this.gameOutcome,
-      revealedPlayers: this.players.flatMap((player) => player.role ? [{
-        id: player.id,
-        number: player.number,
-        nickname: player.nickname,
-        role: player.role,
-        alive: player.alive
-      }] : []),
+      revealedPlayers: this.players.flatMap((player) =>
+        player.role
+          ? [
+              {
+                id: player.id,
+                number: player.number,
+                nickname: player.nickname,
+                role: player.role,
+                alive: player.alive
+              }
+            ]
+          : []
+      ),
       records: this.gameRecords.map((record) => ({ ...record }))
     };
   }
@@ -1853,7 +1798,8 @@ export class LobbyRoom {
     this.dawnDeathIds = [...snapshot.dawnDeathIds];
     this.roleConfiguration = roleConfigurationSchema.parse(snapshot.roleConfiguration);
     this.chatMode = chatModeSchema.parse(snapshot.chatMode);
-    const snapshotMessages = snapshot.chatMessages?.map((message) => ({ ...message })) ?? (
+    const snapshotMessages =
+      snapshot.chatMessages?.map((message) => ({ ...message })) ??
       snapshot.wolfMessages?.map((message, index) => ({
         id: message.id,
         sequence: index + 1,
@@ -1861,30 +1807,22 @@ export class LobbyRoom {
         day: snapshot.dayNumber,
         phase: "first-night" as const,
         sender: { kind: "player" as const, ...message.sender },
-        content: message.kind === "target-suggestion" && message.target
-          ? { kind: "target-suggestion" as const, target: message.target }
-          : message.kind === "quick"
-            ? {
-                kind: "quick" as const,
-                code: message.text === "赞同"
-                  ? "agree" as const
-                  : message.text === "反对"
-                    ? "disagree" as const
-                    : "no-kill" as const
-              }
-            : { kind: "text" as const, text: message.text },
+        content:
+          message.kind === "target-suggestion" && message.target
+            ? { kind: "target-suggestion" as const, target: message.target }
+            : message.kind === "quick"
+              ? {
+                  kind: "quick" as const,
+                  code: message.text === "赞同" ? ("agree" as const) : message.text === "反对" ? ("disagree" as const) : ("no-kill" as const)
+                }
+              : { kind: "text" as const, text: message.text },
         createdAt: message.createdAt
-      })) ?? []
-    );
-    this.gameSessionId = snapshot.gameSessionId
-      ?? (snapshot.phase === "lobby" ? null : randomUUID());
-    const existingSession = this.gameSessionId
-      ? this.chatPersistence?.getSession?.(this.gameSessionId) ?? null
-      : null;
-    this.gameSessionStartedAt = snapshot.gameSessionStartedAt
-      ?? existingSession?.startedAt
-      ?? snapshotMessages[0]?.createdAt
-      ?? (this.gameSessionId ? new Date().toISOString() : null);
+      })) ??
+      [];
+    this.gameSessionId = snapshot.gameSessionId ?? (snapshot.phase === "lobby" ? null : randomUUID());
+    const existingSession = this.gameSessionId ? (this.chatPersistence?.getSession?.(this.gameSessionId) ?? null) : null;
+    this.gameSessionStartedAt =
+      snapshot.gameSessionStartedAt ?? existingSession?.startedAt ?? snapshotMessages[0]?.createdAt ?? (this.gameSessionId ? new Date().toISOString() : null);
     if (this.chatPersistence && this.gameSessionId) {
       this.chatPersistence.createSession({
         id: this.gameSessionId,
@@ -1919,9 +1857,7 @@ export class LobbyRoom {
     this.guardTargetId = snapshot.guardTargetId ?? null;
     this.lastGuardTargetId = snapshot.lastGuardTargetId ?? null;
     this.guardActionSubmitted = snapshot.guardActionSubmitted ?? false;
-    this.pendingHunterResolution = snapshot.pendingHunterResolution
-      ? { ...snapshot.pendingHunterResolution }
-      : null;
+    this.pendingHunterResolution = snapshot.pendingHunterResolution ? { ...snapshot.pendingHunterResolution } : null;
     this.hunterShotPlayerId = snapshot.hunterShotPlayerId ?? null;
     this.hunterActionSubmitted = snapshot.hunterActionSubmitted ?? false;
     this.revealedIdiotId = snapshot.revealedIdiotId ?? null;
@@ -1933,10 +1869,8 @@ export class LobbyRoom {
       return {
         ...player,
         controller,
-        botKind: controller === "bot" ? player.botKind ?? "deterministic" : null,
-        botProfileId: controller === "bot" && player.botKind === "llm"
-          ? player.botProfileId ?? null
-          : null,
+        botKind: controller === "bot" ? (player.botKind ?? "deterministic") : null,
+        botProfileId: controller === "bot" && player.botKind === "llm" ? (player.botProfileId ?? null) : null,
         aiConfigurationLocked: player.aiConfigurationLocked ?? false,
         aiBotProfileRevision: player.aiBotProfileRevision ?? null,
         aiModelProfileId: player.aiModelProfileId ?? null,
@@ -1945,9 +1879,7 @@ export class LobbyRoom {
         lastChatMessageAtMs: player.lastChatMessageAtMs ?? lastWolfMessageAtMs ?? null,
         idiotRevealed: player.idiotRevealed ?? false,
         socketId: null,
-        connection: player.connection === "departed"
-          ? "departed"
-          : controller === "bot" ? "online" : "offline",
+        connection: player.connection === "departed" ? "departed" : controller === "bot" ? "online" : "offline",
         reconnectTokenHash: Buffer.from(player.reconnectTokenHash, "base64")
       };
     });
@@ -1959,26 +1891,27 @@ export class LobbyRoom {
       const unavailablePlayer = this.players.find((player) => player.id === playerId);
       if (unavailablePlayer?.role === "guard") this.guardTargetId = null;
       if (this.nightStage === "wolf") {
-        const activeWolves = this.players.filter(
-          (candidate) => candidate.role === "wolf" && candidate.alive && candidate.connection !== "departed"
-        );
+        const activeWolves = this.players.filter((candidate) => candidate.role === "wolf" && candidate.alive && candidate.connection !== "departed");
         if (activeWolves.length === 0 || this.lockWolfVoteIfComplete()) {
           this.wolfVoteLocked = true;
           this.advanceFromWolfStage();
         }
-      } else if (this.nightStage === "seer" && !this.players.some(
-        (candidate) => candidate.role === "seer" && candidate.alive && candidate.connection !== "departed"
-      )) {
+      } else if (
+        this.nightStage === "seer" &&
+        !this.players.some((candidate) => candidate.role === "seer" && candidate.alive && candidate.connection !== "departed")
+      ) {
         this.advanceFromSeerStage();
-      } else if (this.nightStage === "guard" && !this.players.some(
-        (candidate) => candidate.role === "guard" && candidate.alive && candidate.connection !== "departed"
-      )) {
+      } else if (
+        this.nightStage === "guard" &&
+        !this.players.some((candidate) => candidate.role === "guard" && candidate.alive && candidate.connection !== "departed")
+      ) {
         this.guardActionSubmitted = true;
         this.guardTargetId = null;
         this.advanceFromGuardStage();
-      } else if (this.nightStage === "witch" && !this.players.some(
-        (candidate) => candidate.role === "witch" && candidate.alive && candidate.connection !== "departed"
-      )) {
+      } else if (
+        this.nightStage === "witch" &&
+        !this.players.some((candidate) => candidate.role === "witch" && candidate.alive && candidate.connection !== "departed")
+      ) {
         this.witchActionSubmitted = true;
         this.settleFirstNight(false, null);
       }

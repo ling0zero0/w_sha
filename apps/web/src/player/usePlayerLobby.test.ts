@@ -36,9 +36,7 @@ vi.mock("react", async (importOriginal) => {
       return [
         hookHarness.state,
         (next: unknown) => {
-          hookHarness.state = typeof next === "function"
-            ? (next as (current: unknown) => unknown)(hookHarness.state)
-            : next;
+          hookHarness.state = typeof next === "function" ? (next as (current: unknown) => unknown)(hookHarness.state) : next;
         }
       ];
     }
@@ -51,12 +49,7 @@ vi.mock("socket.io-client", () => ({
 
 import { usePlayerLobby } from "./usePlayerLobby";
 
-function message(
-  id: string,
-  sequence: number,
-  text: string,
-  channel: ChatMessage["channel"] = "day-public"
-): ChatMessage {
+function message(id: string, sequence: number, text: string, channel: ChatMessage["channel"] = "day-public"): ChatMessage {
   return {
     id,
     sequence,
@@ -105,11 +98,7 @@ function historyCall(index = 0) {
   const calls = socketHarness.socket.emit.mock.calls.filter(([event]) => event === "chat:history");
   const call = calls[index];
   if (!call) throw new Error(`Missing chat:history call ${index}`);
-  return call as [
-    "chat:history",
-    { afterSequence: number; limit: number },
-    (result: unknown) => void
-  ];
+  return call as ["chat:history", { afterSequence: number; limit: number }, (result: unknown) => void];
 }
 
 describe("usePlayerLobby chat merging", () => {
@@ -161,12 +150,7 @@ describe("usePlayerLobby chat merging", () => {
     });
 
     const publicMessage = message("22222222-2222-4222-8222-222222222222", 2, "public");
-    const wolfMessage = message(
-      "33333333-3333-4333-8333-333333333333",
-      4,
-      "wolf",
-      "wolf-private"
-    );
+    const wolfMessage = message("33333333-3333-4333-8333-333333333333", 4, "wolf", "wolf-private");
     dispatch("player:state", lobby([publicMessage], { wolfMessages: [wolfMessage] }));
 
     const [, request, ack] = historyCall();
@@ -177,12 +161,7 @@ describe("usePlayerLobby chat merging", () => {
       sender: { kind: "system", label: "系统" },
       content: { kind: "system", text: "system" }
     };
-    const nextWolfMessage = message(
-      "55555555-5555-4555-8555-555555555555",
-      6,
-      "next wolf",
-      "wolf-private"
-    );
+    const nextWolfMessage = message("55555555-5555-4555-8555-555555555555", 6, "next wolf", "wolf-private");
     ack({
       ok: true,
       data: {
@@ -251,15 +230,11 @@ describe("usePlayerLobby chat merging", () => {
     api.requestTakeover();
 
     const joinCalls = socketHarness.socket.emit.mock.calls.filter(([event]) => event === "player:join");
-    const takeoverCalls = socketHarness.socket.emit.mock.calls.filter(
-      ([event]) => event === "player:request-takeover"
-    );
+    const takeoverCalls = socketHarness.socket.emit.mock.calls.filter(([event]) => event === "player:request-takeover");
     expect(joinCalls).toHaveLength(2);
     expect(takeoverCalls).toHaveLength(2);
-    expect((joinCalls[0]![1] as { actionId: string }).actionId)
-      .toBe((joinCalls[1]![1] as { actionId: string }).actionId);
-    expect((takeoverCalls[0]![1] as { actionId: string }).actionId)
-      .toBe((takeoverCalls[1]![1] as { actionId: string }).actionId);
+    expect((joinCalls[0]![1] as { actionId: string }).actionId).toBe((joinCalls[1]![1] as { actionId: string }).actionId);
+    expect((takeoverCalls[0]![1] as { actionId: string }).actionId).toBe((takeoverCalls[1]![1] as { actionId: string }).actionId);
   });
 
   it("reuses the reconnect action id across automatic socket reconnects", () => {
@@ -283,11 +258,8 @@ describe("usePlayerLobby chat merging", () => {
     dispatch("connect", undefined);
     dispatch("connect", undefined);
 
-    const reconnectCalls = socketHarness.socket.emit.mock.calls.filter(
-      ([event]) => event === "player:reconnect"
-    );
+    const reconnectCalls = socketHarness.socket.emit.mock.calls.filter(([event]) => event === "player:reconnect");
     expect(reconnectCalls).toHaveLength(2);
-    expect((reconnectCalls[0]![1] as { actionId: string }).actionId)
-      .toBe((reconnectCalls[1]![1] as { actionId: string }).actionId);
+    expect((reconnectCalls[0]![1] as { actionId: string }).actionId).toBe((reconnectCalls[1]![1] as { actionId: string }).actionId);
   });
 });

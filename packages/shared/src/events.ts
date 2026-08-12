@@ -18,11 +18,7 @@ import type {
   WolfSelectTargetRequest,
   WolfSendMessageRequest
 } from "./actions.js";
-import type {
-  ChatHistoryPage,
-  ChatHistoryRequest,
-  ChatMessage
-} from "./chat.js";
+import type { ChatHistoryPage, ChatHistoryRequest, ChatMessage } from "./chat.js";
 import type { HostAddBotRequest } from "./bot.js";
 import type { RoleConfigurationInput } from "./domain.js";
 import type { PublicGameState } from "./game.js";
@@ -38,10 +34,7 @@ import type {
 } from "./lobby.js";
 import type { ClientPing, ServerPong, ServiceStatus } from "./system.js";
 
-type OptionalActionEvent<T> = (
-  payloadOrAck?: ActionRequest | RoomActionAck<T>,
-  ack?: RoomActionAck<T>
-) => void;
+type OptionalActionEvent<T> = (payloadOrAck?: ActionRequest | RoomActionAck<T>, ack?: RoomActionAck<T>) => void;
 
 export interface ClientToServerEvents {
   "system:ping": (payload: ClientPing) => void;

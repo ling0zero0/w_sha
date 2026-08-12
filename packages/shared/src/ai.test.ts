@@ -64,42 +64,60 @@ const botProfileWrite = {
 describe("AI shared contracts", () => {
   it("accepts only the stage-1 provider protocol and strict provider writes", () => {
     expect(createAiProviderRequestSchema.parse(providerWrite)).toEqual(providerWrite);
-    expect(createAiProviderRequestSchema.safeParse({
-      ...providerWrite,
-      protocol: "anthropic-messages"
-    }).success).toBe(false);
-    expect(createAiProviderRequestSchema.safeParse({
-      ...providerWrite,
-      extra: true
-    }).success).toBe(false);
-    expect(createAiProviderRequestSchema.safeParse({
-      ...providerWrite,
-      baseUrl: "file:///tmp/model"
-    }).success).toBe(false);
-    expect(createAiProviderRequestSchema.safeParse({
-      ...providerWrite,
-      baseUrl: "https://user:password@example.com/v1"
-    }).success).toBe(false);
-    expect(createAiProviderRequestSchema.safeParse({
-      ...providerWrite,
-      baseUrl: "http://169.254.169.254/latest/meta-data"
-    }).success).toBe(false);
-    expect(createAiProviderRequestSchema.safeParse({
-      ...providerWrite,
-      baseUrl: "http://[fe80::1]/v1"
-    }).success).toBe(false);
-    expect(createAiProviderRequestSchema.safeParse({
-      ...providerWrite,
-      baseUrl: "http://[::ffff:169.254.169.254]/v1"
-    }).success).toBe(false);
-    expect(createAiProviderRequestSchema.safeParse({
-      ...providerWrite,
-      baseUrl: "http://[::ffff:100.100.100.200]/v1"
-    }).success).toBe(false);
-    expect(createAiProviderRequestSchema.safeParse({
-      ...providerWrite,
-      baseUrl: "http://[::ffff:127.0.0.1]/v1"
-    }).success).toBe(true);
+    expect(
+      createAiProviderRequestSchema.safeParse({
+        ...providerWrite,
+        protocol: "anthropic-messages"
+      }).success
+    ).toBe(false);
+    expect(
+      createAiProviderRequestSchema.safeParse({
+        ...providerWrite,
+        extra: true
+      }).success
+    ).toBe(false);
+    expect(
+      createAiProviderRequestSchema.safeParse({
+        ...providerWrite,
+        baseUrl: "file:///tmp/model"
+      }).success
+    ).toBe(false);
+    expect(
+      createAiProviderRequestSchema.safeParse({
+        ...providerWrite,
+        baseUrl: "https://user:password@example.com/v1"
+      }).success
+    ).toBe(false);
+    expect(
+      createAiProviderRequestSchema.safeParse({
+        ...providerWrite,
+        baseUrl: "http://169.254.169.254/latest/meta-data"
+      }).success
+    ).toBe(false);
+    expect(
+      createAiProviderRequestSchema.safeParse({
+        ...providerWrite,
+        baseUrl: "http://[fe80::1]/v1"
+      }).success
+    ).toBe(false);
+    expect(
+      createAiProviderRequestSchema.safeParse({
+        ...providerWrite,
+        baseUrl: "http://[::ffff:169.254.169.254]/v1"
+      }).success
+    ).toBe(false);
+    expect(
+      createAiProviderRequestSchema.safeParse({
+        ...providerWrite,
+        baseUrl: "http://[::ffff:100.100.100.200]/v1"
+      }).success
+    ).toBe(false);
+    expect(
+      createAiProviderRequestSchema.safeParse({
+        ...providerWrite,
+        baseUrl: "http://[::ffff:127.0.0.1]/v1"
+      }).success
+    ).toBe(true);
   });
 
   it("keeps provider credentials out of redacted views", () => {
@@ -107,10 +125,12 @@ describe("AI shared contracts", () => {
 
     expect(parsed.credentialConfigured).toBe(true);
     expect(Object.keys(parsed)).not.toContain("apiKey");
-    expect(aiProviderViewSchema.safeParse({
-      ...providerView,
-      apiKey: "secret-value"
-    }).success).toBe(false);
+    expect(
+      aiProviderViewSchema.safeParse({
+        ...providerView,
+        apiKey: "secret-value"
+      }).success
+    ).toBe(false);
   });
 
   it("requires meaningful provider updates and explicit credential clearing", () => {
@@ -121,53 +141,71 @@ describe("AI shared contracts", () => {
     expect(updateAiProviderRequestSchema.parse({ clearCredential: true })).toEqual({
       clearCredential: true
     });
-    expect(updateAiProviderRequestSchema.safeParse({
-      apiKey: "replacement",
-      clearCredential: true
-    }).success).toBe(false);
+    expect(
+      updateAiProviderRequestSchema.safeParse({
+        apiKey: "replacement",
+        clearCredential: true
+      }).success
+    ).toBe(false);
     expect(updateAiProviderRequestSchema.safeParse({ clearCredential: false }).success).toBe(false);
   });
 
   it("strictly validates model profile create, update, and view payloads", () => {
     expect(createAiModelProfileRequestSchema.parse(modelWrite)).toEqual(modelWrite);
-    expect(aiModelProfileViewSchema.parse({
-      id: modelProfileId,
-      ...modelWrite
-    }).id).toBe(modelProfileId);
-    expect(createAiModelProfileRequestSchema.safeParse({
-      ...modelWrite,
-      maxAttemptsPerTurn: 3
-    }).success).toBe(false);
-    expect(createAiModelProfileRequestSchema.safeParse({
-      ...modelWrite,
-      gameTokenBudget: 100
-    }).success).toBe(false);
-    expect(aiModelProfileViewSchema.safeParse({
-      id: modelProfileId,
-      ...modelWrite,
-      fallbackModelProfileId: modelProfileId
-    }).success).toBe(false);
+    expect(
+      aiModelProfileViewSchema.parse({
+        id: modelProfileId,
+        ...modelWrite
+      }).id
+    ).toBe(modelProfileId);
+    expect(
+      createAiModelProfileRequestSchema.safeParse({
+        ...modelWrite,
+        maxAttemptsPerTurn: 3
+      }).success
+    ).toBe(false);
+    expect(
+      createAiModelProfileRequestSchema.safeParse({
+        ...modelWrite,
+        gameTokenBudget: 100
+      }).success
+    ).toBe(false);
+    expect(
+      aiModelProfileViewSchema.safeParse({
+        id: modelProfileId,
+        ...modelWrite,
+        fallbackModelProfileId: modelProfileId
+      }).success
+    ).toBe(false);
     expect(updateAiModelProfileRequestSchema.safeParse({}).success).toBe(false);
-    expect(updateAiModelProfileRequestSchema.safeParse({
-      temperature: 0.7,
-      unknown: true
-    }).success).toBe(false);
+    expect(
+      updateAiModelProfileRequestSchema.safeParse({
+        temperature: 0.7,
+        unknown: true
+      }).success
+    ).toBe(false);
   });
 
   it("strictly validates bot profile create, update, and view payloads", () => {
     expect(createAiBotProfileRequestSchema.parse(botProfileWrite)).toEqual(botProfileWrite);
-    expect(aiBotProfileViewSchema.parse({
-      id: botProfileId,
-      ...botProfileWrite
-    }).strategy).toBe("cautious");
-    expect(createAiBotProfileRequestSchema.safeParse({
-      ...botProfileWrite,
-      strategy: "reckless"
-    }).success).toBe(false);
-    expect(createAiBotProfileRequestSchema.safeParse({
-      ...botProfileWrite,
-      role: "wolf"
-    }).success).toBe(false);
+    expect(
+      aiBotProfileViewSchema.parse({
+        id: botProfileId,
+        ...botProfileWrite
+      }).strategy
+    ).toBe("cautious");
+    expect(
+      createAiBotProfileRequestSchema.safeParse({
+        ...botProfileWrite,
+        strategy: "reckless"
+      }).success
+    ).toBe(false);
+    expect(
+      createAiBotProfileRequestSchema.safeParse({
+        ...botProfileWrite,
+        role: "wolf"
+      }).success
+    ).toBe(false);
     expect(updateAiBotProfileRequestSchema.safeParse({}).success).toBe(false);
   });
 

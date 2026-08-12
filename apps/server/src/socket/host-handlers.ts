@@ -9,12 +9,7 @@ import {
   roleConfigurationSchema
 } from "@werewolf/shared";
 import { z } from "zod";
-import {
-  handleHostActionRequest,
-  playerLifecycleActionScope,
-  type GameSocket,
-  type SocketHandlerContext
-} from "./context.js";
+import { handleHostActionRequest, playerLifecycleActionScope, type GameSocket, type SocketHandlerContext } from "./context.js";
 
 const emptyActionSchema = z.object({}).strict();
 

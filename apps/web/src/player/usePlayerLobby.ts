@@ -84,8 +84,7 @@ function mergeMessages(current: ChatMessage[], incoming: ChatMessage[]): ChatMes
 }
 
 function lastLobbySequence(lobby: PlayerLobbyView): number {
-  return [...lobby.publicChat.messages, ...(lobby.wolfAction?.messages ?? [])]
-    .reduce((latest, message) => Math.max(latest, message.sequence), 0);
+  return [...lobby.publicChat.messages, ...(lobby.wolfAction?.messages ?? [])].reduce((latest, message) => Math.max(latest, message.sequence), 0);
 }
 
 function appendChatMessage(lobby: PlayerLobbyView, message: ChatMessage): PlayerLobbyView {
@@ -141,9 +140,7 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
     const mergeHistory = (messages: ChatMessage[], clearExisting: boolean) => {
       setState((current) => {
         if (!current.lobby) return current;
-        const publicMessages = messages.filter(
-          (message) => message.channel === "day-public" || message.channel === "system"
-        );
+        const publicMessages = messages.filter((message) => message.channel === "day-public" || message.channel === "system");
         const wolfMessages = messages.filter((message) => message.channel === "wolf-private");
         return {
           ...current,
@@ -151,18 +148,12 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
             ...current.lobby,
             publicChat: {
               ...current.lobby.publicChat,
-              messages: mergeMessages(
-                clearExisting ? [] : current.lobby.publicChat.messages,
-                publicMessages
-              )
+              messages: mergeMessages(clearExisting ? [] : current.lobby.publicChat.messages, publicMessages)
             },
             wolfAction: current.lobby.wolfAction
               ? {
                   ...current.lobby.wolfAction,
-                  messages: mergeMessages(
-                    clearExisting ? [] : current.lobby.wolfAction.messages,
-                    wolfMessages
-                  )
+                  messages: mergeMessages(clearExisting ? [] : current.lobby.wolfAction.messages, wolfMessages)
                 }
               : null
           }
@@ -170,15 +161,9 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
       });
     };
 
-    const requestHistory = (
-      socket: Socket<ServerToClientEvents, ClientToServerEvents>,
-      view: PlayerLobbyView,
-      fromStart = false
-    ) => {
+    const requestHistory = (socket: Socket<ServerToClientEvents, ClientToServerEvents>, view: PlayerLobbyView, fromStart = false) => {
       if (view.phase === "lobby" || (fromStart && replayLoadedRef.current)) return;
-      const initialAfterSequence = fromStart
-        ? 0
-        : Math.max(chatCursorRef.current, lastLobbySequence(view));
+      const initialAfterSequence = fromStart ? 0 : Math.max(chatCursorRef.current, lastLobbySequence(view));
 
       const requestPage = (afterSequence: number, clearExisting: boolean) => {
         socket.emit("chat:history", { afterSequence, limit: 100 }, (result) => {
@@ -187,8 +172,7 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
             return;
           }
 
-          const sessionChanged = chatSessionRef.current !== null
-            && chatSessionRef.current !== result.data.sessionId;
+          const sessionChanged = chatSessionRef.current !== null && chatSessionRef.current !== result.data.sessionId;
           chatSessionRef.current = result.data.sessionId;
           if (sessionChanged && afterSequence > 0) {
             chatCursorRef.current = 0;
@@ -200,9 +184,7 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
 
           mergeHistory(result.data.messages, clearExisting || sessionChanged);
           const pageCursor = result.data.messages.at(-1)?.sequence ?? afterSequence;
-          chatCursorRef.current = result.data.hasMore
-            ? pageCursor
-            : Math.max(pageCursor, result.data.latestSequence);
+          chatCursorRef.current = result.data.hasMore ? pageCursor : Math.max(pageCursor, result.data.latestSequence);
 
           if (result.data.hasMore) {
             requestPage(pageCursor, false);
@@ -215,37 +197,28 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
       requestPage(initialAfterSequence, fromStart);
     };
 
-    const applyLobbyView = (
-      socket: Socket<ServerToClientEvents, ClientToServerEvents>,
-      lobby: PlayerLobbyView
-    ) => {
+    const applyLobbyView = (socket: Socket<ServerToClientEvents, ClientToServerEvents>, lobby: PlayerLobbyView) => {
       setState((current) => {
-        const startsNewView = lobby.phase === "lobby"
-          || (current.lobby?.phase === "game-over" && lobby.phase !== "game-over");
+        const startsNewView = lobby.phase === "lobby" || (current.lobby?.phase === "game-over" && lobby.phase !== "game-over");
         if (startsNewView) resetChatHistory();
         return {
           ...current,
-          lobby: startsNewView || !current.lobby
-            ? lobby
-            : {
-                ...lobby,
-                publicChat: {
-                  ...lobby.publicChat,
-                  messages: mergeMessages(
-                    current.lobby.publicChat.messages,
-                    lobby.publicChat.messages
-                  )
-                },
-                wolfAction: lobby.wolfAction
-                  ? {
-                      ...lobby.wolfAction,
-                      messages: mergeMessages(
-                        current.lobby.wolfAction?.messages ?? [],
-                        lobby.wolfAction.messages
-                      )
-                    }
-                  : null
-              }
+          lobby:
+            startsNewView || !current.lobby
+              ? lobby
+              : {
+                  ...lobby,
+                  publicChat: {
+                    ...lobby.publicChat,
+                    messages: mergeMessages(current.lobby.publicChat.messages, lobby.publicChat.messages)
+                  },
+                  wolfAction: lobby.wolfAction
+                    ? {
+                        ...lobby.wolfAction,
+                        messages: mergeMessages(current.lobby.wolfAction?.messages ?? [], lobby.wolfAction.messages)
+                      }
+                    : null
+                }
         };
       });
       requestHistory(socket, lobby, lobby.phase === "game-over");
@@ -336,59 +309,62 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
     };
   }, [invitation]);
 
-  const join = useCallback((nickname: string) => {
-    const socket = socketRef.current;
-    if (!socket || !invitation) return;
-    if (!socket.connected) {
-      setState((current) => ({ ...current, error: "尚未连接到主机" }));
-      return;
-    }
-
-    const normalizedNickname = nickname.trim();
-    lastNicknameRef.current = normalizedNickname;
-    const actionId = joinActionRef.current?.nickname === normalizedNickname
-      ? joinActionRef.current.actionId
-      : createActionId();
-    joinActionRef.current = { actionId, nickname: normalizedNickname };
-    setState((current) => ({ ...current, joining: true, canRequestTakeover: false, error: "" }));
-    socket.emit("player:join", { ...invitation, nickname, actionId }, (result) => {
-      if (joinActionRef.current?.actionId === actionId) joinActionRef.current = null;
-      if (result.ok) {
-        credentialsRef.current = result.data.credentials;
-        saveSession(result.data);
-        setState((current) => ({ ...current, joining: false, lobby: result.data.lobby, error: "" }));
-      } else {
-        setState((current) => ({
-          ...current,
-          joining: false,
-          canRequestTakeover: result.code === "NICKNAME_TAKEN",
-          error: result.message
-        }));
+  const join = useCallback(
+    (nickname: string) => {
+      const socket = socketRef.current;
+      if (!socket || !invitation) return;
+      if (!socket.connected) {
+        setState((current) => ({ ...current, error: "尚未连接到主机" }));
+        return;
       }
-    });
-  }, [invitation]);
+
+      const normalizedNickname = nickname.trim();
+      lastNicknameRef.current = normalizedNickname;
+      const actionId = joinActionRef.current?.nickname === normalizedNickname ? joinActionRef.current.actionId : createActionId();
+      joinActionRef.current = { actionId, nickname: normalizedNickname };
+      setState((current) => ({ ...current, joining: true, canRequestTakeover: false, error: "" }));
+      socket.emit("player:join", { ...invitation, nickname, actionId }, (result) => {
+        if (joinActionRef.current?.actionId === actionId) joinActionRef.current = null;
+        if (result.ok) {
+          credentialsRef.current = result.data.credentials;
+          saveSession(result.data);
+          setState((current) => ({ ...current, joining: false, lobby: result.data.lobby, error: "" }));
+        } else {
+          setState((current) => ({
+            ...current,
+            joining: false,
+            canRequestTakeover: result.code === "NICKNAME_TAKEN",
+            error: result.message
+          }));
+        }
+      });
+    },
+    [invitation]
+  );
 
   const requestTakeover = useCallback(() => {
     const socket = socketRef.current;
     if (!socket?.connected || !invitation || !lastNicknameRef.current) return;
     const nickname = lastNicknameRef.current;
-    const actionId = takeoverActionRef.current?.nickname === nickname
-      ? takeoverActionRef.current.actionId
-      : createActionId();
+    const actionId = takeoverActionRef.current?.nickname === nickname ? takeoverActionRef.current.actionId : createActionId();
     takeoverActionRef.current = { actionId, nickname };
     setState((current) => ({ ...current, takeoverPending: true, canRequestTakeover: false, error: "" }));
-    socket.emit("player:request-takeover", {
-      ...invitation,
-      nickname,
-      actionId
-    }, (result) => {
-      if (result.ok) {
-        setState((current) => ({ ...current, error: "接管申请已发送，请等待主机批准" }));
-      } else {
-        if (takeoverActionRef.current?.actionId === actionId) takeoverActionRef.current = null;
-        setState((current) => ({ ...current, takeoverPending: false, error: result.message }));
+    socket.emit(
+      "player:request-takeover",
+      {
+        ...invitation,
+        nickname,
+        actionId
+      },
+      (result) => {
+        if (result.ok) {
+          setState((current) => ({ ...current, error: "接管申请已发送，请等待主机批准" }));
+        } else {
+          if (takeoverActionRef.current?.actionId === actionId) takeoverActionRef.current = null;
+          setState((current) => ({ ...current, takeoverPending: false, error: result.message }));
+        }
       }
-    });
+    );
   }, [invitation]);
 
   const confirmRole = useCallback(() => {
@@ -404,31 +380,25 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
   const applyPlayerView = useCallback((result: RoomActionResult<PlayerLobbyView>) => {
     if (result.ok) {
       setState((current) => {
-        const startsNewView = result.data.phase === "lobby"
-          || (current.lobby?.phase === "game-over" && result.data.phase !== "game-over");
+        const startsNewView = result.data.phase === "lobby" || (current.lobby?.phase === "game-over" && result.data.phase !== "game-over");
         return {
           ...current,
-          lobby: startsNewView || !current.lobby
-            ? result.data
-            : {
-                ...result.data,
-                publicChat: {
-                  ...result.data.publicChat,
-                  messages: mergeMessages(
-                    current.lobby.publicChat.messages,
-                    result.data.publicChat.messages
-                  )
+          lobby:
+            startsNewView || !current.lobby
+              ? result.data
+              : {
+                  ...result.data,
+                  publicChat: {
+                    ...result.data.publicChat,
+                    messages: mergeMessages(current.lobby.publicChat.messages, result.data.publicChat.messages)
+                  },
+                  wolfAction: result.data.wolfAction
+                    ? {
+                        ...result.data.wolfAction,
+                        messages: mergeMessages(current.lobby.wolfAction?.messages ?? [], result.data.wolfAction.messages)
+                      }
+                    : null
                 },
-                wolfAction: result.data.wolfAction
-                  ? {
-                      ...result.data.wolfAction,
-                      messages: mergeMessages(
-                        current.lobby.wolfAction?.messages ?? [],
-                        result.data.wolfAction.messages
-                      )
-                    }
-                  : null
-              },
           error: ""
         };
       });
@@ -437,13 +407,19 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
     }
   }, []);
 
-  const selectWolfTarget = useCallback((target: WolfVoteTarget) => {
-    socketRef.current?.emit("wolf:select-target", { target, actionId: createActionId() }, applyPlayerView);
-  }, [applyPlayerView]);
+  const selectWolfTarget = useCallback(
+    (target: WolfVoteTarget) => {
+      socketRef.current?.emit("wolf:select-target", { target, actionId: createActionId() }, applyPlayerView);
+    },
+    [applyPlayerView]
+  );
 
-  const confirmWolfVote = useCallback((confirmed: boolean) => {
-    socketRef.current?.emit("wolf:confirm-vote", { confirmed, actionId: createActionId() }, applyPlayerView);
-  }, [applyPlayerView]);
+  const confirmWolfVote = useCallback(
+    (confirmed: boolean) => {
+      socketRef.current?.emit("wolf:confirm-vote", { confirmed, actionId: createActionId() }, applyPlayerView);
+    },
+    [applyPlayerView]
+  );
 
   const sendChatMessage = useCallback((payload: ChatSendRequest) => {
     socketRef.current?.emit("chat:send", { ...payload, actionId: createActionId() }, (result) => {
@@ -451,39 +427,57 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
     });
   }, []);
 
-  const inspectAsSeer = useCallback((target: string) => {
-    socketRef.current?.emit("seer:inspect", { target, actionId: createActionId() }, applyPlayerView);
-  }, [applyPlayerView]);
+  const inspectAsSeer = useCallback(
+    (target: string) => {
+      socketRef.current?.emit("seer:inspect", { target, actionId: createActionId() }, applyPlayerView);
+    },
+    [applyPlayerView]
+  );
 
-  const submitWitchAction = useCallback((action: "none" | "save" | "poison", target?: string) => {
-    if (action === "poison" && target) {
-      socketRef.current?.emit("witch:submit-action", { action, target, actionId: createActionId() }, applyPlayerView);
-      return;
-    }
-    if (action !== "poison") {
-      socketRef.current?.emit("witch:submit-action", { action, actionId: createActionId() }, applyPlayerView);
-    }
-  }, [applyPlayerView]);
+  const submitWitchAction = useCallback(
+    (action: "none" | "save" | "poison", target?: string) => {
+      if (action === "poison" && target) {
+        socketRef.current?.emit("witch:submit-action", { action, target, actionId: createActionId() }, applyPlayerView);
+        return;
+      }
+      if (action !== "poison") {
+        socketRef.current?.emit("witch:submit-action", { action, actionId: createActionId() }, applyPlayerView);
+      }
+    },
+    [applyPlayerView]
+  );
 
-  const protectAsGuard = useCallback((target: string | null) => {
-    socketRef.current?.emit("guard:protect", { target, actionId: createActionId() }, applyPlayerView);
-  }, [applyPlayerView]);
+  const protectAsGuard = useCallback(
+    (target: string | null) => {
+      socketRef.current?.emit("guard:protect", { target, actionId: createActionId() }, applyPlayerView);
+    },
+    [applyPlayerView]
+  );
 
-  const shootAsHunter = useCallback((target: string | null) => {
-    socketRef.current?.emit("hunter:shoot", { target, actionId: createActionId() }, applyPlayerView);
-  }, [applyPlayerView]);
+  const shootAsHunter = useCallback(
+    (target: string | null) => {
+      socketRef.current?.emit("hunter:shoot", { target, actionId: createActionId() }, applyPlayerView);
+    },
+    [applyPlayerView]
+  );
 
   const finishSpeaking = useCallback(() => {
     socketRef.current?.emit("player:finish-speaking", { actionId: createActionId() }, applyPlayerView);
   }, [applyPlayerView]);
 
-  const selectDayVote = useCallback((target: string | "abstain" | null) => {
-    socketRef.current?.emit("day:select-vote", { target, actionId: createActionId() }, applyPlayerView);
-  }, [applyPlayerView]);
+  const selectDayVote = useCallback(
+    (target: string | "abstain" | null) => {
+      socketRef.current?.emit("day:select-vote", { target, actionId: createActionId() }, applyPlayerView);
+    },
+    [applyPlayerView]
+  );
 
-  const confirmDayVote = useCallback((confirmed: boolean) => {
-    socketRef.current?.emit("day:confirm-vote", { confirmed, actionId: createActionId() }, applyPlayerView);
-  }, [applyPlayerView]);
+  const confirmDayVote = useCallback(
+    (confirmed: boolean) => {
+      socketRef.current?.emit("day:confirm-vote", { confirmed, actionId: createActionId() }, applyPlayerView);
+    },
+    [applyPlayerView]
+  );
 
   return {
     ...state,

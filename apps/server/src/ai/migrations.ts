@@ -81,10 +81,12 @@ export function runAiConfigMigrations(database: DatabaseSync): void {
     );
   `);
 
-  const appliedRows = database.prepare(`
+  const appliedRows = database
+    .prepare(`
     SELECT version
     FROM schema_migrations
-  `).all() as unknown as Array<{ version: number }>;
+  `)
+    .all() as unknown as Array<{ version: number }>;
   const appliedVersions = new Set(appliedRows.map((row) => row.version));
 
   for (const migration of migrations) {
@@ -92,10 +94,12 @@ export function runAiConfigMigrations(database: DatabaseSync): void {
     database.exec("BEGIN IMMEDIATE");
     try {
       database.exec(migration.sql);
-      database.prepare(`
+      database
+        .prepare(`
         INSERT INTO schema_migrations (version, applied_at)
         VALUES (?, ?)
-      `).run(migration.version, new Date().toISOString());
+      `)
+        .run(migration.version, new Date().toISOString());
       database.exec("COMMIT");
     } catch (error) {
       database.exec("ROLLBACK");

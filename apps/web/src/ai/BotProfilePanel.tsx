@@ -1,10 +1,4 @@
-import type {
-  AiBotProfileId,
-  AiBotProfileView,
-  AiBotStrategy,
-  AiModelProfileView,
-  CreateAiBotProfileRequest
-} from "@werewolf/shared";
+import type { AiBotProfileId, AiBotProfileView, AiBotStrategy, AiModelProfileView, CreateAiBotProfileRequest } from "@werewolf/shared";
 import { Bot, Plus, Save, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import type { AiAdminClient } from "./ai-client";
@@ -41,7 +35,10 @@ export function BotProfilePanel({ profiles, models, client, onChanged }: BotProf
     <div className="ai-resource-layout">
       <aside className="ai-resource-list" aria-label="机器人档案列表">
         <div className="ai-list-heading">
-          <div><span>{profiles.length}</span><strong>机器人档案</strong></div>
+          <div>
+            <span>{profiles.length}</span>
+            <strong>机器人档案</strong>
+          </div>
           <button type="button" className="ai-icon-button" aria-label="新建机器人档案" title="新建机器人档案" onClick={() => setSelectedId("new")}>
             <Plus size={18} aria-hidden="true" />
           </button>
@@ -54,7 +51,12 @@ export function BotProfilePanel({ profiles, models, client, onChanged }: BotProf
             onClick={() => setSelectedId(profile.id)}
           >
             <Bot size={18} aria-hidden="true" />
-            <span><strong>{profile.name}</strong><small>{profile.defaultNickname} · {strategyLabels[profile.strategy]}</small></span>
+            <span>
+              <strong>{profile.name}</strong>
+              <small>
+                {profile.defaultNickname} · {strategyLabels[profile.strategy]}
+              </small>
+            </span>
             <i className={profile.enabled ? "is-enabled" : ""} aria-label={profile.enabled ? "已启用" : "已停用"} />
           </button>
         ))}
@@ -146,7 +148,14 @@ function BotProfileForm({
           <h2>{profile?.name ?? "添加机器人档案"}</h2>
         </div>
         {profile ? (
-          <button type="button" className="ai-icon-button ai-delete-button" aria-label="删除机器人档案" title="删除机器人档案" disabled={saving} onClick={() => void remove()}>
+          <button
+            type="button"
+            className="ai-icon-button ai-delete-button"
+            aria-label="删除机器人档案"
+            title="删除机器人档案"
+            disabled={saving}
+            onClick={() => void remove()}
+          >
             <Trash2 size={18} aria-hidden="true" />
           </button>
         ) : null}
@@ -166,7 +175,11 @@ function BotProfileForm({
           <span>模型</span>
           <select required value={modelProfileId} disabled={saving || models.length === 0} onChange={(event) => setModelProfileId(event.target.value)}>
             <option value="">选择模型</option>
-            {models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
+            {models.map((model) => (
+              <option key={model.id} value={model.id}>
+                {model.name}
+              </option>
+            ))}
           </select>
         </label>
         <fieldset className="ai-strategy-field">
@@ -193,7 +206,14 @@ function BotProfileForm({
         </label>
         <label className="ai-full-field">
           <span>人格提示词</span>
-          <textarea required maxLength={12000} rows={7} value={personalityPrompt} disabled={saving} onChange={(event) => setPersonalityPrompt(event.target.value)} />
+          <textarea
+            required
+            maxLength={12000}
+            rows={7}
+            value={personalityPrompt}
+            disabled={saving}
+            onChange={(event) => setPersonalityPrompt(event.target.value)}
+          />
         </label>
         <label className="ai-full-field">
           <span>发言风格</span>

@@ -8,14 +8,8 @@ export interface AiAdminRequestIdentity {
   authorization?: string;
 }
 
-export function isAuthorizedAiAdmin(
-  request: AiAdminRequestIdentity,
-  expectedHostSession: string
-): boolean {
-  const browserAddress = getBrowserAddress(
-    request.directAddress,
-    request.proxyClientAddress
-  );
+export function isAuthorizedAiAdmin(request: AiAdminRequestIdentity, expectedHostSession: string): boolean {
+  const browserAddress = getBrowserAddress(request.directAddress, request.proxyClientAddress);
   if (!isLoopbackAddress(browserAddress)) return false;
   if (!isLoopbackBrowserSource(request.origin ?? request.referer)) return false;
 
@@ -24,9 +18,7 @@ export function isAuthorizedAiAdmin(
 }
 
 export function isLoopbackAddress(address: string): boolean {
-  return address === "127.0.0.1"
-    || address === "::1"
-    || address === "::ffff:127.0.0.1";
+  return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1";
 }
 
 export function isLoopbackBrowserSource(source: string | undefined): boolean {
@@ -35,18 +27,13 @@ export function isLoopbackBrowserSource(source: string | undefined): boolean {
     const url = new URL(source);
     if (url.protocol !== "http:" && url.protocol !== "https:") return false;
     const hostname = url.hostname;
-    return hostname === "127.0.0.1"
-      || hostname === "localhost"
-      || hostname === "[::1]";
+    return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "[::1]";
   } catch {
     return false;
   }
 }
 
-function getBrowserAddress(
-  directAddress: string,
-  proxyClientAddress: string | string[] | undefined
-): string {
+function getBrowserAddress(directAddress: string, proxyClientAddress: string | string[] | undefined): string {
   if (!isLoopbackAddress(directAddress) || typeof proxyClientAddress !== "string") {
     return directAddress;
   }

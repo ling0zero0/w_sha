@@ -1,18 +1,16 @@
 import { z } from "zod";
-import {
-  chatQuickContentSchema,
-  chatTargetSuggestionContentSchema,
-  chatTextContentSchema
-} from "./chat.js";
+import { chatQuickContentSchema, chatTargetSuggestionContentSchema, chatTextContentSchema } from "./chat.js";
 import { playerIdSchema, wolfVoteTargetSchema } from "./domain.js";
 import { dayVoteTargetSchema } from "./game.js";
 
 export const actionIdSchema = z.uuid();
 export type ActionId = z.infer<typeof actionIdSchema>;
 
-export const actionRequestSchema = z.object({
-  actionId: actionIdSchema
-}).strict();
+export const actionRequestSchema = z
+  .object({
+    actionId: actionIdSchema
+  })
+  .strict();
 export type ActionRequest = z.infer<typeof actionRequestSchema>;
 
 export type ActionPayload<T> = T & Partial<ActionRequest>;
@@ -30,7 +28,12 @@ export const hostResolveTakeoverRequestSchema = z.object({ requestId: z.uuid(), 
 export type HostResolveTakeoverRequest = z.infer<typeof hostResolveTakeoverRequestSchema>;
 
 export const hostAdjustPhaseTimeRequestSchema = z.object({
-  deltaMs: z.number().int().min(-300_000).max(300_000).refine((value) => value !== 0)
+  deltaMs: z
+    .number()
+    .int()
+    .min(-300_000)
+    .max(300_000)
+    .refine((value) => value !== 0)
 });
 export type HostAdjustPhaseTimeRequest = z.infer<typeof hostAdjustPhaseTimeRequestSchema>;
 
@@ -48,18 +51,22 @@ export const wolfSendMessageRequestSchema = z.discriminatedUnion("kind", [
 export type WolfSendMessageRequest = z.infer<typeof wolfSendMessageRequestSchema>;
 
 export const chatSendRequestSchema = z.discriminatedUnion("channel", [
-  z.object({
-    channel: z.literal("day-public"),
-    content: chatTextContentSchema
-  }).strict(),
-  z.object({
-    channel: z.literal("wolf-private"),
-    content: z.union([
-      chatTextContentSchema.extend({ text: z.string().trim().min(1).max(80) }),
-      chatQuickContentSchema,
-      chatTargetSuggestionContentSchema.pick({ kind: true }).extend({ target: playerIdSchema })
-    ])
-  }).strict()
+  z
+    .object({
+      channel: z.literal("day-public"),
+      content: chatTextContentSchema
+    })
+    .strict(),
+  z
+    .object({
+      channel: z.literal("wolf-private"),
+      content: z.union([
+        chatTextContentSchema.extend({ text: z.string().trim().min(1).max(80) }),
+        chatQuickContentSchema,
+        chatTargetSuggestionContentSchema.pick({ kind: true }).extend({ target: playerIdSchema })
+      ])
+    })
+    .strict()
 ]);
 export type ChatSendRequest = z.infer<typeof chatSendRequestSchema>;
 

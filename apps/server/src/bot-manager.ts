@@ -1,10 +1,4 @@
-import {
-  botIntentSchema,
-  type BotIntent,
-  type BotKind,
-  type PlayerId,
-  type PlayerLobbyView
-} from "@werewolf/shared";
+import { botIntentSchema, type BotIntent, type BotKind, type PlayerId, type PlayerLobbyView } from "@werewolf/shared";
 import type { BotConfigurationLock, LobbyRoom } from "./room.js";
 
 export interface BotTurnContext {
@@ -22,12 +16,7 @@ export interface BotAdapter {
   dispose(): Promise<void>;
 }
 
-export type BotAdapterFactory = (
-  kind: BotKind,
-  playerId: PlayerId,
-  botProfileId: string | null,
-  lockedConfiguration?: BotConfigurationLock
-) => BotAdapter;
+export type BotAdapterFactory = (kind: BotKind, playerId: PlayerId, botProfileId: string | null, lockedConfiguration?: BotConfigurationLock) => BotAdapter;
 
 interface ManagedBot {
   adapter: BotAdapter;
@@ -103,12 +92,7 @@ export class BotManager {
     for (const [playerId, seat] of seats) {
       if (this.bots.has(playerId)) continue;
       this.bots.set(playerId, {
-        adapter: this.adapterFactory(
-          seat.botKind,
-          playerId,
-          seat.botProfileId,
-          seat.lockedConfiguration
-        ),
+        adapter: this.adapterFactory(seat.botKind, playerId, seat.botProfileId, seat.lockedConfiguration),
         kind: seat.botKind,
         lastAttemptedRevision: null,
         task: null,
@@ -139,22 +123,18 @@ export class BotManager {
     queueMicrotask(() => void this.runTurn(playerId, bot, view, controller, generation));
   }
 
-  private async runTurn(
-    playerId: PlayerId,
-    bot: ManagedBot,
-    view: PlayerLobbyView,
-    controller: AbortController,
-    generation: number
-  ): Promise<void> {
+  private async runTurn(playerId: PlayerId, bot: ManagedBot, view: PlayerLobbyView, controller: AbortController, generation: number): Promise<void> {
     let timeout: NodeJS.Timeout | null = null;
     try {
       const turnTimeoutMs = bot.adapter.turnTimeoutMs ?? this.timeoutMs;
-      const decision = Promise.resolve(bot.adapter.onView(view, {
-        playerId,
-        signal: controller.signal,
-        revision: view.revision,
-        deadlineAt: new Date(Date.now() + turnTimeoutMs).toISOString()
-      })).then(
+      const decision = Promise.resolve(
+        bot.adapter.onView(view, {
+          playerId,
+          signal: controller.signal,
+          revision: view.revision,
+          deadlineAt: new Date(Date.now() + turnTimeoutMs).toISOString()
+        })
+      ).then(
         (intent) => ({ kind: "decision" as const, intent }),
         (error) => ({ kind: "error" as const, error })
       );
@@ -176,11 +156,7 @@ export class BotManager {
 
       const currentBot = this.bots.get(playerId);
       const currentView = this.room.getPlayerView(playerId);
-      if (
-        currentBot !== bot
-        || bot.generation !== generation
-        || currentView?.revision !== view.revision
-      ) return;
+      if (currentBot !== bot || bot.generation !== generation || currentView?.revision !== view.revision) return;
 
       const parsed = botIntentSchema.safeParse(result.intent);
       if (!parsed.success) {
@@ -214,9 +190,7 @@ export class DeterministicBotAdapter implements BotAdapter {
     if (view.wolfAction?.chatEnabled && !view.wolfAction.locked) {
       if (view.wolfAction.target === null) {
         const teammateIds = new Set(view.privateRole?.wolfTeammates.map((player) => player.id) ?? []);
-        const target = view.wolfAction.candidates.find(
-          (candidate) => candidate.id !== view.selfId && !teammateIds.has(candidate.id)
-        );
+        const target = view.wolfAction.candidates.find((candidate) => candidate.id !== view.selfId && !teammateIds.has(candidate.id));
         return {
           type: "wolf-select-target",
           payload: { target: target?.id ?? "no-kill" }
@@ -245,11 +219,7 @@ export class DeterministicBotAdapter implements BotAdapter {
     }
 
     const currentSpeakerId = view.dayState?.currentSpeaker?.id;
-    if (
-      currentSpeakerId === view.selfId
-      && view.publicChat.canSend
-      && (view.phase === "last-words" || view.phase === "day-speech")
-    ) {
+    if (currentSpeakerId === view.selfId && view.publicChat.canSend && (view.phase === "last-words" || view.phase === "day-speech")) {
       if (!this.sentPublicMessage) {
         this.sentPublicMessage = true;
         return {

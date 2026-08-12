@@ -3,12 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ChatTimeline, chatMessageText } from "./ChatTimeline";
 
-function textMessage(
-  id: string,
-  sequence: number,
-  text: string,
-  nickname = "Alice"
-): ChatMessage {
+function textMessage(id: string, sequence: number, text: string, nickname = "Alice"): ChatMessage {
   return {
     id,
     sequence,
@@ -30,10 +25,7 @@ describe("ChatTimeline", () => {
   it("renders messages in the order supplied by the merged sequence", () => {
     const html = renderToStaticMarkup(
       <ChatTimeline
-        messages={[
-          textMessage("22222222-2222-4222-8222-222222222222", 1, "first"),
-          textMessage("33333333-3333-4333-8333-333333333333", 2, "second", "Bob")
-        ]}
+        messages={[textMessage("22222222-2222-4222-8222-222222222222", 1, "first"), textMessage("33333333-3333-4333-8333-333333333333", 2, "second", "Bob")]}
         emptyText="No messages"
       />
     );
@@ -45,9 +37,7 @@ describe("ChatTimeline", () => {
   });
 
   it("renders the empty state and formats non-text chat content", () => {
-    const emptyHtml = renderToStaticMarkup(
-      <ChatTimeline messages={[]} emptyText="No messages yet" className="host-messages" />
-    );
+    const emptyHtml = renderToStaticMarkup(<ChatTimeline messages={[]} emptyText="No messages yet" className="host-messages" />);
     const suggestion: ChatMessage = {
       ...textMessage("44444444-4444-4444-8444-444444444444", 3, "unused"),
       channel: "wolf-private",
@@ -64,9 +54,11 @@ describe("ChatTimeline", () => {
     expect(emptyHtml).toContain("chat-timeline host-messages");
     expect(emptyHtml).toContain("No messages yet");
     expect(chatMessageText(suggestion)).toBe("建议选择 6 号Carol");
-    expect(chatMessageText({
-      ...suggestion,
-      content: { kind: "quick", code: "no-kill" }
-    })).toBe("建议空刀");
+    expect(
+      chatMessageText({
+        ...suggestion,
+        content: { kind: "quick", code: "no-kill" }
+      })
+    ).toBe("建议空刀");
   });
 });

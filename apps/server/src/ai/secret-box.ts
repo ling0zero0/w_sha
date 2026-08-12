@@ -1,8 +1,4 @@
-import {
-  createCipheriv,
-  createDecipheriv,
-  randomBytes
-} from "node:crypto";
+import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
 const algorithm = "aes-256-gcm";
 const keyLength = 32;
@@ -49,10 +45,7 @@ export class AesGcmSecretBox implements SecretBox {
     const nonce = randomBytes(nonceLength);
     const cipher = createCipheriv(algorithm, this.key, nonce);
     cipher.setAAD(additionalData);
-    const ciphertext = Buffer.concat([
-      cipher.update(plaintext, "utf8"),
-      cipher.final()
-    ]);
+    const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
 
     return {
       version: 1,
@@ -68,17 +61,10 @@ export class AesGcmSecretBox implements SecretBox {
       if (encrypted.version !== 1 || encrypted.keyVersion !== this.keyVersion) {
         throw new Error("unsupported encrypted secret version");
       }
-      const decipher = createDecipheriv(
-        algorithm,
-        this.key,
-        decodeBase64(encrypted.nonce, nonceLength)
-      );
+      const decipher = createDecipheriv(algorithm, this.key, decodeBase64(encrypted.nonce, nonceLength));
       decipher.setAAD(purposeBuffer(purpose));
       decipher.setAuthTag(decodeBase64(encrypted.authTag, 16));
-      return Buffer.concat([
-        decipher.update(decodeBase64(encrypted.ciphertext)),
-        decipher.final()
-      ]).toString("utf8");
+      return Buffer.concat([decipher.update(decodeBase64(encrypted.ciphertext)), decipher.final()]).toString("utf8");
     } catch {
       throw new Error("could not decrypt AI credential");
     }
@@ -92,10 +78,7 @@ function purposeBuffer(purpose: string): Buffer {
 
 function decodeBase64(value: string, expectedLength?: number): Buffer {
   const decoded = Buffer.from(value, "base64");
-  if (
-    decoded.toString("base64") !== value
-    || (expectedLength !== undefined && decoded.byteLength !== expectedLength)
-  ) {
+  if (decoded.toString("base64") !== value || (expectedLength !== undefined && decoded.byteLength !== expectedLength)) {
     throw new Error("invalid encrypted secret encoding");
   }
   return decoded;

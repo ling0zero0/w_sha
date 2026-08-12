@@ -160,10 +160,7 @@ export function registerPlayerHandlers(socket: GameSocket, context: SocketHandle
           const takeoverMetadata = asTakeoverLifecycleMetadata(metadata);
           if (takeoverMetadata?.state === "approved") {
             if (!takeoverMetadata.session) return null;
-            if (
-              socket.data.pendingTakeoverRequestId
-              && socket.data.pendingTakeoverRequestId !== takeoverMetadata.requestId
-            ) return alreadyJoined();
+            if (socket.data.pendingTakeoverRequestId && socket.data.pendingTakeoverRequestId !== takeoverMetadata.requestId) return alreadyJoined();
             delete socket.data.pendingTakeoverRequestId;
             delete socket.data.pendingTakeoverActionId;
             const rebound = rebindPlayerSession(takeoverMetadata.session.credentials);
@@ -173,25 +170,15 @@ export function registerPlayerHandlers(socket: GameSocket, context: SocketHandle
           }
           if (takeoverMetadata?.state === "rejected") {
             if (socket.data.playerId) return alreadyJoined();
-            if (
-              socket.data.pendingTakeoverRequestId
-              && socket.data.pendingTakeoverRequestId !== takeoverMetadata.requestId
-            ) return alreadyJoined();
+            if (socket.data.pendingTakeoverRequestId && socket.data.pendingTakeoverRequestId !== takeoverMetadata.requestId) return alreadyJoined();
             delete socket.data.pendingTakeoverRequestId;
             delete socket.data.pendingTakeoverActionId;
             socket.emit("player:takeover-rejected", { message: "主机拒绝了设备接管申请" });
             return null;
           }
           if (socket.data.playerId) return alreadyJoined();
-          if (
-            socket.data.pendingTakeoverRequestId
-            && socket.data.pendingTakeoverRequestId !== result.data.requestId
-          ) return alreadyJoined();
-          const rebound = runtime.room.reattachTakeoverRequest(
-            result.data.requestId,
-            action.payload,
-            socket.id
-          );
+          if (socket.data.pendingTakeoverRequestId && socket.data.pendingTakeoverRequestId !== result.data.requestId) return alreadyJoined();
+          const rebound = runtime.room.reattachTakeoverRequest(result.data.requestId, action.payload, socket.id);
           if (!rebound.ok) return rebound;
           socket.data.pendingTakeoverRequestId = result.data.requestId;
           if (action.actionId) socket.data.pendingTakeoverActionId = action.actionId;
@@ -202,11 +189,14 @@ export function registerPlayerHandlers(socket: GameSocket, context: SocketHandle
           emitLobbyViews();
           emitPublicGameState();
         },
-        (result) => result.ok ? {
-          kind: "takeover",
-          requestId: result.data.requestId,
-          state: "pending"
-        } satisfies TakeoverLifecycleMetadata : undefined
+        (result) =>
+          result.ok
+            ? ({
+                kind: "takeover",
+                requestId: result.data.requestId,
+                state: "pending"
+              } satisfies TakeoverLifecycleMetadata)
+            : undefined
       );
     } catch (error) {
       ack(invalidRequest(error));

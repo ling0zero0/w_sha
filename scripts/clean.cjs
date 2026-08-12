@@ -1,29 +1,29 @@
-'use strict';
+"use strict";
 
-const fs = require('node:fs');
-const path = require('node:path');
+const fs = require("node:fs");
+const path = require("node:path");
 
-const projectRoot = path.resolve(__dirname, '..');
-const stateFile = path.join(projectRoot, '.runtime', 'dev-process.json');
+const projectRoot = path.resolve(__dirname, "..");
+const stateFile = path.join(projectRoot, ".runtime", "dev-process.json");
 
 const generatedPaths = [
-  'apps/server/dist',
-  'apps/web/dist',
-  'packages/shared/dist',
-  'coverage',
-  'playwright-report',
-  'test-results',
-  'release',
-  '.runtime',
-  'dev-server.log',
-  'dev-server-error.log',
+  "apps/server/dist",
+  "apps/web/dist",
+  "packages/shared/dist",
+  "coverage",
+  "playwright-report",
+  "test-results",
+  "release",
+  ".runtime",
+  "dev-server.log",
+  "dev-server-error.log"
 ];
 
 function resolveProjectPath(relativePath) {
   const target = path.resolve(projectRoot, relativePath);
   const relative = path.relative(projectRoot, target);
 
-  if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
+  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
     throw new Error(`Refusing to clean a path outside the project: ${target}`);
   }
 
@@ -32,7 +32,7 @@ function resolveProjectPath(relativePath) {
 
 let running = false;
 try {
-  const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+  const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
   process.kill(state.pid, 0);
   running = true;
 } catch {
@@ -40,7 +40,7 @@ try {
 }
 
 if (running) {
-  console.error('ERROR: The project is running. Use the close script before cleaning.');
+  console.error("ERROR: The project is running. Use the close script before cleaning.");
   process.exit(1);
 }
 
@@ -56,4 +56,4 @@ for (const relativePath of generatedPaths) {
   removed += 1;
 }
 
-console.log(removed > 0 ? `Cleaned ${removed} generated paths.` : 'Nothing to clean.');
+console.log(removed > 0 ? `Cleaned ${removed} generated paths.` : "Nothing to clean.");

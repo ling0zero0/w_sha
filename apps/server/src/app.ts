@@ -54,10 +54,7 @@ function isLoopbackAddress(address: string): boolean {
   return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1";
 }
 
-function getBrowserAddress(
-  directAddress: string,
-  proxyClientAddress: string | string[] | undefined
-): string {
+function getBrowserAddress(directAddress: string, proxyClientAddress: string | string[] | undefined): string {
   if (!isLoopbackAddress(directAddress) || typeof proxyClientAddress !== "string") {
     return directAddress;
   }
@@ -65,11 +62,7 @@ function getBrowserAddress(
   return proxyClientAddress;
 }
 
-export function buildServer(
-  config: ServerConfig,
-  runtime?: GameRuntime,
-  aiServices?: AiAdminServices
-) {
+export function buildServer(config: ServerConfig, runtime?: GameRuntime, aiServices?: AiAdminServices) {
   const app = Fastify({ logger: loggerOptions(config) });
 
   if (config.WEB_ROOT) {
@@ -83,23 +76,24 @@ export function buildServer(
   app.get("/api/bootstrap", async () => createServiceStatus());
   app.get("/api/host-bootstrap", async (request, reply) => {
     const browserSource = request.headers.origin ?? request.headers.referer;
-    const browserAddress = getBrowserAddress(
-      request.ip,
-      request.headers["x-werewolf-proxy-client-ip"]
-    );
+    const browserAddress = getBrowserAddress(request.ip, request.headers["x-werewolf-proxy-client-ip"]);
     if (!runtime || !isLoopbackAddress(browserAddress) || !isLoopbackBrowserSource(browserSource)) {
-      return reply.code(403).send(apiErrorSchema.parse({
-        code: "HOST_LOCAL_ONLY",
-        message: "主机控制台只能从本机打开",
-        requestId: request.id
-      }));
+      return reply.code(403).send(
+        apiErrorSchema.parse({
+          code: "HOST_LOCAL_ONLY",
+          message: "主机控制台只能从本机打开",
+          requestId: request.id
+        })
+      );
     }
 
     reply.header("cache-control", "no-store");
-    return reply.send(hostBootstrapSchema.parse({
-      sessionToken: runtime.hostSession,
-      lobby: runtime.room.getHostView()
-    }));
+    return reply.send(
+      hostBootstrapSchema.parse({
+        sessionToken: runtime.hostSession,
+        lobby: runtime.room.getHostView()
+      })
+    );
   });
 
   if (runtime && aiServices) {

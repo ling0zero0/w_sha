@@ -1,12 +1,6 @@
 import { z } from "zod";
 import { chatMessageSchema } from "./chat.js";
-import {
-  lobbyPlayerSchema,
-  playerIdSchema,
-  roleConfirmationProgressSchema,
-  roleSchema,
-  wolfVoteTargetSchema
-} from "./domain.js";
+import { lobbyPlayerSchema, playerIdSchema, roleConfirmationProgressSchema, roleSchema, wolfVoteTargetSchema } from "./domain.js";
 
 export const nightCandidateSchema = lobbyPlayerSchema.pick({
   id: true,
@@ -62,79 +56,88 @@ export const privateWitchActionSchema = z.object({
 });
 export type PrivateWitchAction = z.infer<typeof privateWitchActionSchema>;
 
-export const privateGuardActionSchema = z.object({
-  active: z.boolean(),
-  candidates: z.array(nightCandidateSchema),
-  protectedPlayer: nightCandidateSchema.nullable(),
-  submitted: z.boolean()
-}).strict();
+export const privateGuardActionSchema = z
+  .object({
+    active: z.boolean(),
+    candidates: z.array(nightCandidateSchema),
+    protectedPlayer: nightCandidateSchema.nullable(),
+    submitted: z.boolean()
+  })
+  .strict();
 export type PrivateGuardAction = z.infer<typeof privateGuardActionSchema>;
 
-export const privateHunterActionSchema = z.object({
-  active: z.boolean(),
-  candidates: z.array(nightCandidateSchema),
-  shotPlayer: nightCandidateSchema.nullable(),
-  submitted: z.boolean()
-}).strict();
+export const privateHunterActionSchema = z
+  .object({
+    active: z.boolean(),
+    candidates: z.array(nightCandidateSchema),
+    shotPlayer: nightCandidateSchema.nullable(),
+    submitted: z.boolean()
+  })
+  .strict();
 export type PrivateHunterAction = z.infer<typeof privateHunterActionSchema>;
 
-export const dawnResultSchema = z.object({
-  deaths: z.array(nightCandidateSchema)
-}).nullable();
+export const dawnResultSchema = z
+  .object({
+    deaths: z.array(nightCandidateSchema)
+  })
+  .nullable();
 export type DawnResult = z.infer<typeof dawnResultSchema>;
 
 export const gameRecordSchema = z.object({
-  type: z.enum([
-    "death",
-    "seer-inspection",
-    "witch-action",
-    "guard-action",
-    "hunter-shot",
-    "idiot-reveal",
-    "day-vote",
-    "host-intervention"
-  ]),
+  type: z.enum(["death", "seer-inspection", "witch-action", "guard-action", "hunter-shot", "idiot-reveal", "day-vote", "host-intervention"]),
   day: z.number().int().positive(),
   detail: z.string().min(1)
 });
 export type GameRecord = z.infer<typeof gameRecordSchema>;
 
-export const gameResultSchema = z.object({
-  outcome: z.enum(["good-win", "wolf-win", "draw", "terminated"]),
-  revealedPlayers: z.array(nightCandidateSchema.extend({
-    role: roleSchema,
-    alive: z.boolean()
-  })),
-  records: z.array(gameRecordSchema)
-}).nullable();
+export const gameResultSchema = z
+  .object({
+    outcome: z.enum(["good-win", "wolf-win", "draw", "terminated"]),
+    revealedPlayers: z.array(
+      nightCandidateSchema.extend({
+        role: roleSchema,
+        alive: z.boolean()
+      })
+    ),
+    records: z.array(gameRecordSchema)
+  })
+  .nullable();
 export type GameResult = z.infer<typeof gameResultSchema>;
 
-export const publicDayStateSchema = z.object({
-  alivePlayerIds: z.array(playerIdSchema),
-  revealedIdiot: nightCandidateSchema.nullable(),
-  hunterPending: z.boolean(),
-  currentSpeaker: nightCandidateSchema.nullable(),
-  speechOrder: z.array(nightCandidateSchema),
-  voteProgress: roleConfirmationProgressSchema.nullable(),
-  voteResult: z.object({
-    ballots: z.array(z.object({
-      voter: nightCandidateSchema,
-      target: nightCandidateSchema.nullable()
-    })),
-    exiledPlayer: nightCandidateSchema.nullable()
-  }).nullable()
-}).nullable();
+export const publicDayStateSchema = z
+  .object({
+    alivePlayerIds: z.array(playerIdSchema),
+    revealedIdiot: nightCandidateSchema.nullable(),
+    hunterPending: z.boolean(),
+    currentSpeaker: nightCandidateSchema.nullable(),
+    speechOrder: z.array(nightCandidateSchema),
+    voteProgress: roleConfirmationProgressSchema.nullable(),
+    voteResult: z
+      .object({
+        ballots: z.array(
+          z.object({
+            voter: nightCandidateSchema,
+            target: nightCandidateSchema.nullable()
+          })
+        ),
+        exiledPlayer: nightCandidateSchema.nullable()
+      })
+      .nullable()
+  })
+  .nullable();
 export type PublicDayState = z.infer<typeof publicDayStateSchema>;
 
 export const dayVoteTargetSchema = z.union([playerIdSchema, z.literal("abstain")]).nullable();
 export type DayVoteTarget = z.infer<typeof dayVoteTargetSchema>;
 
-export const privateDayVoteSchema = z.object({
-  eligible: z.boolean(),
-  candidates: z.array(nightCandidateSchema),
-  target: dayVoteTargetSchema,
-  confirmed: z.boolean()
-}).nullable();
+export const privateDayVoteSchema = z
+  .object({
+    eligible: z.boolean(),
+    candidates: z.array(nightCandidateSchema),
+    target: dayVoteTargetSchema,
+    confirmed: z.boolean()
+  })
+  .nullable();
 export type PrivateDayVote = z.infer<typeof privateDayVoteSchema>;
 
 export const clockStatusSchema = z.enum(["idle", "running", "paused", "ended"]);
@@ -147,15 +150,7 @@ export const publicPhaseClockSchema = z.object({
 });
 export type PublicPhaseClock = z.infer<typeof publicPhaseClockSchema>;
 
-export const hostInterventionTypeSchema = z.enum([
-  "pause",
-  "resume",
-  "adjust-time",
-  "force-end",
-  "skip-phase",
-  "depart-player",
-  "correct-life"
-]);
+export const hostInterventionTypeSchema = z.enum(["pause", "resume", "adjust-time", "force-end", "skip-phase", "depart-player", "correct-life"]);
 export type HostInterventionType = z.infer<typeof hostInterventionTypeSchema>;
 
 export const publicHostInterventionSchema = z.object({

@@ -1,15 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  botConfigurationSchema,
-  botIntentSchema,
-  hostAddBotRequestSchema,
-  lobbyPlayerSchema
-} from "./index.js";
-import type {
-  ClientToServerEvents,
-  HostAddBotRequest,
-  HostLobbyView
-} from "./index.js";
+import { botConfigurationSchema, botIntentSchema, hostAddBotRequestSchema, lobbyPlayerSchema } from "./index.js";
+import type { ClientToServerEvents, HostAddBotRequest, HostLobbyView } from "./index.js";
 
 const playerId = "019bf178-7f24-7e40-b8dc-0c2dd948d5a7";
 const targetId = "019bf178-7f24-7e40-b8dc-0c2dd948d5a8";
@@ -29,12 +20,14 @@ const addBotAck: Parameters<ClientToServerEvents["host:add-bot"]>[1] = (result) 
 
 describe("shared bot schemas", () => {
   it("defaults legacy lobby players to human controllers", () => {
-    expect(lobbyPlayerSchema.parse({
-      id: playerId,
-      number: 1,
-      nickname: "Player 1",
-      connection: "online"
-    })).toMatchObject({
+    expect(
+      lobbyPlayerSchema.parse({
+        id: playerId,
+        number: 1,
+        nickname: "Player 1",
+        connection: "online"
+      })
+    ).toMatchObject({
       controller: "human",
       botKind: null,
       botProfileId: null
@@ -42,38 +35,44 @@ describe("shared bot schemas", () => {
   });
 
   it("enforces human, deterministic bot, and LLM bot field consistency", () => {
-    expect(botConfigurationSchema.parse({
-      controller: "bot",
-      botKind: "llm",
-      botProfileId
-    })).toEqual({
+    expect(
+      botConfigurationSchema.parse({
+        controller: "bot",
+        botKind: "llm",
+        botProfileId
+      })
+    ).toEqual({
       controller: "bot",
       botKind: "llm",
       botProfileId
     });
 
-    expect(lobbyPlayerSchema.parse({
-      id: playerId,
-      number: 1,
-      nickname: "Bot 1",
-      connection: "online",
-      controller: "bot",
-      botKind: "deterministic"
-    })).toMatchObject({
+    expect(
+      lobbyPlayerSchema.parse({
+        id: playerId,
+        number: 1,
+        nickname: "Bot 1",
+        connection: "online",
+        controller: "bot",
+        botKind: "deterministic"
+      })
+    ).toMatchObject({
       controller: "bot",
       botKind: "deterministic",
       botProfileId: null
     });
 
-    expect(lobbyPlayerSchema.parse({
-      id: playerId,
-      number: 1,
-      nickname: "Bot 1",
-      connection: "online",
-      controller: "bot",
-      botKind: "llm",
-      botProfileId
-    })).toMatchObject({
+    expect(
+      lobbyPlayerSchema.parse({
+        id: playerId,
+        number: 1,
+        nickname: "Bot 1",
+        connection: "online",
+        controller: "bot",
+        botKind: "llm",
+        botProfileId
+      })
+    ).toMatchObject({
       controller: "bot",
       botKind: "llm",
       botProfileId
@@ -87,13 +86,15 @@ describe("shared bot schemas", () => {
       { controller: "bot", botKind: "llm", botProfileId: null },
       { controller: "bot", botKind: "random", botProfileId: null }
     ]) {
-      expect(lobbyPlayerSchema.safeParse({
-        id: playerId,
-        number: 1,
-        nickname: "Bot 1",
-        connection: "online",
-        ...invalidConfiguration
-      }).success).toBe(false);
+      expect(
+        lobbyPlayerSchema.safeParse({
+          id: playerId,
+          number: 1,
+          nickname: "Bot 1",
+          connection: "online",
+          ...invalidConfiguration
+        }).success
+      ).toBe(false);
     }
   });
 
@@ -101,31 +102,41 @@ describe("shared bot schemas", () => {
     const request: HostAddBotRequest = addBotPayload;
 
     expect(hostAddBotRequestSchema.parse(request)).toEqual(request);
-    expect(hostAddBotRequestSchema.parse({
-      nickname: "LLM Bot",
-      botKind: "llm",
-      botProfileId
-    })).toEqual({
+    expect(
+      hostAddBotRequestSchema.parse({
+        nickname: "LLM Bot",
+        botKind: "llm",
+        botProfileId
+      })
+    ).toEqual({
       nickname: "LLM Bot",
       botKind: "llm",
       botProfileId
     });
-    expect(hostAddBotRequestSchema.safeParse({
-      nickname: "LLM Bot",
-      botKind: "llm"
-    }).success).toBe(false);
-    expect(hostAddBotRequestSchema.safeParse({
-      ...request,
-      botProfileId
-    }).success).toBe(false);
-    expect(hostAddBotRequestSchema.safeParse({
-      nickname: "Bot 1",
-      botKind: "random"
-    }).success).toBe(false);
-    expect(hostAddBotRequestSchema.safeParse({
-      ...request,
-      playerId
-    }).success).toBe(false);
+    expect(
+      hostAddBotRequestSchema.safeParse({
+        nickname: "LLM Bot",
+        botKind: "llm"
+      }).success
+    ).toBe(false);
+    expect(
+      hostAddBotRequestSchema.safeParse({
+        ...request,
+        botProfileId
+      }).success
+    ).toBe(false);
+    expect(
+      hostAddBotRequestSchema.safeParse({
+        nickname: "Bot 1",
+        botKind: "random"
+      }).success
+    ).toBe(false);
+    expect(
+      hostAddBotRequestSchema.safeParse({
+        ...request,
+        playerId
+      }).success
+    ).toBe(false);
     expect(typeof addBotAck).toBe("function");
   });
 
@@ -150,9 +161,7 @@ describe("shared bot schemas", () => {
       { type: "day-confirm-vote", payload: { confirmed: true } }
     ];
 
-    expect(intents.map((intent) => botIntentSchema.parse(intent).type)).toEqual(
-      intents.map((intent) => intent.type)
-    );
+    expect(intents.map((intent) => botIntentSchema.parse(intent).type)).toEqual(intents.map((intent) => intent.type));
   });
 
   it("rejects actor ids and malformed nested action payloads", () => {

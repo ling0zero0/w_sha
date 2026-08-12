@@ -81,29 +81,26 @@ export function useHostLobby() {
         };
 
         const mergeHistory = (messages: ChatMessage[], clearExisting: boolean) => {
-          const publicMessages = messages.filter(
-            (message) => message.channel === "day-public" || message.channel === "system"
+          const publicMessages = messages.filter((message) => message.channel === "day-public" || message.channel === "system");
+          setState((current) =>
+            current.lobby
+              ? {
+                  ...current,
+                  lobby: {
+                    ...current.lobby,
+                    publicChat: {
+                      ...current.lobby.publicChat,
+                      messages: mergeMessages(clearExisting ? [] : current.lobby.publicChat.messages, publicMessages)
+                    }
+                  }
+                }
+              : current
           );
-          setState((current) => current.lobby ? {
-            ...current,
-            lobby: {
-              ...current.lobby,
-              publicChat: {
-                ...current.lobby.publicChat,
-                messages: mergeMessages(
-                  clearExisting ? [] : current.lobby.publicChat.messages,
-                  publicMessages
-                )
-              }
-            }
-          } : current);
         };
 
         const requestHistory = (view: HostLobbyView, fromStart = false) => {
           if (view.phase === "lobby" || (fromStart && replayLoadedRef.current)) return;
-          const initialAfterSequence = fromStart
-            ? 0
-            : Math.max(chatCursorRef.current, lastSequence(view.publicChat.messages));
+          const initialAfterSequence = fromStart ? 0 : Math.max(chatCursorRef.current, lastSequence(view.publicChat.messages));
 
           const requestPage = (afterSequence: number, clearExisting: boolean) => {
             socket.emit("chat:history", { afterSequence, limit: 100 }, (result) => {
@@ -112,8 +109,7 @@ export function useHostLobby() {
                 return;
               }
 
-              const sessionChanged = chatSessionRef.current !== null
-                && chatSessionRef.current !== result.data.sessionId;
+              const sessionChanged = chatSessionRef.current !== null && chatSessionRef.current !== result.data.sessionId;
               chatSessionRef.current = result.data.sessionId;
               if (sessionChanged && afterSequence > 0) {
                 chatCursorRef.current = 0;
@@ -125,9 +121,7 @@ export function useHostLobby() {
 
               mergeHistory(result.data.messages, clearExisting || sessionChanged);
               const pageCursor = result.data.messages.at(-1)?.sequence ?? afterSequence;
-              chatCursorRef.current = result.data.hasMore
-                ? pageCursor
-                : Math.max(pageCursor, result.data.latestSequence);
+              chatCursorRef.current = result.data.hasMore ? pageCursor : Math.max(pageCursor, result.data.latestSequence);
 
               if (result.data.hasMore) {
                 requestPage(pageCursor, false);
@@ -142,23 +136,20 @@ export function useHostLobby() {
 
         const applyLobbyView = (lobby: HostLobbyView) => {
           setState((current) => {
-            const startsNewView = lobby.phase === "lobby"
-              || (current.lobby?.phase === "game-over" && lobby.phase !== "game-over");
+            const startsNewView = lobby.phase === "lobby" || (current.lobby?.phase === "game-over" && lobby.phase !== "game-over");
             if (startsNewView) resetChatHistory();
             return {
               ...current,
-              lobby: startsNewView || !current.lobby
-                ? lobby
-                : {
-                    ...lobby,
-                    publicChat: {
-                      ...lobby.publicChat,
-                      messages: mergeMessages(
-                        current.lobby.publicChat.messages,
-                        lobby.publicChat.messages
-                      )
-                    }
-                  },
+              lobby:
+                startsNewView || !current.lobby
+                  ? lobby
+                  : {
+                      ...lobby,
+                      publicChat: {
+                        ...lobby.publicChat,
+                        messages: mergeMessages(current.lobby.publicChat.messages, lobby.publicChat.messages)
+                      }
+                    },
               error: ""
             };
           });
@@ -177,15 +168,16 @@ export function useHostLobby() {
           chatCursorRef.current = Math.max(chatCursorRef.current, message.sequence);
           setState((current) => ({
             ...current,
-            lobby: current.lobby && (message.channel === "day-public" || message.channel === "system")
-              ? {
-                  ...current.lobby,
-                  publicChat: {
-                    ...current.lobby.publicChat,
-                    messages: appendMessage(current.lobby.publicChat.messages, message)
+            lobby:
+              current.lobby && (message.channel === "day-public" || message.channel === "system")
+                ? {
+                    ...current.lobby,
+                    publicChat: {
+                      ...current.lobby.publicChat,
+                      messages: appendMessage(current.lobby.publicChat.messages, message)
+                    }
                   }
-                }
-              : current.lobby
+                : current.lobby
           }));
         });
       })
@@ -209,22 +201,19 @@ export function useHostLobby() {
   const applyResult = useCallback((result: RoomActionResult<HostLobbyView>) => {
     if (result.ok) {
       setState((current) => {
-        const startsNewView = result.data.phase === "lobby"
-          || (current.lobby?.phase === "game-over" && result.data.phase !== "game-over");
+        const startsNewView = result.data.phase === "lobby" || (current.lobby?.phase === "game-over" && result.data.phase !== "game-over");
         return {
           ...current,
-          lobby: startsNewView || !current.lobby
-            ? result.data
-            : {
-                ...result.data,
-                publicChat: {
-                  ...result.data.publicChat,
-                  messages: mergeMessages(
-                    current.lobby.publicChat.messages,
-                    result.data.publicChat.messages
-                  )
-                }
-              },
+          lobby:
+            startsNewView || !current.lobby
+              ? result.data
+              : {
+                  ...result.data,
+                  publicChat: {
+                    ...result.data.publicChat,
+                    messages: mergeMessages(current.lobby.publicChat.messages, result.data.publicChat.messages)
+                  }
+                },
           error: ""
         };
       });
@@ -245,25 +234,40 @@ export function useHostLobby() {
     socketRef.current?.emit("host:refresh-join", { actionId: createActionId() }, applyResult);
   }, [applyResult]);
 
-  const movePlayer = useCallback((playerId: PlayerId, direction: "up" | "down") => {
-    socketRef.current?.emit("host:move-player", { playerId, direction, actionId: createActionId() }, applyResult);
-  }, [applyResult]);
+  const movePlayer = useCallback(
+    (playerId: PlayerId, direction: "up" | "down") => {
+      socketRef.current?.emit("host:move-player", { playerId, direction, actionId: createActionId() }, applyResult);
+    },
+    [applyResult]
+  );
 
-  const removePlayer = useCallback((playerId: PlayerId) => {
-    socketRef.current?.emit("host:remove-player", { playerId, actionId: createActionId() }, applyResult);
-  }, [applyResult]);
+  const removePlayer = useCallback(
+    (playerId: PlayerId) => {
+      socketRef.current?.emit("host:remove-player", { playerId, actionId: createActionId() }, applyResult);
+    },
+    [applyResult]
+  );
 
-  const addBot = useCallback((request: HostAddBotRequest) => {
-    socketRef.current?.emit("host:add-bot", { ...request, actionId: createActionId() }, applyResult);
-  }, [applyResult]);
+  const addBot = useCallback(
+    (request: HostAddBotRequest) => {
+      socketRef.current?.emit("host:add-bot", { ...request, actionId: createActionId() }, applyResult);
+    },
+    [applyResult]
+  );
 
-  const correctPlayerLife = useCallback((playerId: PlayerId, alive: boolean) => {
-    socketRef.current?.emit("host:correct-player-life", { playerId, alive, actionId: createActionId() }, applyResult);
-  }, [applyResult]);
+  const correctPlayerLife = useCallback(
+    (playerId: PlayerId, alive: boolean) => {
+      socketRef.current?.emit("host:correct-player-life", { playerId, alive, actionId: createActionId() }, applyResult);
+    },
+    [applyResult]
+  );
 
-  const resolveTakeover = useCallback((requestId: string, approved: boolean) => {
-    socketRef.current?.emit("host:resolve-takeover", { requestId, approved, actionId: createActionId() }, applyResult);
-  }, [applyResult]);
+  const resolveTakeover = useCallback(
+    (requestId: string, approved: boolean) => {
+      socketRef.current?.emit("host:resolve-takeover", { requestId, approved, actionId: createActionId() }, applyResult);
+    },
+    [applyResult]
+  );
 
   const pausePhase = useCallback(() => {
     socketRef.current?.emit("host:pause-phase", { actionId: createActionId() }, applyGameResult);
@@ -273,9 +277,12 @@ export function useHostLobby() {
     socketRef.current?.emit("host:resume-phase", { actionId: createActionId() }, applyGameResult);
   }, [applyGameResult]);
 
-  const adjustPhaseTime = useCallback((deltaMs: number) => {
-    socketRef.current?.emit("host:adjust-phase-time", { deltaMs, actionId: createActionId() }, applyGameResult);
-  }, [applyGameResult]);
+  const adjustPhaseTime = useCallback(
+    (deltaMs: number) => {
+      socketRef.current?.emit("host:adjust-phase-time", { deltaMs, actionId: createActionId() }, applyGameResult);
+    },
+    [applyGameResult]
+  );
 
   const forceEndPhase = useCallback(() => {
     socketRef.current?.emit("host:force-end-phase", { actionId: createActionId() }, applyGameResult);
@@ -285,13 +292,19 @@ export function useHostLobby() {
     socketRef.current?.emit("host:skip-night-phase", { actionId: createActionId() }, applyGameResult);
   }, [applyGameResult]);
 
-  const updateRoleConfiguration = useCallback((configuration: RoleConfiguration) => {
-    socketRef.current?.emit("host:update-role-configuration", { ...configuration, actionId: createActionId() }, applyResult);
-  }, [applyResult]);
+  const updateRoleConfiguration = useCallback(
+    (configuration: RoleConfiguration) => {
+      socketRef.current?.emit("host:update-role-configuration", { ...configuration, actionId: createActionId() }, applyResult);
+    },
+    [applyResult]
+  );
 
-  const updateChatMode = useCallback((chatMode: ChatMode) => {
-    socketRef.current?.emit("host:update-chat-mode", { chatMode, actionId: createActionId() }, applyResult);
-  }, [applyResult]);
+  const updateChatMode = useCallback(
+    (chatMode: ChatMode) => {
+      socketRef.current?.emit("host:update-chat-mode", { chatMode, actionId: createActionId() }, applyResult);
+    },
+    [applyResult]
+  );
 
   const startGame = useCallback(() => {
     socketRef.current?.emit("host:start-game", { actionId: createActionId() }, applyResult);
