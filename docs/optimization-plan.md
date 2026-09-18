@@ -13,6 +13,7 @@
 - [x] 阶段 4：AI 治理。房间级预算、用量审计、模型配置版本锁定、多 LLM 并发验证。
 - [x] 阶段 5：移动端体验。收敛首屏行动区、320px/横屏适配、焦点管理和读屏验收。
 - [x] 阶段 6：工程化。拆分房间领域模块，补充 lint、format、CI、安全扫描和产物检查。
+- [x] 阶段 6B：领域去重与入库收尾。`apps/server/src/room/` 领域模块、PWA 资源与安装器烟测脚本纳入版本库；`index.ts` 资源关闭收敛为 `closeResources()`；房间侧新增 `findPlayer` / `isLivePlayer` / `findNightActor` 与 `commitPlayerView` / `advanceWhenReady`，消除 27 处重复的玩家查找、夜间守卫复制和视图提交样板；`attachSocketServer` 改为 options 对象，`SocketData` 的接管字段合并为 `pendingTakeover`；Web 端玩家动作回调收敛为 `emitPlayerAction`；验收脚本共享 `scripts/lib/verify-utils.cjs`；`getPublicGameState` 移除热路径上的 zod 全量校验。
 - [x] 阶段 7A：自动化发布验收。Windows 发布产物、固定端口 LAN、桌面/Android/iPhone/微信 UA 页面烟测。
 - [ ] 阶段 7B：真实设备发布验收（执行中）。Windows 安装/防火墙、Android/iPhone/微信浏览器、断网/锁屏/重启和真实完整对局。
 

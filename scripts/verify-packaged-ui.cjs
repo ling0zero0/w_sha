@@ -1,13 +1,12 @@
 "use strict";
 
 const fs = require("node:fs");
-const net = require("node:net");
 const os = require("node:os");
 const path = require("node:path");
-const { spawn, spawnSync } = require("node:child_process");
+const { spawn } = require("node:child_process");
 const { chromium, devices } = require("@playwright/test");
 
-const projectRoot = path.resolve(__dirname, "..");
+const { delay, getAvailablePort, projectRoot, stopChild } = require("./lib/verify-utils.cjs");
 const productRoot = path.resolve(process.argv[2] ?? path.join(projectRoot, ".runtime", "package-portable", "W_SHA"));
 const nodePath = path.join(productRoot, "node.exe");
 const entryPath = path.join(productRoot, "app", "server", "dist", "index.js");
@@ -16,21 +15,6 @@ const webRoot = path.join(productRoot, "app", "public");
 if (process.platform !== "win32") {
   console.error("Packaged UI verification currently supports Windows only.");
   process.exit(1);
-}
-
-function getAvailablePort() {
-  return new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      server.close(() => resolve(address.port));
-    });
-  });
-}
-
-function delay(milliseconds) {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 function findBrowserExecutable() {
@@ -42,28 +26,6 @@ function findBrowserExecutable() {
     "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
   ].filter(Boolean);
   return candidates.find((candidate) => fs.existsSync(candidate));
-}
-
-async function stopChild(child, output) {
-  if (child.exitCode === null) child.kill("SIGTERM");
-  const gracefulDeadline = Date.now() + 3_000;
-  while (child.exitCode === null && Date.now() < gracefulDeadline) {
-    await delay(100);
-  }
-
-  if (child.exitCode === null) {
-    spawnSync("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], {
-      windowsHide: true,
-      stdio: "ignore"
-    });
-    await delay(500);
-  }
-
-  child.stdout?.destroy();
-  child.stderr?.destroy();
-  if (child.exitCode !== null && child.exitCode !== 0 && output.length > 0) {
-    throw new Error(`packaged server exited with ${child.exitCode}: ${output.join("")}`);
-  }
 }
 
 async function startServer(port, databasePath) {
@@ -143,7 +105,7 @@ async function main() {
 
   const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "w-sha-packaged-ui-"));
   const databasePath = path.join(temporaryRoot, "werewolf.sqlite");
-  const port = await getAvailablePort();
+  const port = await getAvailablePort("127.0.0.1");
   const baseUrl = `http://127.0.0.1:${port}`;
   let serverRun = null;
   let browser = null;

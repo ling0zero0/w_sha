@@ -1,12 +1,4 @@
-import {
-  type ChatMessage,
-  type ClientToServerEvents,
-  type HostLobbyView,
-  type PlayerLobbyView,
-  type PlayerSession,
-  type PublicGameState,
-  type ServerToClientEvents
-} from "@werewolf/shared";
+import type { ChatMessage, ClientToServerEvents, HostLobbyView, PlayerLobbyView, PlayerSession, PublicGameState, ServerToClientEvents } from "@werewolf/shared";
 import type { AddressInfo } from "node:net";
 import { io as createClient, type Socket } from "socket.io-client";
 import { afterEach, describe, expect, it } from "vitest";
@@ -14,7 +6,7 @@ import { buildServer } from "./app.js";
 import { ChatStore } from "./chat-store.js";
 import type { ServerConfig } from "./config.js";
 import { GameRuntime } from "./runtime.js";
-import { attachSocketServer } from "./socket.js";
+import { type AttachSocketServerOptions, attachSocketServer } from "./socket.js";
 
 const config: ServerConfig = {
   HOST: "127.0.0.1",
@@ -31,7 +23,9 @@ const clients: TestSocket[] = [];
 const cleanups: Array<() => Promise<void>> = [];
 
 afterEach(async () => {
-  clients.splice(0).forEach((client) => client.disconnect());
+  clients.splice(0).forEach((client) => {
+    client.disconnect();
+  });
   await Promise.all(cleanups.splice(0).map((cleanup) => cleanup()));
 });
 
@@ -114,7 +108,7 @@ function connectWithOrigin(url: string, origin: string): TestSocket {
   return socket;
 }
 
-async function startRuntime(automaticPhaseProgression = false, stageTimingOverrides: Parameters<typeof attachSocketServer>[5] = {}) {
+async function startRuntime(automaticPhaseProgression = false, stageTimingOverrides: AttachSocketServerOptions["stageTimingOverrides"] = {}) {
   const chatStore = new ChatStore(":memory:");
   const runtime = new GameRuntime({
     localAddress: "192.168.1.20",
@@ -125,7 +119,13 @@ async function startRuntime(automaticPhaseProgression = false, stageTimingOverri
     chatPersistence: chatStore
   });
   const app = buildServer(config, runtime);
-  const io = attachSocketServer(app.server, app.log, runtime, () => undefined, automaticPhaseProgression, stageTimingOverrides);
+  const io = attachSocketServer({
+    server: app.server,
+    logger: app.log,
+    runtime,
+    automaticPhaseProgression,
+    stageTimingOverrides
+  });
   await app.listen({ host: "127.0.0.1", port: 0 });
   const address = app.server.address() as AddressInfo;
   cleanups.push(async () => {

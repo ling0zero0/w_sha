@@ -4,18 +4,10 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
-const projectRoot = path.resolve(__dirname, "..");
+const { createAssert, projectRoot } = require("./lib/verify-utils.cjs");
+const { assert } = createAssert("Repository verification failed: ");
 const packageJsonPath = path.join(projectRoot, "package.json");
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
-
-function fail(message) {
-  console.error(`Repository verification failed: ${message}`);
-  process.exit(1);
-}
-
-function assert(condition, message) {
-  if (!condition) fail(message);
-}
 
 function resolveProjectPath(relativePath) {
   const target = path.resolve(projectRoot, relativePath);

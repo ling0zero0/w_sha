@@ -6,7 +6,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
-const projectRoot = path.resolve(__dirname, "..");
+const { powershellLiteral, projectRoot } = require("./lib/verify-utils.cjs");
 const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, "package.json"), "utf8"));
 const releaseRoot = path.join(projectRoot, "release");
 const portablePath = path.join(releaseRoot, `W_SHA-portable-${packageJson.version}.zip`);
@@ -22,10 +22,6 @@ function assert(condition, message) {
 
 function sha256(filePath) {
   return crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex").toUpperCase();
-}
-
-function powershellLiteral(value) {
-  return `'${value.replaceAll("'", "''")}'`;
 }
 
 function extractPortableArchive(destinationPath) {
