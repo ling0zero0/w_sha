@@ -19,6 +19,7 @@ export function GuardActionPanel({
 
   useEffect(() => {
     setTarget(action.protectedPlayer?.id ?? null);
+    void action.active;
   }, [action.protectedPlayer?.id, action.active]);
 
   return (
@@ -78,6 +79,7 @@ export function HunterActionPanel({
 
   useEffect(() => {
     setTarget(action.shotPlayer?.id ?? null);
+    void action.active;
   }, [action.shotPlayer?.id, action.active]);
 
   return (

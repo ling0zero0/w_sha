@@ -9,6 +9,7 @@ export function RoleArtwork({ role, className = "", alt, hidden = false }: { rol
 
   useEffect(() => {
     setFailed(false);
+    void image;
   }, [image]);
 
   const unavailable = hidden || !image || failed;

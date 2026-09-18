@@ -35,8 +35,8 @@ describe("CredentialInput", () => {
     });
     const input = findElement(field, (element) => element.type === "input");
 
-    expect((input?.props as { value?: string }).value).toBe("");
-    expect((input?.props as { autoComplete?: string }).autoComplete).toBe("new-password");
+    expect((input?.props as { value?: string } | undefined)?.value).toBe("");
+    expect((input?.props as { autoComplete?: string } | undefined)?.autoComplete).toBe("new-password");
     expect(JSON.stringify(field)).not.toContain(savedKey);
     expect(JSON.stringify(field)).toContain("密钥不会重新显示");
   });
@@ -54,7 +54,7 @@ describe("CredentialInput", () => {
     });
     const clearButton = findElement(field, (element) => (element.props as { className?: string }).className?.includes("ai-danger-command") ?? false);
 
-    (clearButton?.props as { onClick(): void }).onClick();
+    (clearButton?.props as { onClick(): void } | undefined)?.onClick();
     expect(onChange).toHaveBeenCalledWith("");
     expect(onClearRequested).toHaveBeenCalledWith(true);
   });

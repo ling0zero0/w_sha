@@ -68,7 +68,7 @@ describe("OpenAI-compatible model provider", () => {
         totalTokens: 19
       }
     });
-    const [url, init] = fetchMock.mock.calls[0]!;
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("http://127.0.0.1:1234/v1/chat/completions");
     expect(init?.redirect).toBe("manual");
     expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer top-secret");
@@ -91,7 +91,7 @@ describe("OpenAI-compatible model provider", () => {
     const result = await provider.testConnection(model, new AbortController().signal);
 
     expect(result.ok).toBe(true);
-    const [, init] = fetchMock.mock.calls[0]!;
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(new Headers(init?.headers).has("Authorization")).toBe(false);
   });
 

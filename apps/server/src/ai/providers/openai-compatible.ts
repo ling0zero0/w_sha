@@ -4,6 +4,7 @@ import {
   type AiConnectionTestResult,
   type AiDecisionRequest,
   type AiDecisionResponse,
+  type AiModelDecision,
   type AiProviderError,
   type AiTokenUsage,
   type ModelProvider
@@ -75,7 +76,7 @@ export class OpenAiCompatibleProvider implements ModelProvider {
       return { ok: false, ...metadata, error: result.error };
     }
 
-    let decision;
+    let decision: AiModelDecision | null = null;
     try {
       decision = parseAiModelDecision(JSON.parse(result.content));
     } catch {

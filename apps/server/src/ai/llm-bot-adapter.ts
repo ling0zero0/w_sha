@@ -7,8 +7,8 @@ import {
   type PlayerId,
   type PlayerLobbyView
 } from "@werewolf/shared";
-import { AiAuditStore } from "./ai-audit-store.js";
-import { BudgetExhaustedError, BudgetLedger } from "./budget-ledger.js";
+import type { AiAuditStore } from "./ai-audit-store.js";
+import { BudgetExhaustedError, BudgetLedger, type BudgetReservation } from "./budget-ledger.js";
 import { planBotDecision } from "./decision-gate.js";
 import type { AiConfigStore } from "./ai-config-store.js";
 import { buildBotPrompt } from "./prompt-builder.js";
@@ -131,7 +131,7 @@ export class LlmBotAdapter implements BotAdapter {
       for (let attempt = 0; attempt < attempts; attempt += 1) {
         if (context.signal.aborted) return null;
         const startedAt = new Date().toISOString();
-        let reservation;
+        let reservation: BudgetReservation | null = null;
         try {
           reservation = this.budgetLedger.reserve({
             gameId: this.options.gameId(),

@@ -21,7 +21,9 @@ const temporaryDirectories: string[] = [];
 
 afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => server.close()));
-  temporaryDirectories.splice(0).forEach((directory) => rmSync(directory, { recursive: true, force: true }));
+  temporaryDirectories.splice(0).forEach((directory) => {
+    rmSync(directory, { recursive: true, force: true });
+  });
 });
 
 describe("server shell", () => {

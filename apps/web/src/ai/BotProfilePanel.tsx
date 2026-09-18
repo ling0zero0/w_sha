@@ -57,7 +57,7 @@ export function BotProfilePanel({ profiles, models, client, onChanged }: BotProf
                 {profile.defaultNickname} · {strategyLabels[profile.strategy]}
               </small>
             </span>
-            <i className={profile.enabled ? "is-enabled" : ""} aria-label={profile.enabled ? "已启用" : "已停用"} />
+            <i className={profile.enabled ? "is-enabled" : ""} role="img" aria-label={profile.enabled ? "已启用" : "已停用"} />
           </button>
         ))}
         {profiles.length === 0 ? <p className="ai-list-empty">尚未配置机器人档案</p> : null}
@@ -186,17 +186,17 @@ function BotProfileForm({
           <legend>策略</legend>
           <div role="radiogroup" aria-label="机器人策略">
             {(Object.keys(strategyLabels) as AiBotStrategy[]).map((value) => (
-              <button
-                key={value}
-                type="button"
-                role="radio"
-                aria-checked={strategy === value}
-                className={strategy === value ? "is-selected" : ""}
-                disabled={saving}
-                onClick={() => setStrategy(value)}
-              >
+              <label key={value} className={strategy === value ? "is-selected" : ""}>
+                <input
+                  type="radio"
+                  name="bot-strategy"
+                  value={value}
+                  checked={strategy === value}
+                  disabled={saving}
+                  onChange={() => setStrategy(value)}
+                />
                 {strategyLabels[value]}
-              </button>
+              </label>
             ))}
           </div>
         </fieldset>

@@ -438,7 +438,7 @@ test("three mobile players complete a full game and start a clean rematch", asyn
     await Promise.all(players.map((player) => assertMobileLayout(player)));
     await players[0]!.setViewportSize({ width: 667, height: 320 });
     await assertMobileLayout(players[0]!);
-    const wolfName = ["林野", "阿岚", "青禾"][roles.indexOf("狼人")]!;
+    const wolfName = ["林野", "阿岚", "青禾"][roles.indexOf("狼人")] as string;
     for (const [index, player] of players.entries()) {
       if (roles[index] === "狼人") {
         await player.getByRole("button", { name: "弃票" }).click();

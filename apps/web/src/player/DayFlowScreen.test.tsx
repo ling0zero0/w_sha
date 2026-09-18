@@ -123,14 +123,14 @@ describe("DayFlowScreen public chat", () => {
     const textarea = findElement(screen, (element) => element.type === "textarea");
 
     expect(textarea).toBeDefined();
-    (textarea?.props as { onChange: (event: { target: { value: string } }) => void }).onChange({ target: { value: "  ready to vote  " } });
+    (textarea?.props as { onChange: (event: { target: { value: string } }) => void } | undefined)?.onChange({ target: { value: "  ready to vote  " } });
 
     screen = renderDayFlow(lobby, onSendChat);
     const form = findElement(screen, (element) => (element.props as { className?: string }).className === "day-chat-form");
     const enabledButton = findElement(screen, (element) => element.type === "button" && (element.props as { title?: string }).title === "发送公开发言");
 
-    expect((enabledButton?.props as { disabled?: boolean }).disabled).toBe(false);
-    (form?.props as { onSubmit: (event: { preventDefault: () => void }) => void }).onSubmit({ preventDefault: vi.fn() });
+    expect((enabledButton?.props as { disabled?: boolean } | undefined)?.disabled).toBe(false);
+    (form?.props as { onSubmit: (event: { preventDefault: () => void }) => void } | undefined)?.onSubmit({ preventDefault: vi.fn() });
 
     expect(onSendChat).toHaveBeenCalledWith({
       channel: "day-public",
@@ -141,8 +141,8 @@ describe("DayFlowScreen public chat", () => {
     const clearedTextarea = findElement(screen, (element) => element.type === "textarea");
     const disabledButton = findElement(screen, (element) => element.type === "button" && (element.props as { title?: string }).title === "发送公开发言");
 
-    expect((clearedTextarea?.props as { value?: string }).value).toBe("");
-    expect((disabledButton?.props as { disabled?: boolean }).disabled).toBe(true);
+    expect((clearedTextarea?.props as { value?: string } | undefined)?.value).toBe("");
+    expect((disabledButton?.props as { disabled?: boolean } | undefined)?.disabled).toBe(true);
   });
 
   it("shows the composer to a non-current speaker in open mode without exposing finish speaking", () => {
@@ -166,6 +166,6 @@ describe("DayFlowScreen public chat", () => {
     const roster = findElement(screen, (element) => typeof element.type === "function" && element.type.name === "PublicPlayerRoster");
 
     expect(roster).toBeDefined();
-    expect((roster?.props as { players?: unknown[] }).players).toHaveLength(2);
+    expect((roster?.props as { players?: unknown[] } | undefined)?.players).toHaveLength(2);
   });
 });

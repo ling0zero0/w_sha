@@ -51,7 +51,7 @@ export function ModelPanel({ models, providers, client, onChanged }: ModelPanelP
               <strong>{model.name}</strong>
               <small>{model.model}</small>
             </span>
-            <i className={model.enabled ? "is-enabled" : ""} aria-label={model.enabled ? "已启用" : "已停用"} />
+            <i className={model.enabled ? "is-enabled" : ""} role="img" aria-label={model.enabled ? "已启用" : "已停用"} />
           </button>
         ))}
         {models.length === 0 ? <p className="ai-list-empty">尚未配置模型</p> : null}

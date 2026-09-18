@@ -66,6 +66,14 @@ function writeStoredKey(path: string, encodedKey: string): void {
   });
 }
 
+function removeTemporaryKeyFile(path: string): void {
+  try {
+    unlinkSync(path);
+  } catch (error) {
+    if (!isMissingFile(error)) throw error;
+  }
+}
+
 function replaceStoredKey(path: string, encodedKey: string): void {
   const temporaryPath = `${path}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`;
   writeFileSync(temporaryPath, formatStoredKey(encodedKey), {
@@ -85,11 +93,7 @@ function replaceStoredKey(path: string, encodedKey: string): void {
       }
     }
   } finally {
-    try {
-      unlinkSync(temporaryPath);
-    } catch (error) {
-      if (!isMissingFile(error)) throw error;
-    }
+    removeTemporaryKeyFile(temporaryPath);
   }
 }
 

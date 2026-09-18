@@ -97,28 +97,30 @@ export function RoleConfigurationPanel({
           <small>{connected ? "开局前可调整" : "连接恢复后可调整"}</small>
         </div>
         <div className="chat-mode-segments" role="radiogroup" aria-labelledby="chat-mode-label">
-          <button
-            type="button"
-            role="radio"
-            aria-checked={chatMode === "ordered"}
-            className={chatMode === "ordered" ? "is-selected" : ""}
-            disabled={!connected}
-            onClick={() => onChatModeChange("ordered")}
-          >
+          <label className={chatMode === "ordered" ? "is-selected" : ""}>
+            <input
+              type="radio"
+              name="chat-mode"
+              value="ordered"
+              checked={chatMode === "ordered"}
+              disabled={!connected}
+              onChange={() => onChatModeChange("ordered")}
+            />
             <ListOrdered size={17} aria-hidden="true" />
             <span>有序发言</span>
-          </button>
-          <button
-            type="button"
-            role="radio"
-            aria-checked={chatMode === "open"}
-            className={chatMode === "open" ? "is-selected" : ""}
-            disabled={!connected}
-            onClick={() => onChatModeChange("open")}
-          >
+          </label>
+          <label className={chatMode === "open" ? "is-selected" : ""}>
+            <input
+              type="radio"
+              name="chat-mode"
+              value="open"
+              checked={chatMode === "open"}
+              disabled={!connected}
+              onChange={() => onChatModeChange("open")}
+            />
             <MessagesSquare size={17} aria-hidden="true" />
             <span>自由讨论</span>
-          </button>
+          </label>
         </div>
       </div>
       {readiness.issues.length > 0 ? (

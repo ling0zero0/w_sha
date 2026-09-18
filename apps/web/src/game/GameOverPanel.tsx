@@ -34,7 +34,7 @@ export function GameOverPanel({
         <h3>对局记录</h3>
         {result.records.length > 0 ? (
           result.records.map((record, index) => (
-            <p key={`${record.day}-${record.type}-${index}`}>
+            <p key={`${record.day}-${record.type}-${record.detail}`}>
               <strong>第 {record.day} 天</strong>
               {record.detail}
             </p>

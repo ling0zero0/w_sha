@@ -29,7 +29,14 @@
 
 ## 2. Windows 安装与防火墙
 
-- [ ] 以管理员身份运行 `release/W_SHA-Setup-0.1.0.exe`。
+- [ ] 运行安装器烟测脚本（会自动以管理员权限安装并验证文件与防火墙规则）：
+
+```powershell
+corepack pnpm verify:installer
+```
+
+  脚本会选取 `release/` 中版本号最新的 `W_SHA-Setup-*.exe`，经 UAC 以管理员身份静默安装（`/VERYSILENT /SUPPRESSMSGBOXES /NORESTART`），等待结束后校验退出码，再确认安装目录（默认 `%ProgramFiles%\W_SHA`）包含 `node.exe`、`app/server/dist/index.js`、`app/public/index.html`，并检查 `W_SHA 局域网狼人杀` 防火墙规则仅放行 TCP/35173、仅限本地子网。UAC 弹窗需手动点击“是”，这是预期行为，脚本无法代点。
+
 - [ ] 安装完成后能从开始菜单或桌面快捷方式启动。
 - [ ] 安装目录包含 `node.exe`、`app/server/dist/index.js` 和 `app/public/index.html`。
 - [ ] 服务监听 `TCP/35173`，主机页面自动打开。
@@ -43,7 +50,7 @@ Get-NetFirewallRule -DisplayName "W_SHA 局域网狼人杀" |
 ```
 
 - [ ] 规则覆盖当前网络配置，但没有把端口开放给任意远程地址。
-- [ ] 卸载后服务进程停止，`W_SHA 局域网狼人杀` 防火墙规则被删除，游戏数据仍按产品说明保留。
+- [ ] 卸载后服务进程停止，`W_SHA 局域网狼人杀` 防火墙规则被删除，游戏数据仍按产品说明保留。卸载冒烟可用 `corepack pnpm verify:installer --uninstall` 自动完成：以管理员运行卸载程序并复验防火墙规则已删除、安装目录下进程已退出。
 
 ## 3. 二维码与浏览器加入
 

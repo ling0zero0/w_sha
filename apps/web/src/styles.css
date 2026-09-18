@@ -399,7 +399,7 @@ a {
   border-radius: 4px;
   overflow: hidden;
 }
-.chat-mode-segments button {
+.chat-mode-segments label {
   min-width: 0;
   min-height: 44px;
   padding: 0 12px;
@@ -415,16 +415,22 @@ a {
   font-size: 12px;
   font-weight: 750;
 }
-.chat-mode-segments button:last-child {
+.chat-mode-segments label:last-child {
   border-right: 0;
 }
-.chat-mode-segments button.is-selected {
+.chat-mode-segments label.is-selected {
   background: var(--amber);
   color: #161a19;
 }
-.chat-mode-segments button:disabled {
+.chat-mode-segments label:has(input:disabled) {
   opacity: 0.42;
   cursor: default;
+}
+.chat-mode-segments input[type="radio"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
 }
 .readiness-issues,
 .readiness-success {
@@ -2263,7 +2269,7 @@ a {
   .chat-mode-segments {
     width: 100%;
   }
-  .chat-mode-segments button {
+  .chat-mode-segments label {
     min-height: 44px;
   }
   .hunter-action-panel {
@@ -2846,7 +2852,7 @@ a {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   overflow: hidden;
 }
-.ai-strategy-field button {
+.ai-strategy-field label {
   min-width: 0;
   border: 0;
   border-right: 1px solid #d2d5d1;
@@ -2855,13 +2861,26 @@ a {
   cursor: pointer;
   font-size: 12px;
   font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
-.ai-strategy-field button:last-child {
+.ai-strategy-field label:last-child {
   border-right: 0;
 }
-.ai-strategy-field button.is-selected {
+.ai-strategy-field label.is-selected {
   background: #527d65;
   color: #fff;
+}
+.ai-strategy-field label:has(input:disabled) {
+  opacity: 0.42;
+  cursor: default;
+}
+.ai-strategy-field input[type="radio"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
 }
 .ai-load-state {
   min-height: 420px;

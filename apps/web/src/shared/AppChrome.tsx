@@ -18,6 +18,7 @@ export function PhaseClockDisplay({ clock }: { clock: PublicPhaseClock }) {
   useEffect(() => {
     if (clock.status !== "running") return;
     setNowMs(Date.now());
+    void clock.deadlineAt;
     const timer = window.setInterval(() => setNowMs(Date.now()), 250);
     return () => window.clearInterval(timer);
   }, [clock.status, clock.deadlineAt]);

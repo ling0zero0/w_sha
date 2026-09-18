@@ -26,7 +26,7 @@ async function joinPlayers(
 
   for (const [index, player] of players.entries()) {
     await player.goto(joinUrl);
-    await player.getByLabel("昵称").fill(nicknames[index]!);
+    await player.getByLabel("昵称").fill(nicknames[index] as string);
     await player.getByRole("button", { name: "进入大厅" }).click();
     await expect(player.getByRole("heading", { name: "已进入大厅" })).toBeVisible();
   }
@@ -65,11 +65,11 @@ test("generate README screenshots from a complete game", async ({ browser, page 
     await expect(page.getByRole("heading", { name: "玩家确认身份" })).toBeVisible();
 
     const roles = await Promise.all(players.map((player) => player.getByTestId("private-role").textContent()));
-    const wolf = players[roles.indexOf("狼人")]!;
-    const seer = players[roles.indexOf("预言家")]!;
-    const villager = players[roles.indexOf("村民")]!;
-    const wolfNickname = nicknames[roles.indexOf("狼人")]!;
-    const playerByNickname = new Map(nicknames.map((nickname, index) => [nickname, players[index]!]));
+    const wolf = players[roles.indexOf("狼人")] as Page;
+    const seer = players[roles.indexOf("预言家")] as Page;
+    const villager = players[roles.indexOf("村民")] as Page;
+    const wolfNickname = nicknames[roles.indexOf("狼人")] as string;
+    const playerByNickname = new Map(nicknames.map((nickname, index) => [nickname, players[index] as Page]));
 
     await wolf.screenshot({
       path: path.join(screenshotDirectory, "player-role.jpg"),
@@ -95,7 +95,7 @@ test("generate README screenshots from a complete game", async ({ browser, page 
       const currentText = await currentHeading.textContent();
       const nickname = nicknames.find((name) => currentText?.includes(name));
       if (!nickname) throw new Error("无法识别当前发言玩家");
-      await playerByNickname.get(nickname)!.getByRole("button", { name: "结束我的发言" }).click();
+      await (playerByNickname.get(nickname) as Page).getByRole("button", { name: "结束我的发言" }).click();
       if (index < players.length - 1) await expect(currentHeading).not.toHaveText(currentText ?? "");
     }
 

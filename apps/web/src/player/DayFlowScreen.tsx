@@ -57,6 +57,7 @@ export function DayFlowScreen({
 
   useEffect(() => {
     setRoleVisible(false);
+    void lobby.phase;
   }, [lobby.phase]);
 
   function submitChat(event: FormEvent<HTMLFormElement>) {

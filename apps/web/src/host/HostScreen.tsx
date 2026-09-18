@@ -336,7 +336,7 @@ export function HostScreen() {
               </div>
 
               {lobby.takeoverRequests.length > 0 ? (
-                <div className="takeover-queue" aria-label="设备接管申请">
+                <div className="takeover-queue" role="region" aria-label="设备接管申请">
                   {lobby.takeoverRequests.map((request) => (
                     <div className="takeover-request" key={request.id} data-testid="takeover-request">
                       <span>

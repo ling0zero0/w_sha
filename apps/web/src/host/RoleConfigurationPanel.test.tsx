@@ -55,20 +55,26 @@ describe("RoleConfigurationPanel chat mode", () => {
   it("renders an accessible segmented radio control and emits a selection", () => {
     const onChatModeChange = vi.fn();
     const panel = renderPanel(true, onChatModeChange);
-    const options = findElements(panel, (element) => (element.props as { role?: string }).role === "radio");
+    const options = findElements(
+      panel,
+      (element) => element.type === "input" && (element.props as { type?: string }).type === "radio"
+    );
 
     expect(options).toHaveLength(2);
-    expect((options[0]!.props as { "aria-checked": boolean })["aria-checked"]).toBe(false);
-    expect((options[1]!.props as { "aria-checked": boolean })["aria-checked"]).toBe(true);
+    expect((options[0] as { props: { checked: boolean } }).props.checked).toBe(false);
+    expect((options[1] as { props: { checked: boolean } }).props.checked).toBe(true);
 
-    (options[0]!.props as { onClick: () => void }).onClick();
+    (options[0] as { props: { onChange: () => void } }).props.onChange();
     expect(onChatModeChange).toHaveBeenCalledWith("ordered");
   });
 
   it("disables both mode options while disconnected", () => {
     const panel = renderPanel(false);
-    const options = findElements(panel, (element) => (element.props as { role?: string }).role === "radio");
+    const options = findElements(
+      panel,
+      (element) => element.type === "input" && (element.props as { type?: string }).type === "radio"
+    );
 
-    expect(options.every((option) => (option.props as { disabled?: boolean }).disabled)).toBe(true);
+    expect(options.every((option) => (option as { props: { disabled?: boolean } }).props.disabled)).toBe(true);
   });
 });

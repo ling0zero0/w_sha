@@ -17,6 +17,7 @@ export function ChatTimeline({ messages, emptyText, className = "" }: { messages
   useEffect(() => {
     const timeline = timelineRef.current;
     if (timeline) timeline.scrollTop = timeline.scrollHeight;
+    void messages.length;
   }, [messages.length]);
 
   return (

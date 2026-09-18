@@ -45,7 +45,7 @@ export function ProviderPanel({ providers, client, onChanged }: ProviderPanelPro
               <strong>{provider.name}</strong>
               <small>{provider.baseUrl}</small>
             </span>
-            <i className={provider.enabled ? "is-enabled" : ""} aria-label={provider.enabled ? "已启用" : "已停用"} />
+            <i className={provider.enabled ? "is-enabled" : ""} role="img" aria-label={provider.enabled ? "已启用" : "已停用"} />
           </button>
         ))}
         {providers.length === 0 ? <p className="ai-list-empty">尚未配置服务连接</p> : null}

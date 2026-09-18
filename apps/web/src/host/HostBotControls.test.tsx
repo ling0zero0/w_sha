@@ -75,8 +75,8 @@ describe("HostBotControls", () => {
     });
     const input = findElement(controls, (element) => element.type === "input");
 
-    expect((input?.props as { value?: string }).value).toBe("机器人 2");
-    (input?.props as { onChange: (event: { target: { value: string } }) => void }).onChange({ target: { value: "  小灰  " } });
+    expect((input?.props as { value?: string } | undefined)?.value).toBe("机器人 2");
+    (input?.props as { onChange: (event: { target: { value: string } }) => void } | undefined)?.onChange({ target: { value: "  小灰  " } });
 
     stateHarness.index = 0;
     controls = HostBotControls({
@@ -85,7 +85,7 @@ describe("HostBotControls", () => {
       onAddBot
     });
     const form = findElement(controls, (element) => (element.props as { className?: string }).className === "bot-add-form");
-    (form?.props as { onSubmit: (event: { preventDefault: () => void }) => void }).onSubmit({ preventDefault: vi.fn() });
+    (form?.props as { onSubmit: (event: { preventDefault: () => void }) => void } | undefined)?.onSubmit({ preventDefault: vi.fn() });
 
     expect(onAddBot).toHaveBeenCalledWith({
       nickname: "小灰",
