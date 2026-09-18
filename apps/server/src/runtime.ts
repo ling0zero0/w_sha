@@ -1,5 +1,4 @@
 import {
-  publicGameStateSchema,
   type HostInterventionType,
   type PublicGameState,
   type PublicHostIntervention,
@@ -180,11 +179,11 @@ export class GameRuntime {
   }
 
   getPublicGameState(nowMs = Date.now()): PublicGameState {
-    return publicGameStateSchema.parse({
+    return {
       revision: this.publicRevision,
       clock: this.phaseClock.view(nowMs),
       interventions: this.getPublicInterventions().slice(-20)
-    });
+    };
   }
 
   private success(nowMs: number): RoomActionResult<PublicGameState> {

@@ -13,7 +13,7 @@ import type { Server, Socket } from "socket.io";
 import { actionIdSchema } from "@werewolf/shared";
 import { z, ZodError, type ZodType } from "zod";
 import type { GameRuntime } from "../runtime.js";
-import { ActionLedger, actionFingerprint } from "./action-ledger.js";
+import { type ActionLedger, actionFingerprint } from "./action-ledger.js";
 
 export const playerLifecycleActionScope = "player:lifecycle";
 
@@ -24,11 +24,15 @@ export interface TakeoverLifecycleMetadata {
   session?: PlayerSession | null;
 }
 
+export interface PendingTakeover {
+  requestId: string;
+  actionId: ActionId | null;
+}
+
 export interface SocketData {
   isHost: boolean;
-  pendingTakeoverActionId?: ActionId;
+  pendingTakeover?: PendingTakeover;
   playerId?: PlayerId;
-  pendingTakeoverRequestId?: string;
 }
 
 export type GameSocketServer = Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
@@ -88,11 +92,17 @@ export function executeIdempotentAction<T>(
   const fingerprint = action.actionId ? actionFingerprint(action.payload) : null;
   if (action.actionId && fingerprint) {
     const lookup = ledger.lookup(scope, event, action.actionId, fingerprint);
-    if (lookup.kind === "conflict") return ack(invalidActionIdConflict());
+    if (lookup.kind === "conflict") {
+      ack(invalidActionIdConflict());
+      return;
+    }
     if (lookup.kind === "replay") {
       const replayResult = lookup.result as RoomActionResult<T>;
       const replayFailure = onReplay?.(replayResult, lookup.metadata) ?? null;
-      if (replayFailure) return ack(replayFailure);
+      if (replayFailure) {
+        ack(replayFailure);
+        return;
+      }
       ack(replayResult);
       if (replayResult.ok) afterReplay?.(replayResult);
       return;
@@ -121,7 +131,10 @@ export function handleHostActionRequest<T, P>(
   action: (payload: P) => RoomActionResult<T>,
   afterSuccess: (result: RoomActionResult<T>) => void
 ): void {
-  if (!isHost) return ack(invalidHostSession());
+  if (!isHost) {
+    ack(invalidHostSession());
+    return;
+  }
   try {
     const parsed = parseActionPayload(schema, rawPayload);
     executeIdempotentAction(ledger, "host", event, parsed, ack, () => action(parsed.payload), afterSuccess);
@@ -140,12 +153,14 @@ export function handlePlayerActionRequest<T, P>(
   action: (playerId: PlayerId, payload: P) => RoomActionResult<T>,
   afterSuccess: (result: RoomActionResult<T>) => void
 ): void {
-  if (!playerId)
-    return ack({
+  if (!playerId) {
+    ack({
       ok: false,
       code: "INVALID_RECONNECT_CREDENTIALS",
       message: "玩家会话无效，请重新连接"
     });
+    return;
+  }
   try {
     const parsed = parseActionPayload(schema, rawPayload);
     executeIdempotentAction(ledger, `player:${playerId}`, event, parsed, ack, () => action(playerId, parsed.payload), afterSuccess);
@@ -196,7 +211,10 @@ export function handleHostAction<T>(
   action: () => { ok: true; data: T } | RoomActionFailure,
   afterSuccess: () => void
 ): void {
-  if (!isHost) return ack(invalidHostSession());
+  if (!isHost) {
+    ack(invalidHostSession());
+    return;
+  }
   try {
     const result = action();
     ack(result);
@@ -212,12 +230,14 @@ export function handlePlayerViewAction<T>(
   action: () => { ok: true; data: T } | RoomActionFailure,
   afterSuccess: () => void
 ): void {
-  if (!playerId)
-    return ack({
+  if (!playerId) {
+    ack({
       ok: false,
       code: "INVALID_RECONNECT_CREDENTIALS",
       message: "玩家会话无效，请重新连接"
     });
+    return;
+  }
   try {
     const result = action();
     ack(result);

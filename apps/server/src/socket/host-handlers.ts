@@ -162,9 +162,8 @@ export function registerHostHandlers(socket: GameSocket, context: SocketHandlerC
           takeoverActionIds.delete(payload.requestId);
         }
         const requestSocket = io.sockets.sockets.get(result.data.requestSocketId);
-        if (requestSocket?.data.pendingTakeoverRequestId === resolvedRequestId) {
-          delete requestSocket.data.pendingTakeoverRequestId;
-          delete requestSocket.data.pendingTakeoverActionId;
+        if (requestSocket?.data.pendingTakeover?.requestId === resolvedRequestId) {
+          delete requestSocket.data.pendingTakeover;
         }
         if (result.data.approved && result.data.session) {
           const playerId = result.data.session.lobby.selfId;

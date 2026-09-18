@@ -13,6 +13,14 @@ import { ProviderRegistry } from "./ai/provider-registry.js";
 import { createOpenAiCompatibleProvider } from "./ai/providers/openai-compatible.js";
 import { ActionLedger } from "./socket/action-ledger.js";
 
+function closeResources(): void {
+  snapshotStore.close();
+  chatStore.close();
+  aiAuditStore.close();
+  aiConfigStore.close();
+  actionLedger?.close();
+}
+
 const config = loadConfig();
 const aiGameTokenBudget = config.AI_GAME_TOKEN_BUDGET ?? 100_000;
 const localAddress = config.PUBLIC_ADDRESS ?? selectLanAddress();
@@ -28,10 +36,7 @@ try {
   if (!snapshotStore.checkIntegrity()) throw new Error("runtime database integrity check failed");
   snapshot = snapshotStore.load();
 } catch (error) {
-  snapshotStore.close();
-  chatStore.close();
-  aiAuditStore.close();
-  aiConfigStore.close();
+  closeResources();
   throw error;
 }
 const runtime = new GameRuntime(
@@ -39,17 +44,14 @@ const runtime = new GameRuntime(
     ? { localAddress, webPort: config.WEB_PORT, snapshot, chatPersistence: chatStore }
     : { localAddress, webPort: config.WEB_PORT, chatPersistence: chatStore }
 );
-let actionLedger: ActionLedger;
+let actionLedger: ActionLedger | undefined;
 try {
   actionLedger = new ActionLedger({
     databasePath: config.DATABASE_PATH,
     secretBox
   });
 } catch (error) {
-  snapshotStore.close();
-  chatStore.close();
-  aiAuditStore.close();
-  aiConfigStore.close();
+  closeResources();
   throw error;
 }
 const app = buildServer(config, runtime, {
@@ -74,36 +76,33 @@ const testStageTiming =
         "exile-result": { minimumMs: 50, maximumMs: 500 }
       } as const)
     : {};
-const io = attachSocketServer(
-  app.server,
-  app.log,
+const additionalSocketOrigins = config.SOCKET_ALLOWED_ORIGINS?.split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean) ?? [];
+const io = attachSocketServer({
+  server: app.server,
+  logger: app.log,
   runtime,
   persistSnapshot,
-  true,
-  testStageTiming,
-  {
+  automaticPhaseProgression: true,
+  stageTimingOverrides: testStageTiming,
+  aiServices: {
     store: aiConfigStore,
     providers: providerRegistry,
     auditStore: aiAuditStore,
     gameTokenBudget: aiGameTokenBudget
   },
-  config.SOCKET_ALLOWED_ORIGINS?.split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean),
-  actionLedger
-);
+  additionalSocketOrigins,
+  ...(actionLedger ? { actionLedger } : {})
+});
 
 async function shutdown(signal: string) {
   app.log.info({ signal }, "shutting down");
   persistSnapshot();
   snapshotStore.flush();
   io.close();
-  actionLedger.close();
   await app.close();
-  snapshotStore.close();
-  chatStore.close();
-  aiAuditStore.close();
-  aiConfigStore.close();
+  closeResources();
 }
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
@@ -127,10 +126,6 @@ try {
   if (config.OPEN_BROWSER) openBrowser(`http://127.0.0.1:${config.PORT}/`);
 } catch (error) {
   app.log.fatal({ err: error }, "server failed to start");
-  snapshotStore.close();
-  chatStore.close();
-  aiAuditStore.close();
-  aiConfigStore.close();
-  actionLedger.close();
+  closeResources();
   process.exit(1);
 }

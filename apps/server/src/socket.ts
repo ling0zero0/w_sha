@@ -44,22 +44,35 @@ const stageTiming: Record<TimedStage, { minimumMs: number; maximumMs: number }> 
   "exile-result": { minimumMs: 8_000, maximumMs: 8_000 }
 };
 
-export function attachSocketServer(
-  server: HttpServer,
-  logger: FastifyBaseLogger,
-  runtime: GameRuntime,
-  persistSnapshot: () => void = () => undefined,
-  automaticPhaseProgression = false,
-  stageTimingOverrides: Partial<Record<TimedStage, { minimumMs: number; maximumMs: number }>> = {},
+export interface AttachSocketServerOptions {
+  server: HttpServer;
+  logger: FastifyBaseLogger;
+  runtime: GameRuntime;
+  persistSnapshot?: () => void;
+  automaticPhaseProgression?: boolean;
+  stageTimingOverrides?: Partial<Record<TimedStage, { minimumMs: number; maximumMs: number }>>;
   aiServices?: {
     store: AiConfigStore;
     providers: ProviderRegistry;
     auditStore?: AiAuditStore;
     gameTokenBudget?: number;
-  },
-  additionalSocketOrigins: readonly string[] = [],
-  providedActionLedger?: ActionLedger
-) {
+  };
+  additionalSocketOrigins?: readonly string[];
+  actionLedger?: ActionLedger;
+}
+
+export function attachSocketServer(options: AttachSocketServerOptions) {
+  const {
+    server,
+    logger,
+    runtime,
+    persistSnapshot = () => undefined,
+    automaticPhaseProgression = false,
+    stageTimingOverrides = {},
+    aiServices,
+    additionalSocketOrigins = [],
+    actionLedger: providedActionLedger
+  } = options;
   if (automaticPhaseProgression) runtime.room.enableDeferredStageAdvancement();
   const activeStageTiming = { ...stageTiming, ...stageTimingOverrides };
   const socketOriginPolicy = createSocketOriginPolicy({
@@ -309,7 +322,7 @@ export function attachSocketServer(
 
     socket.on("disconnect", (reason) => {
       const changedPlayer = runtime.room.setReconnecting(socket.id);
-      const preservedTakeoverRequestId = socket.data.pendingTakeoverActionId ? (socket.data.pendingTakeoverRequestId ?? null) : null;
+      const preservedTakeoverRequestId = socket.data.pendingTakeover?.requestId ?? null;
       const removedTakeoverRequest = runtime.room.cancelTakeoverRequests(socket.id, preservedTakeoverRequestId);
       if (changedPlayer) {
         emitLobbyViews();

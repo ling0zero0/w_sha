@@ -35,6 +35,18 @@ interface PendingLifecycleAction {
   nickname: string;
 }
 
+type PlayerActionEvent =
+  | "player:confirm-role"
+  | "player:finish-speaking"
+  | "wolf:select-target"
+  | "wolf:confirm-vote"
+  | "seer:inspect"
+  | "witch:submit-action"
+  | "guard:protect"
+  | "hunter:shoot"
+  | "day:select-vote"
+  | "day:confirm-vote";
+
 const initialState: PlayerLobbyState = {
   socket: "checking",
   lobby: null,
@@ -121,11 +133,11 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
   const chatCursorRef = useRef(0);
   const replayLoadedRef = useRef(false);
 
-  const clearLifecycleActions = () => {
+  const clearLifecycleActions = useCallback(() => {
     joinActionRef.current = null;
     reconnectActionRef.current = null;
     takeoverActionRef.current = null;
-  };
+  }, []);
 
   useEffect(() => {
     clearLifecycleActions();
@@ -307,7 +319,7 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [invitation]);
+  }, [invitation, clearLifecycleActions]);
 
   const join = useCallback(
     (nickname: string) => {
@@ -367,16 +379,6 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
     );
   }, [invitation]);
 
-  const confirmRole = useCallback(() => {
-    socketRef.current?.emit("player:confirm-role", { actionId: createActionId() }, (result) => {
-      if (result.ok) {
-        setState((current) => ({ ...current, lobby: result.data, error: "" }));
-      } else {
-        setState((current) => ({ ...current, error: result.message }));
-      }
-    });
-  }, []);
-
   const applyPlayerView = useCallback((result: RoomActionResult<PlayerLobbyView>) => {
     if (result.ok) {
       setState((current) => {
@@ -407,19 +409,18 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
     }
   }, []);
 
-  const selectWolfTarget = useCallback(
-    (target: WolfVoteTarget) => {
-      socketRef.current?.emit("wolf:select-target", { target, actionId: createActionId() }, applyPlayerView);
+  const emitPlayerAction = useCallback(
+    (event: PlayerActionEvent, payload: Record<string, unknown> = {}) => {
+      socketRef.current?.emit(event, { ...payload, actionId: createActionId() } as never, applyPlayerView as never);
     },
     [applyPlayerView]
   );
 
-  const confirmWolfVote = useCallback(
-    (confirmed: boolean) => {
-      socketRef.current?.emit("wolf:confirm-vote", { confirmed, actionId: createActionId() }, applyPlayerView);
-    },
-    [applyPlayerView]
-  );
+  const confirmRole = useCallback(() => emitPlayerAction("player:confirm-role"), [emitPlayerAction]);
+
+  const selectWolfTarget = useCallback((target: WolfVoteTarget) => emitPlayerAction("wolf:select-target", { target }), [emitPlayerAction]);
+
+  const confirmWolfVote = useCallback((confirmed: boolean) => emitPlayerAction("wolf:confirm-vote", { confirmed }), [emitPlayerAction]);
 
   const sendChatMessage = useCallback((payload: ChatSendRequest) => {
     socketRef.current?.emit("chat:send", { ...payload, actionId: createActionId() }, (result) => {
@@ -427,57 +428,33 @@ export function usePlayerLobby(invitation: Omit<JoinLobbyRequest, "nickname"> | 
     });
   }, []);
 
-  const inspectAsSeer = useCallback(
-    (target: string) => {
-      socketRef.current?.emit("seer:inspect", { target, actionId: createActionId() }, applyPlayerView);
-    },
-    [applyPlayerView]
-  );
+  const inspectAsSeer = useCallback((target: string) => emitPlayerAction("seer:inspect", { target }), [emitPlayerAction]);
 
   const submitWitchAction = useCallback(
     (action: "none" | "save" | "poison", target?: string) => {
       if (action === "poison" && target) {
-        socketRef.current?.emit("witch:submit-action", { action, target, actionId: createActionId() }, applyPlayerView);
+        emitPlayerAction("witch:submit-action", { action, target });
         return;
       }
       if (action !== "poison") {
-        socketRef.current?.emit("witch:submit-action", { action, actionId: createActionId() }, applyPlayerView);
+        emitPlayerAction("witch:submit-action", { action });
       }
     },
-    [applyPlayerView]
+    [emitPlayerAction]
   );
 
-  const protectAsGuard = useCallback(
-    (target: string | null) => {
-      socketRef.current?.emit("guard:protect", { target, actionId: createActionId() }, applyPlayerView);
-    },
-    [applyPlayerView]
-  );
+  const protectAsGuard = useCallback((target: string | null) => emitPlayerAction("guard:protect", { target }), [emitPlayerAction]);
 
-  const shootAsHunter = useCallback(
-    (target: string | null) => {
-      socketRef.current?.emit("hunter:shoot", { target, actionId: createActionId() }, applyPlayerView);
-    },
-    [applyPlayerView]
-  );
+  const shootAsHunter = useCallback((target: string | null) => emitPlayerAction("hunter:shoot", { target }), [emitPlayerAction]);
 
-  const finishSpeaking = useCallback(() => {
-    socketRef.current?.emit("player:finish-speaking", { actionId: createActionId() }, applyPlayerView);
-  }, [applyPlayerView]);
+  const finishSpeaking = useCallback(() => emitPlayerAction("player:finish-speaking"), [emitPlayerAction]);
 
   const selectDayVote = useCallback(
-    (target: string | "abstain" | null) => {
-      socketRef.current?.emit("day:select-vote", { target, actionId: createActionId() }, applyPlayerView);
-    },
-    [applyPlayerView]
+    (target: string | "abstain" | null) => emitPlayerAction("day:select-vote", { target }),
+    [emitPlayerAction]
   );
 
-  const confirmDayVote = useCallback(
-    (confirmed: boolean) => {
-      socketRef.current?.emit("day:confirm-vote", { confirmed, actionId: createActionId() }, applyPlayerView);
-    },
-    [applyPlayerView]
-  );
+  const confirmDayVote = useCallback((confirmed: boolean) => emitPlayerAction("day:confirm-vote", { confirmed }), [emitPlayerAction]);
 
   return {
     ...state,
