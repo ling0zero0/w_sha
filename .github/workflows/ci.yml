@@ -1,9 +1,18 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "运行完整检查（含 Playwright 端到端测试）"
+        required: false
+        default: "true"
+        type: boolean
+      ref:
+        description: "要检测的分支 / tag / commit"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -14,9 +23,10 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          ref: ${{ inputs.ref }}
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -24,7 +34,7 @@ jobs:
           version: 11.5.0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
@@ -38,12 +48,16 @@ jobs:
       - name: Check formatting and lint
         run: corepack pnpm quality
 
-      - name: Run full checks
-        run: corepack pnpm check:all
+      - name: Run checks
+        run: corepack pnpm check
+
+      - name: Run end-to-end tests
+        if: ${{ inputs.full }}
+        run: corepack pnpm test:e2e
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: playwright-report
           path: playwright-report/
