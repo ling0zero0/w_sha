@@ -1,8 +1,10 @@
 import type { AiProviderId, AiProviderView, CreateAiProviderRequest } from "@werewolf/shared";
-import { Check, FlaskConical, Plus, Save, Server, Trash2 } from "lucide-react";
+import { FlaskConical, Plus, Save, Server, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import type { AiAdminClient } from "./ai-client";
 import { CredentialInput } from "./CredentialInput";
+import { FormStatus } from "./FormStatus";
+import { useAiForm } from "./useAiForm";
 
 interface ProviderPanelProps {
   providers: AiProviderView[];
@@ -72,79 +74,55 @@ function ProviderForm({
   onChanged(): Promise<void>;
   onDeleted(): void;
 }) {
-  const [name, setName] = useState(provider?.name ?? emptyProvider.name);
-  const [baseUrl, setBaseUrl] = useState(provider?.baseUrl ?? emptyProvider.baseUrl);
-  const [enabled, setEnabled] = useState(provider?.enabled ?? true);
-  const [apiKey, setApiKey] = useState("");
-  const [clearCredential, setClearCredential] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const form = useAiForm({
+    name: provider?.name ?? emptyProvider.name,
+    baseUrl: provider?.baseUrl ?? emptyProvider.baseUrl,
+    enabled: provider?.enabled ?? emptyProvider.enabled,
+    apiKey: "",
+    clearCredential: false
+  });
+  const { values, saving, testing, status } = form;
 
   async function save(event: FormEvent) {
     event.preventDefault();
-    const submittedKey = apiKey || undefined;
-    setApiKey("");
-    setSaving(true);
-    setError("");
-    setSuccess("");
-    try {
+    const submittedKey = values.apiKey || undefined;
+    form.update({ apiKey: "" });
+    await form.submit(async () => {
       if (provider) {
         await client.updateProvider(provider.id, {
-          name,
+          name: values.name,
           protocol: "openai-compatible-chat",
-          baseUrl,
-          enabled,
+          baseUrl: values.baseUrl,
+          enabled: values.enabled,
           ...(submittedKey ? { apiKey: submittedKey } : {}),
-          ...(!submittedKey && clearCredential ? { clearCredential: true as const } : {})
+          ...(!submittedKey && values.clearCredential ? { clearCredential: true as const } : {})
         });
       } else {
         await client.createProvider({
-          name,
+          name: values.name,
           protocol: "openai-compatible-chat",
-          baseUrl,
-          enabled,
+          baseUrl: values.baseUrl,
+          enabled: values.enabled,
           ...(submittedKey ? { apiKey: submittedKey } : {})
         });
       }
-      setClearCredential(false);
-      setSuccess("服务连接已保存");
+      form.update({ clearCredential: false });
       await onChanged();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "保存服务连接失败");
-    } finally {
-      setSaving(false);
-    }
+    }, "服务连接已保存", "保存服务连接失败");
   }
 
   async function testConnection() {
     if (!provider) return;
-    setTesting(true);
-    setError("");
-    setSuccess("");
-    try {
-      await client.testProvider(provider.id);
-      setSuccess("连接测试通过");
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "连接测试失败");
-    } finally {
-      setTesting(false);
-    }
+    await form.runTest(() => client.testProvider(provider.id), "连接测试通过", "连接测试失败");
   }
 
   async function remove() {
     if (!provider || !window.confirm(`删除服务连接“${provider.name}”？`)) return;
-    setSaving(true);
-    setError("");
-    try {
+    await form.destroy(async () => {
       await client.deleteProvider(provider.id);
       onDeleted();
       await onChanged();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "删除服务连接失败");
-      setSaving(false);
-    }
+    }, "删除服务连接失败");
   }
 
   return (
@@ -171,7 +149,7 @@ function ProviderForm({
       <div className="ai-form-grid">
         <label>
           <span>名称</span>
-          <input required maxLength={80} value={name} disabled={saving} onChange={(event) => setName(event.target.value)} />
+          <input required maxLength={80} value={values.name} disabled={saving} onChange={(event) => form.setField("name", event.target.value)} />
         </label>
         <label>
           <span>协议</span>
@@ -185,28 +163,33 @@ function ProviderForm({
             required
             type="url"
             placeholder="http://127.0.0.1:11434/v1"
-            value={baseUrl}
+            value={values.baseUrl}
             disabled={saving}
-            onChange={(event) => setBaseUrl(event.target.value)}
+            onChange={(event) => form.setField("baseUrl", event.target.value)}
           />
         </label>
         <CredentialInput
-          value={apiKey}
+          value={values.apiKey}
           configured={provider?.credentialConfigured ?? false}
           hint={provider?.credentialHint ?? null}
           disabled={saving}
-          clearRequested={clearCredential}
-          onChange={setApiKey}
-          onClearRequested={setClearCredential}
+          clearRequested={values.clearCredential}
+          onChange={(value) => form.setField("apiKey", value)}
+          onClearRequested={(value) => form.setField("clearCredential", value)}
         />
       </div>
 
       <label className="ai-toggle-row">
-        <input type="checkbox" checked={enabled} disabled={saving} onChange={(event) => setEnabled(event.target.checked)} />
+        <input
+          type="checkbox"
+          checked={values.enabled}
+          disabled={saving}
+          onChange={(event) => form.setField("enabled", event.target.checked)}
+        />
         <span>启用此服务连接</span>
       </label>
 
-      <FormStatus error={error} success={success} />
+      <FormStatus status={status} />
       <footer className="ai-form-actions">
         {provider ? (
           <button type="button" className="ai-secondary-button" disabled={saving || testing} onClick={() => void testConnection()}>
@@ -220,15 +203,5 @@ function ProviderForm({
         </button>
       </footer>
     </form>
-  );
-}
-
-export function FormStatus({ error, success }: { error: string; success: string }) {
-  if (!error && !success) return null;
-  return (
-    <p className={`ai-form-status${error ? " is-error" : " is-success"}`} role={error ? "alert" : "status"}>
-      {success ? <Check size={16} aria-hidden="true" /> : null}
-      {error || success}
-    </p>
   );
 }

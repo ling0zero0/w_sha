@@ -2,7 +2,8 @@ import type { AiModelProfileId, AiModelProfileView, AiProviderView, CreateAiMode
 import { Cpu, FlaskConical, Plus, Save, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import type { AiAdminClient } from "./ai-client";
-import { FormStatus } from "./ProviderPanel";
+import { FormStatus } from "./FormStatus";
+import { useAiForm } from "./useAiForm";
 
 interface ModelPanelProps {
   models: AiModelProfileView[];
@@ -84,77 +85,53 @@ function ModelForm({
   onChanged(): Promise<void>;
   onDeleted(): void;
 }) {
-  const [providerId, setProviderId] = useState(model?.providerId ?? providers[0]?.id ?? "");
-  const [name, setName] = useState(model?.name ?? defaults.name);
-  const [modelName, setModelName] = useState(model?.model ?? defaults.model);
-  const [enabled, setEnabled] = useState(model?.enabled ?? defaults.enabled);
-  const [temperature, setTemperature] = useState<number | null>(model?.temperature ?? defaults.temperature);
-  const [maxOutputTokens, setMaxOutputTokens] = useState(model?.maxOutputTokens ?? defaults.maxOutputTokens);
-  const [requestTimeoutMs, setRequestTimeoutMs] = useState(model?.requestTimeoutMs ?? defaults.requestTimeoutMs);
-  const [maxAttemptsPerTurn, setMaxAttemptsPerTurn] = useState(model?.maxAttemptsPerTurn ?? defaults.maxAttemptsPerTurn);
-  const [gameTokenBudget, setGameTokenBudget] = useState(model?.gameTokenBudget ?? defaults.gameTokenBudget);
-  const [fallbackModelProfileId, setFallbackModelProfileId] = useState<string>(model?.fallbackModelProfileId ?? "");
-  const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const form = useAiForm({
+    providerId: model?.providerId ?? providers[0]?.id ?? "",
+    name: model?.name ?? defaults.name,
+    modelName: model?.model ?? defaults.model,
+    enabled: model?.enabled ?? defaults.enabled,
+    temperature: (model?.temperature ?? defaults.temperature) as number | null,
+    maxOutputTokens: model?.maxOutputTokens ?? defaults.maxOutputTokens,
+    requestTimeoutMs: model?.requestTimeoutMs ?? defaults.requestTimeoutMs,
+    maxAttemptsPerTurn: model?.maxAttemptsPerTurn ?? defaults.maxAttemptsPerTurn,
+    gameTokenBudget: model?.gameTokenBudget ?? defaults.gameTokenBudget,
+    fallbackModelProfileId: model?.fallbackModelProfileId ?? ""
+  });
+  const { values, saving, testing, status } = form;
 
   async function save(event: FormEvent) {
     event.preventDefault();
-    setSaving(true);
-    setError("");
-    setSuccess("");
-    const value: CreateAiModelProfileRequest = {
-      providerId,
-      name,
-      model: modelName,
-      enabled,
-      temperature,
-      maxOutputTokens,
-      requestTimeoutMs,
-      maxAttemptsPerTurn,
-      gameTokenBudget,
-      fallbackModelProfileId: fallbackModelProfileId || null
-    };
-    try {
+    await form.submit(async () => {
+      const value: CreateAiModelProfileRequest = {
+        providerId: values.providerId,
+        name: values.name,
+        model: values.modelName,
+        enabled: values.enabled,
+        temperature: values.temperature,
+        maxOutputTokens: values.maxOutputTokens,
+        requestTimeoutMs: values.requestTimeoutMs,
+        maxAttemptsPerTurn: values.maxAttemptsPerTurn,
+        gameTokenBudget: values.gameTokenBudget,
+        fallbackModelProfileId: values.fallbackModelProfileId || null
+      };
       if (model) await client.updateModel(model.id, value);
       else await client.createModel(value);
-      setSuccess("模型配置已保存");
       await onChanged();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "保存模型失败");
-    } finally {
-      setSaving(false);
-    }
+    }, "模型配置已保存", "保存模型失败");
   }
 
   async function testModel() {
     if (!model) return;
-    setTesting(true);
-    setError("");
-    setSuccess("");
-    try {
-      await client.testModel(model.id);
-      setSuccess("模型测试通过");
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "模型测试失败");
-    } finally {
-      setTesting(false);
-    }
+    await form.runTest(() => client.testModel(model.id), "模型测试通过", "模型测试失败");
   }
 
   async function remove() {
     if (!model || !window.confirm(`删除模型“${model.name}”？`)) return;
-    setSaving(true);
-    setError("");
-    try {
+    await form.destroy(async () => {
       await client.deleteModel(model.id);
       onDeleted();
       await onChanged();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "删除模型失败");
-      setSaving(false);
-    }
+    }, "删除模型失败");
   }
 
   return (
@@ -182,11 +159,22 @@ function ModelForm({
       <div className="ai-form-grid">
         <label>
           <span>名称</span>
-          <input required maxLength={80} value={name} disabled={saving} onChange={(event) => setName(event.target.value)} />
+          <input
+            required
+            maxLength={80}
+            value={values.name}
+            disabled={saving}
+            onChange={(event) => form.setField("name", event.target.value)}
+          />
         </label>
         <label>
           <span>服务连接</span>
-          <select required value={providerId} disabled={saving || providers.length === 0} onChange={(event) => setProviderId(event.target.value)}>
+          <select
+            required
+            value={values.providerId}
+            disabled={saving || providers.length === 0}
+            onChange={(event) => form.setField("providerId", event.target.value)}
+          >
             <option value="">选择服务连接</option>
             {providers.map((provider) => (
               <option key={provider.id} value={provider.id}>
@@ -197,7 +185,13 @@ function ModelForm({
         </label>
         <label className="ai-full-field">
           <span>模型 ID</span>
-          <input required maxLength={200} value={modelName} disabled={saving} onChange={(event) => setModelName(event.target.value)} />
+          <input
+            required
+            maxLength={200}
+            value={values.modelName}
+            disabled={saving}
+            onChange={(event) => form.setField("modelName", event.target.value)}
+          />
         </label>
         <label>
           <span>温度</span>
@@ -206,10 +200,10 @@ function ModelForm({
             min="0"
             max="2"
             step="0.1"
-            value={temperature ?? ""}
+            value={values.temperature ?? ""}
             disabled={saving}
             placeholder="使用服务默认值"
-            onChange={(event) => setTemperature(event.target.value === "" ? null : Number(event.target.value))}
+            onChange={(event) => form.setField("temperature", event.target.value === "" ? null : Number(event.target.value))}
           />
         </label>
         <label>
@@ -218,9 +212,9 @@ function ModelForm({
             type="number"
             min="1"
             max="1000000"
-            value={maxOutputTokens}
+            value={values.maxOutputTokens}
             disabled={saving}
-            onChange={(event) => setMaxOutputTokens(Number(event.target.value))}
+            onChange={(event) => form.setField("maxOutputTokens", Number(event.target.value))}
           />
         </label>
         <label>
@@ -230,9 +224,9 @@ function ModelForm({
             min="1000"
             max="300000"
             step="1000"
-            value={requestTimeoutMs}
+            value={values.requestTimeoutMs}
             disabled={saving}
-            onChange={(event) => setRequestTimeoutMs(Number(event.target.value))}
+            onChange={(event) => form.setField("requestTimeoutMs", Number(event.target.value))}
           />
         </label>
         <label>
@@ -241,9 +235,9 @@ function ModelForm({
             type="number"
             min="1"
             max="2"
-            value={maxAttemptsPerTurn}
+            value={values.maxAttemptsPerTurn}
             disabled={saving}
-            onChange={(event) => setMaxAttemptsPerTurn(Number(event.target.value))}
+            onChange={(event) => form.setField("maxAttemptsPerTurn", Number(event.target.value))}
           />
         </label>
         <label>
@@ -252,14 +246,18 @@ function ModelForm({
             type="number"
             min="1"
             max="100000000"
-            value={gameTokenBudget}
+            value={values.gameTokenBudget}
             disabled={saving}
-            onChange={(event) => setGameTokenBudget(Number(event.target.value))}
+            onChange={(event) => form.setField("gameTokenBudget", Number(event.target.value))}
           />
         </label>
         <label>
           <span>回退模型</span>
-          <select value={fallbackModelProfileId} disabled={saving} onChange={(event) => setFallbackModelProfileId(event.target.value)}>
+          <select
+            value={values.fallbackModelProfileId}
+            disabled={saving}
+            onChange={(event) => form.setField("fallbackModelProfileId", event.target.value)}
+          >
             <option value="">无回退模型</option>
             {models
               .filter((candidate) => candidate.id !== model?.id)
@@ -273,10 +271,15 @@ function ModelForm({
       </div>
 
       <label className="ai-toggle-row">
-        <input type="checkbox" checked={enabled} disabled={saving} onChange={(event) => setEnabled(event.target.checked)} />
+        <input
+          type="checkbox"
+          checked={values.enabled}
+          disabled={saving}
+          onChange={(event) => form.setField("enabled", event.target.checked)}
+        />
         <span>启用此模型</span>
       </label>
-      <FormStatus error={error} success={success} />
+      <FormStatus status={status} />
       <footer className="ai-form-actions">
         {model ? (
           <button type="button" className="ai-secondary-button" disabled={saving || testing} onClick={() => void testModel()}>

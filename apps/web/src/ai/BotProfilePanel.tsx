@@ -2,7 +2,8 @@ import type { AiBotProfileId, AiBotProfileView, AiBotStrategy, AiModelProfileVie
 import { Bot, Plus, Save, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import type { AiAdminClient } from "./ai-client";
-import { FormStatus } from "./ProviderPanel";
+import { FormStatus } from "./FormStatus";
+import { useAiForm } from "./useAiForm";
 
 interface BotProfilePanelProps {
   profiles: AiBotProfileView[];
@@ -87,57 +88,44 @@ function BotProfileForm({
   onChanged(): Promise<void>;
   onDeleted(): void;
 }) {
-  const [name, setName] = useState(profile?.name ?? defaults.name);
-  const [defaultNickname, setDefaultNickname] = useState(profile?.defaultNickname ?? defaults.defaultNickname);
-  const [description, setDescription] = useState(profile?.description ?? defaults.description);
-  const [personalityPrompt, setPersonalityPrompt] = useState(profile?.personalityPrompt ?? defaults.personalityPrompt);
-  const [speakingStyle, setSpeakingStyle] = useState(profile?.speakingStyle ?? defaults.speakingStyle);
-  const [strategy, setStrategy] = useState<AiBotStrategy>(profile?.strategy ?? defaults.strategy);
-  const [modelProfileId, setModelProfileId] = useState(profile?.modelProfileId ?? models[0]?.id ?? "");
-  const [enabled, setEnabled] = useState(profile?.enabled ?? defaults.enabled);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const form = useAiForm({
+    name: profile?.name ?? defaults.name,
+    defaultNickname: profile?.defaultNickname ?? defaults.defaultNickname,
+    description: profile?.description ?? defaults.description,
+    personalityPrompt: profile?.personalityPrompt ?? defaults.personalityPrompt,
+    speakingStyle: profile?.speakingStyle ?? defaults.speakingStyle,
+    strategy: profile?.strategy ?? defaults.strategy,
+    modelProfileId: profile?.modelProfileId ?? models[0]?.id ?? "",
+    enabled: profile?.enabled ?? defaults.enabled
+  });
+  const { values, saving, status } = form;
 
   async function save(event: FormEvent) {
     event.preventDefault();
-    setSaving(true);
-    setError("");
-    setSuccess("");
-    const value: CreateAiBotProfileRequest = {
-      name,
-      defaultNickname,
-      description,
-      personalityPrompt,
-      speakingStyle,
-      strategy,
-      modelProfileId,
-      enabled
-    };
-    try {
+    await form.submit(async () => {
+      const value: CreateAiBotProfileRequest = {
+        name: values.name,
+        defaultNickname: values.defaultNickname,
+        description: values.description,
+        personalityPrompt: values.personalityPrompt,
+        speakingStyle: values.speakingStyle,
+        strategy: values.strategy,
+        modelProfileId: values.modelProfileId,
+        enabled: values.enabled
+      };
       if (profile) await client.updateBotProfile(profile.id, value);
       else await client.createBotProfile(value);
-      setSuccess("机器人档案已保存");
       await onChanged();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "保存机器人档案失败");
-    } finally {
-      setSaving(false);
-    }
+    }, "机器人档案已保存", "保存机器人档案失败");
   }
 
   async function remove() {
     if (!profile || !window.confirm(`删除机器人档案“${profile.name}”？`)) return;
-    setSaving(true);
-    setError("");
-    try {
+    await form.destroy(async () => {
       await client.deleteBotProfile(profile.id);
       onDeleted();
       await onChanged();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "删除机器人档案失败");
-      setSaving(false);
-    }
+    }, "删除机器人档案失败");
   }
 
   return (
@@ -165,15 +153,32 @@ function BotProfileForm({
       <div className="ai-form-grid">
         <label>
           <span>档案名称</span>
-          <input required maxLength={80} value={name} disabled={saving} onChange={(event) => setName(event.target.value)} />
+          <input
+            required
+            maxLength={80}
+            value={values.name}
+            disabled={saving}
+            onChange={(event) => form.setField("name", event.target.value)}
+          />
         </label>
         <label>
           <span>默认昵称</span>
-          <input required maxLength={12} value={defaultNickname} disabled={saving} onChange={(event) => setDefaultNickname(event.target.value)} />
+          <input
+            required
+            maxLength={12}
+            value={values.defaultNickname}
+            disabled={saving}
+            onChange={(event) => form.setField("defaultNickname", event.target.value)}
+          />
         </label>
         <label>
           <span>模型</span>
-          <select required value={modelProfileId} disabled={saving || models.length === 0} onChange={(event) => setModelProfileId(event.target.value)}>
+          <select
+            required
+            value={values.modelProfileId}
+            disabled={saving || models.length === 0}
+            onChange={(event) => form.setField("modelProfileId", event.target.value)}
+          >
             <option value="">选择模型</option>
             {models.map((model) => (
               <option key={model.id} value={model.id}>
@@ -186,14 +191,14 @@ function BotProfileForm({
           <legend>策略</legend>
           <div role="radiogroup" aria-label="机器人策略">
             {(Object.keys(strategyLabels) as AiBotStrategy[]).map((value) => (
-              <label key={value} className={strategy === value ? "is-selected" : ""}>
+              <label key={value} className={values.strategy === value ? "is-selected" : ""}>
                 <input
                   type="radio"
                   name="bot-strategy"
                   value={value}
-                  checked={strategy === value}
+                  checked={values.strategy === value}
                   disabled={saving}
-                  onChange={() => setStrategy(value)}
+                  onChange={() => form.setField("strategy", value)}
                 />
                 {strategyLabels[value]}
               </label>
@@ -202,7 +207,13 @@ function BotProfileForm({
         </fieldset>
         <label className="ai-full-field">
           <span>简介</span>
-          <textarea maxLength={1000} rows={3} value={description} disabled={saving} onChange={(event) => setDescription(event.target.value)} />
+          <textarea
+            maxLength={1000}
+            rows={3}
+            value={values.description}
+            disabled={saving}
+            onChange={(event) => form.setField("description", event.target.value)}
+          />
         </label>
         <label className="ai-full-field">
           <span>人格提示词</span>
@@ -210,22 +221,34 @@ function BotProfileForm({
             required
             maxLength={12000}
             rows={7}
-            value={personalityPrompt}
+            value={values.personalityPrompt}
             disabled={saving}
-            onChange={(event) => setPersonalityPrompt(event.target.value)}
+            onChange={(event) => form.setField("personalityPrompt", event.target.value)}
           />
         </label>
         <label className="ai-full-field">
           <span>发言风格</span>
-          <textarea required maxLength={2000} rows={4} value={speakingStyle} disabled={saving} onChange={(event) => setSpeakingStyle(event.target.value)} />
+          <textarea
+            required
+            maxLength={2000}
+            rows={4}
+            value={values.speakingStyle}
+            disabled={saving}
+            onChange={(event) => form.setField("speakingStyle", event.target.value)}
+          />
         </label>
       </div>
 
       <label className="ai-toggle-row">
-        <input type="checkbox" checked={enabled} disabled={saving} onChange={(event) => setEnabled(event.target.checked)} />
+        <input
+          type="checkbox"
+          checked={values.enabled}
+          disabled={saving}
+          onChange={(event) => form.setField("enabled", event.target.checked)}
+        />
         <span>启用此机器人档案</span>
       </label>
-      <FormStatus error={error} success={success} />
+      <FormStatus status={status} />
       <footer className="ai-form-actions">
         <button type="submit" className="ai-primary-button" disabled={saving || models.length === 0}>
           <Save size={17} aria-hidden="true" />
