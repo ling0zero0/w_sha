@@ -20,7 +20,9 @@ export function resolvePlurality<T>(votes: readonly T[]): T | null {
   const highest = Math.max(0, ...counts.values());
   if (highest === 0) return null;
   const winners = [...counts.entries()].filter(([, count]) => count === highest);
-  return winners.length === 1 ? winners[0]![0] : null;
+  if (winners.length !== 1) return null;
+  const [winner] = winners;
+  return winner ? winner[0] : null;
 }
 
 export function resolveWolfAttack(votes: readonly WolfVoteTarget[]): PlayerId | null {
