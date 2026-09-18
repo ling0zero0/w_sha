@@ -1,0 +1,212 @@
+/* 全局断点覆盖，必须在 host/player 之后、ai 之前引入。 */
+@media (max-width: 850px) {
+  .host-shell {
+    overflow: auto;
+  }
+  .lobby-workspace {
+    width: min(620px, calc(100% - 36px));
+    align-self: start;
+  }
+  .lobby-heading {
+    align-items: flex-start;
+  }
+  .lobby-grid {
+    grid-template-columns: 1fr;
+  }
+  .host-phase-panel {
+    grid-template-columns: 1fr;
+  }
+  .phase-controls button {
+    min-height: 44px;
+  }
+  .role-configuration {
+    grid-template-columns: 1fr;
+  }
+  .role-fields {
+    grid-template-columns: repeat(4, minmax(74px, 1fr));
+  }
+  .start-game-button {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .chat-mode-setting,
+  .readiness-issues,
+  .readiness-success {
+    grid-column: 1;
+  }
+  .join-station {
+    min-height: 500px;
+  }
+  .roster {
+    min-height: 470px;
+  }
+}
+
+@media (max-width: 560px) {
+  .topbar {
+    min-height: 62px;
+    padding: 0;
+    padding-left: max(17px, env(safe-area-inset-left));
+    padding-right: max(17px, env(safe-area-inset-right));
+  }
+  .topbar .brand span,
+  .player-header .brand span {
+    display: none;
+  }
+  .host-statuses .status-chip:first-child {
+    display: none;
+  }
+  .lobby-workspace {
+    width: calc(100% - 28px);
+    padding-top: 28px;
+  }
+  .lobby-heading {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  .lobby-heading h1 {
+    font-size: 35px;
+  }
+  .room-code-block {
+    min-width: 0;
+    width: max-content;
+    grid-template-columns: auto auto;
+  }
+  .room-code-block strong {
+    font-size: 38px;
+  }
+  .phase-controls {
+    flex-wrap: wrap;
+  }
+  .phase-controls button {
+    min-width: 0;
+    flex: 1 1 calc(33.333% - 6px);
+    white-space: normal;
+    line-height: 1.3;
+  }
+  .role-fields {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .role-fields input {
+    min-height: 44px;
+  }
+  .chat-mode-setting {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .chat-mode-segments {
+    width: 100%;
+  }
+  .chat-mode-segments label {
+    min-height: 44px;
+  }
+  .hunter-action-panel {
+    padding: 16px;
+  }
+  .hunter-targets,
+  .hunter-action-buttons {
+    grid-template-columns: 1fr;
+  }
+  .join-station {
+    min-height: 0;
+    padding: 19px;
+  }
+  .qr-frame {
+    max-width: 260px;
+  }
+  .roster-header {
+    padding: 15px;
+  }
+  .bot-add-form {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 12px;
+  }
+  .bot-add-form select,
+  .bot-add-form input,
+  .bot-add-form button {
+    min-height: 44px;
+  }
+  .takeover-request {
+    grid-template-columns: 30px minmax(0, 1fr) 44px 44px;
+  }
+  .takeover-request button {
+    width: 44px;
+    height: 44px;
+  }
+  .roster-row {
+    min-height: 0;
+    padding: 10px 12px;
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+  .presence {
+    justify-self: end;
+    font-size: 11px;
+  }
+  .row-actions {
+    grid-column: 1 / -1;
+    width: 100%;
+    grid-template-columns: repeat(4, 44px);
+    gap: 6px;
+    justify-content: end;
+  }
+  .row-actions button {
+    width: 44px;
+    height: 44px;
+  }
+  .host-footer {
+    min-height: 48px;
+    padding: 0;
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .host-footer span:last-child {
+    display: none;
+  }
+  .join-intro h1,
+  .mobile-state h1 {
+    font-size: 37px;
+  }
+  .intervention-notice span {
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+}
+
+@media (max-height: 760px) and (min-width: 851px) {
+  .lobby-workspace {
+    padding-top: 24px;
+    padding-bottom: 22px;
+  }
+  .lobby-heading {
+    margin-bottom: 18px;
+  }
+  .lobby-heading h1 {
+    font-size: 40px;
+  }
+  .lobby-grid {
+    min-height: 440px;
+  }
+  .qr-frame {
+    width: 250px;
+    margin-top: 17px;
+    margin-bottom: 13px;
+  }
+  .roster-list {
+    max-height: 352px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+

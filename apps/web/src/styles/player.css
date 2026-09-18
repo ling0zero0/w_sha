@@ -1,0 +1,1163 @@
+/* 玩家（Player）视图：加入房间、身份揭示、夜间行动、白天流程与结算。 */
+.player-shell {
+  min-height: 100svh;
+  background: var(--paper);
+  color: var(--ink);
+}
+.player-header {
+  min-height: 66px;
+  padding: 0;
+  padding-left: max(clamp(17px, 5vw, 38px), env(safe-area-inset-left));
+  padding-right: max(clamp(17px, 5vw, 38px), env(safe-area-inset-right));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border-bottom: 1px solid #d6d4cd;
+  background: rgba(255, 255, 255, 0.34);
+}
+.player-header .brand {
+  font-size: 14px;
+}
+.connection-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #69726f;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.connection-pill > span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #9ca3a1;
+}
+.connection-pill.status-connected > span {
+  background: #278759;
+}
+.connection-pill.status-disconnected > span {
+  background: #be5548;
+}
+.join-layout,
+.mobile-state {
+  width: min(470px, calc(100% - 36px));
+  margin: 0 auto;
+  padding: clamp(50px, 10vh, 92px) 0 40px;
+}
+.join-intro {
+  margin-bottom: 31px;
+}
+.join-intro h1,
+.mobile-state h1 {
+  font-size: 40px;
+  line-height: 1.1;
+  color: #151919;
+}
+.join-intro > p:last-child,
+.mobile-state > p {
+  margin: 13px 0 0;
+  color: #68716e;
+  line-height: 1.6;
+}
+.join-form {
+  display: grid;
+  gap: 10px;
+}
+.join-form label {
+  margin-top: 8px;
+  color: #3d4644;
+  font-size: 14px;
+  font-weight: 700;
+}
+.join-form input {
+  width: 100%;
+  min-height: 52px;
+  border: 1px solid #c4c5bf;
+  border-radius: 4px;
+  padding: 0 14px;
+  background: #fff;
+  color: #151919;
+  outline: none;
+}
+.join-form input:focus {
+  border-color: #80744e;
+  box-shadow: 0 0 0 3px rgba(191, 153, 75, 0.17);
+}
+.join-form button {
+  width: 100%;
+  min-height: 50px;
+  margin-top: 17px;
+  border: 0;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #d6aa53;
+  color: #181b1b;
+  font-weight: 800;
+  cursor: pointer;
+}
+.join-form button:hover:not(:disabled) {
+  background: #e3b85f;
+}
+.join-form button:disabled {
+  opacity: 0.58;
+  cursor: wait;
+}
+.join-form .takeover-button {
+  margin-top: 0;
+  border: 1px solid #b8aa83;
+  background: transparent;
+  color: #5d4a22;
+}
+.join-form .takeover-button:hover:not(:disabled) {
+  background: #eee7d5;
+}
+.form-message {
+  margin: 14px 0 0;
+  color: #963f35;
+  font-size: 14px;
+  text-align: center;
+}
+.player-security {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin-top: 33px;
+  padding-top: 21px;
+  border-top: 1px solid #d6d4cc;
+  color: #59625f;
+}
+.player-security span {
+  display: grid;
+  gap: 5px;
+}
+.player-security strong {
+  font-size: 14px;
+}
+.player-security small {
+  color: #7a827f;
+  line-height: 1.4;
+}
+.secondary-link {
+  min-height: 46px;
+  width: max-content;
+  margin-top: 26px;
+  padding: 0 17px;
+  border: 1px solid #b9bbb5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #3c4542;
+  font-size: 14px;
+  font-weight: 700;
+}
+.wide-link {
+  width: 100%;
+}
+.mobile-state-centered {
+  min-height: calc(100svh - 66px);
+  padding-top: 0;
+  padding-bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+}
+.large-state-icon {
+  width: 54px;
+  height: 54px;
+  margin-bottom: 23px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #c8c5bb;
+  color: #8c7444;
+}
+.waiting-state {
+  padding-top: clamp(39px, 7vh, 66px);
+}
+.waiting-heading {
+  text-align: center;
+}
+.waiting-heading .large-state-icon {
+  margin-left: auto;
+  margin-right: auto;
+}
+.waiting-heading > p:last-child {
+  margin: 12px 0 0;
+  color: #68716e;
+}
+.player-phase-panel {
+  margin-top: 28px;
+  padding: 14px 15px;
+  border-top: 1px solid #c9c8c1;
+  border-bottom: 1px solid #d3d2cb;
+}
+.player-phase-panel .phase-clock > span {
+  color: #68716e;
+}
+.player-phase-panel .phase-clock strong {
+  color: #7a602e;
+}
+.player-phase-panel .phase-clock-ended strong {
+  color: #a6493e;
+}
+.player-phase-panel .intervention-notice {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #d8d6ce;
+  color: #3e4744;
+}
+.player-phase-panel .intervention-notice small {
+  color: #777f7c;
+}
+.player-phase-panel .intervention-notice svg {
+  color: #8c7444;
+}
+.mobile-roster {
+  margin-top: 37px;
+  border-top: 1px solid #c9c8c1;
+}
+.mobile-roster header,
+.mobile-roster > div {
+  min-height: 53px;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid #d3d2cb;
+}
+.mobile-roster header {
+  grid-template-columns: minmax(0, 1fr) auto;
+  color: #68716e;
+  font-size: 13px;
+}
+.mobile-roster header strong {
+  min-width: 32px;
+  height: 25px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #b7ad91;
+  color: #6f5a2e;
+}
+.mobile-roster > div > span {
+  color: #8c7444;
+  font-variant-numeric: tabular-nums;
+}
+.mobile-player-name {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.mobile-player-name > strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.mobile-player-name .controller-badge {
+  flex: 0 0 auto;
+  border-color: #8cb99d;
+  color: #3f7358;
+}
+.mobile-roster > div > small {
+  color: #78817e;
+}
+.mobile-roster > div.is-self {
+  color: #5d4a22;
+}
+.mobile-roster > div.is-self > small {
+  color: #876925;
+  font-weight: 700;
+}
+.waiting-footer {
+  min-height: 54px;
+  margin-top: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  color: #68716e;
+  font-size: 13px;
+}
+.slow-spin {
+  animation: spin 4s linear infinite;
+}
+.role-screen {
+  background: #171b1a;
+  color: #f3f0e8;
+}
+.role-screen .player-header {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(5, 8, 8, 0.28);
+}
+.role-screen .brand {
+  color: #f3f0e8;
+}
+.role-reveal-state {
+  min-height: calc(100svh - 66px);
+  padding-top: clamp(42px, 8vh, 78px);
+  text-align: center;
+}
+.role-reveal-state .eyebrow {
+  color: #b8bdb9;
+}
+.role-artwork-frame {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  background: #0e1110;
+}
+.role-artwork-frame img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+.role-artwork-frame.is-placeholder {
+  display: grid;
+  place-items: center;
+  background: #202524;
+}
+.role-artwork-placeholder {
+  min-width: 0;
+  padding: 12px;
+  display: grid;
+  justify-items: center;
+  gap: 9px;
+  color: #8f9893;
+  text-align: center;
+}
+.role-artwork-placeholder small {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.role-artwork {
+  width: min(280px, 72vw);
+  aspect-ratio: 3 / 4;
+  margin: 30px auto 24px;
+  border: 1px solid rgba(227, 184, 95, 0.48);
+  background: #0e1110;
+  box-shadow: 0 22px 55px rgba(0, 0, 0, 0.34);
+}
+.role-reveal-state > p {
+  color: #adb4b0;
+}
+.role-reveal-state h1 {
+  margin: 7px 0 27px;
+  color: #e3b85f;
+  font-size: clamp(54px, 17vw, 78px);
+  letter-spacing: 0.12em;
+  text-indent: 0.12em;
+}
+.role-wolf .role-reveal-state h1 {
+  color: #e48779;
+}
+.wolf-teammates {
+  margin: 0 auto 25px;
+  padding: 18px;
+  border-top: 1px solid rgba(228, 135, 121, 0.35);
+  border-bottom: 1px solid rgba(228, 135, 121, 0.35);
+  display: grid;
+  gap: 8px;
+}
+.wolf-teammates span {
+  color: #aeb4b1;
+  font-size: 12px;
+}
+.wolf-teammates strong {
+  color: #f0c0b9;
+}
+.role-guidance {
+  max-width: 340px;
+  margin: 0 auto 26px !important;
+  line-height: 1.7;
+}
+.confirm-role-button {
+  width: 100%;
+  min-height: 52px;
+  margin-top: 18px;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  background: #d6aa53;
+  color: #171b1a;
+  font-weight: 800;
+  cursor: pointer;
+}
+.confirm-role-button:disabled {
+  opacity: 0.5;
+}
+.night-secondary-button {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: transparent;
+  color: #e7e9e5;
+  font-weight: 700;
+  cursor: pointer;
+}
+.night-secondary-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.role-confirmed {
+  min-height: 52px;
+  margin-top: 18px;
+  border: 1px solid rgba(120, 191, 151, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  color: #a8daba;
+}
+.confirmation-count {
+  display: block;
+  margin-top: 15px;
+  color: #8f9793;
+}
+.private-night-clock {
+  margin-bottom: 24px;
+  padding: 12px 14px;
+  border: 1px solid rgba(227, 184, 95, 0.25);
+}
+.private-night-clock .phase-clock > span {
+  color: #aeb4b1;
+}
+.wolf-action-panel {
+  margin-top: 28px;
+  padding-top: 25px;
+  border-top: 1px solid rgba(228, 135, 121, 0.3);
+  text-align: left;
+}
+.wolf-action-panel h2 {
+  margin: 0;
+  font-size: 22px;
+}
+.wolf-action-panel > p {
+  margin: 8px 0 18px;
+  color: #aeb4b1;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.wolf-chat {
+  margin: 0 0 28px;
+  border: 1px solid rgba(228, 135, 121, 0.28);
+  background: rgba(0, 0, 0, 0.14);
+}
+.wolf-chat > header {
+  min-height: 46px;
+  padding: 0 13px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.wolf-chat > header span {
+  color: #f0c0b9;
+  font-size: 13px;
+  font-weight: 800;
+}
+.wolf-chat > header small {
+  color: #89918d;
+}
+.wolf-messages {
+  height: 180px;
+  padding: 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.wolf-messages .chat-empty {
+  color: #7f8985;
+}
+.wolf-messages .chat-message {
+  padding: 9px 11px;
+  background: rgba(255, 255, 255, 0.045);
+}
+.wolf-messages .chat-message span {
+  color: #c99389;
+}
+.wolf-messages .chat-message p {
+  color: #e6e8e4;
+}
+.wolf-quick-messages {
+  padding: 0 10px 10px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+.wolf-quick-messages button {
+  min-height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: transparent;
+  color: #cdd1cd;
+  font-size: 11px;
+  cursor: pointer;
+}
+.wolf-chat-form {
+  padding: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: grid;
+  grid-template-columns: 1fr 64px;
+  gap: 7px;
+}
+.wolf-chat-form input {
+  min-width: 0;
+  height: 44px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.17);
+  background: rgba(255, 255, 255, 0.04);
+  color: #f0f1ed;
+}
+.wolf-chat-form button {
+  border: 0;
+  background: #bd6659;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+.wolf-chat button:disabled,
+.wolf-chat input:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.night-targets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.night-targets button {
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.17);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: rgba(255, 255, 255, 0.035);
+  color: #e7e9e5;
+  cursor: pointer;
+}
+.night-targets button span {
+  color: #e48779;
+  font-variant-numeric: tabular-nums;
+}
+.night-targets button.is-selected {
+  border-color: #e48779;
+  background: rgba(228, 135, 121, 0.14);
+  color: #ffd7d0;
+}
+.night-targets button:disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+.night-role-panel {
+  margin-top: 28px;
+  padding-top: 25px;
+  border-top: 1px solid rgba(227, 184, 95, 0.3);
+  text-align: left;
+}
+.night-role-panel h2 {
+  margin: 0;
+  font-size: 22px;
+}
+.night-role-panel > p {
+  margin: 8px 0 18px;
+  color: #aeb4b1;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.inspection-result {
+  min-height: 118px;
+  padding: 20px;
+  border: 1px solid rgba(227, 184, 95, 0.4);
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  text-align: center;
+}
+.inspection-result span {
+  color: #adb4b0;
+}
+.inspection-result strong {
+  font-size: 34px;
+}
+.inspection-result.result-wolf strong {
+  color: #e48779;
+}
+.inspection-result.result-good strong {
+  color: #9ed4b4;
+}
+.witch-tools {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.witch-tools button {
+  min-height: 48px;
+  border: 0;
+  background: #d6aa53;
+  color: #171b1a;
+  font-weight: 800;
+  cursor: pointer;
+}
+.witch-tools button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.witch-tools .secondary-night-action {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: #e7e9e5;
+}
+.poison-choice {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+.poison-choice > span {
+  display: block;
+  margin-bottom: 12px;
+  color: #c4c9c5;
+  font-size: 13px;
+}
+.poison-submit {
+  background: #bd6659;
+  color: #fff;
+}
+.guard-action-panel .night-targets button span {
+  color: #8fc8a7;
+}
+.guard-action-panel .night-targets button.is-selected {
+  border-color: #78bf97;
+  background: rgba(120, 191, 151, 0.13);
+  color: #c8f0d8;
+}
+.dawn-result {
+  margin-top: 30px;
+  padding: 26px 20px;
+  border-top: 1px solid rgba(227, 184, 95, 0.4);
+  border-bottom: 1px solid rgba(227, 184, 95, 0.4);
+  text-align: center;
+}
+.dawn-result h2 {
+  margin: 8px 0 10px;
+  color: #e3b85f;
+  font-size: 27px;
+}
+.dawn-result > p:last-child {
+  color: #adb4b0;
+  line-height: 1.6;
+}
+.day-flow {
+  padding-top: clamp(44px, 8vh, 76px);
+}
+.player-chat-mode {
+  margin: 0 0 24px;
+  padding: 11px 13px;
+  border-left: 4px solid #98752d;
+  display: grid;
+  gap: 3px;
+  background: #eee6d3;
+  color: #4f3c18;
+  text-align: left;
+}
+.player-chat-mode.mode-open {
+  border-left-color: #4f8f70;
+  background: #e1eee7;
+  color: #28533e;
+}
+.player-chat-mode span {
+  font-size: 13px;
+  font-weight: 800;
+}
+.player-chat-mode small {
+  color: inherit;
+  font-size: 11px;
+  line-height: 1.45;
+  opacity: 0.78;
+}
+.role-reveal-state > .player-chat-mode,
+.dead-observer-screen .player-chat-mode {
+  width: 100%;
+}
+.day-clock {
+  margin-bottom: 28px;
+  padding: 12px 14px;
+  border-top: 1px solid #c9c8c1;
+  border-bottom: 1px solid #d3d2cb;
+}
+.day-clock .phase-clock > span {
+  color: #68716e;
+}
+.day-clock .phase-clock strong {
+  color: #7a602e;
+}
+.day-role-card {
+  width: min(156px, 44vw);
+  aspect-ratio: 3 / 4;
+  margin: 0 auto 12px;
+  perspective: 900px;
+}
+.day-role-card-inner {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.45s ease;
+}
+.day-role-card.is-revealed .day-role-card-inner {
+  transform: rotateY(180deg);
+}
+.day-role-card-face {
+  position: absolute;
+  inset: 0;
+  border: 1px solid #a99b77;
+  overflow: hidden;
+  background: #171b1a;
+  backface-visibility: hidden;
+  box-shadow: 0 12px 28px rgba(30, 36, 34, 0.18);
+}
+.day-role-card-face img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+.day-role-card-face .role-artwork-frame {
+  height: 100%;
+}
+.day-role-card-front {
+  transform: rotateY(180deg);
+}
+.day-role-toggle {
+  min-height: 44px;
+  margin: 0 auto 30px;
+  padding: 0 16px;
+  border: 1px solid #aaa89f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: transparent;
+  color: #3f4845;
+  font-weight: 750;
+  cursor: pointer;
+}
+.day-role-toggle:hover:not(:disabled) {
+  border-color: #8c7444;
+  color: #725822;
+}
+.day-role-toggle:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.day-flow > h1 {
+  margin: 8px 0 14px;
+  font-size: clamp(34px, 10vw, 48px);
+}
+.day-flow > p {
+  color: #68716e;
+  line-height: 1.6;
+}
+.speech-order {
+  margin-top: 30px;
+  border-top: 1px solid #c9c8c1;
+  display: grid;
+}
+.speech-order span {
+  min-height: 48px;
+  padding: 0 12px;
+  border-bottom: 1px solid #d3d2cb;
+  display: flex;
+  align-items: center;
+  color: #626b68;
+}
+.speech-order span.is-current {
+  border-left: 4px solid #b99143;
+  background: #eee6d3;
+  color: #4f3c18;
+  font-weight: 800;
+}
+.chat-timeline {
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.chat-empty {
+  margin: auto;
+  padding: 18px;
+  color: #7b8380;
+  font-size: 12px;
+  text-align: center;
+}
+.chat-message {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.chat-message span {
+  display: block;
+  font-size: 10px;
+  font-weight: 750;
+}
+.chat-message p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.day-chat {
+  margin-top: 24px;
+  border: 1px solid #c9c8c1;
+  background: rgba(255, 255, 255, 0.58);
+}
+.day-chat > header {
+  min-height: 44px;
+  padding: 0 13px;
+  border-bottom: 1px solid #d3d2cb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.day-chat > header strong {
+  color: #303735;
+  font-size: 13px;
+}
+.day-chat > header small {
+  color: #7a602e;
+  font-size: 11px;
+  text-align: right;
+}
+.day-chat .chat-timeline {
+  height: 220px;
+  padding: 12px;
+}
+.day-chat .chat-message {
+  padding: 9px 11px;
+  border-left: 3px solid #b99143;
+  background: #fff;
+}
+.day-chat .chat-message span {
+  color: #876925;
+}
+.day-chat .chat-message p {
+  color: #303735;
+}
+.day-chat-form {
+  padding: 10px;
+  border-top: 1px solid #d3d2cb;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px;
+  gap: 8px;
+}
+.day-chat-form textarea {
+  min-width: 0;
+  resize: vertical;
+  min-height: 72px;
+  max-height: 160px;
+  padding: 10px;
+  border: 1px solid #bfc1bb;
+  background: #fff;
+  color: #303735;
+  font: inherit;
+  line-height: 1.5;
+}
+.day-chat-form button {
+  min-height: 48px;
+  border: 0;
+  display: grid;
+  place-items: center;
+  align-self: stretch;
+  background: #98752d;
+  color: #fff;
+  cursor: pointer;
+}
+.day-chat-form button span {
+  font-size: 11px;
+}
+.day-chat-form button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.day-chat-readonly .chat-timeline {
+  height: min(220px, 34svh);
+}
+.day-vote-panel {
+  margin-top: 28px;
+}
+.day-vote-panel > p {
+  color: #68716e;
+  font-size: 13px;
+}
+.day-vote-options {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.day-vote-options button {
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1px solid #c4c5bf;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #303735;
+  cursor: pointer;
+}
+.day-vote-options button span {
+  color: #8c7444;
+}
+.day-vote-options button.is-selected {
+  border-color: #98752d;
+  background: #eee6d3;
+  color: #5b451d;
+  font-weight: 800;
+}
+.day-vote-options button:disabled {
+  opacity: 0.6;
+}
+.idiot-reveal-notice {
+  margin: 24px 0;
+  padding: 15px 16px;
+  border-left: 4px solid #b99143;
+  display: grid;
+  gap: 5px;
+  background: #eee6d3;
+  color: #4f3c18;
+}
+.idiot-reveal-notice strong {
+  font-size: 14px;
+}
+.idiot-reveal-notice span {
+  color: #6e6043;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.day-ineligible-notice {
+  min-height: 52px;
+  margin-top: 28px;
+  padding: 12px 16px;
+  border: 1px solid #c4b993;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eee6d3;
+  color: #5d4a22;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.hunter-action-panel {
+  margin: 28px 0;
+  padding: 20px;
+  border: 1px solid #bba66e;
+  background: #1b201f;
+  color: #f1efe8;
+}
+.hunter-action-panel h2 {
+  margin: 5px 0 0;
+  font-size: 23px;
+}
+.hunter-action-panel > p:not(.eyebrow) {
+  margin: 9px 0 17px;
+  color: #b8bfbb;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.hunter-targets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.hunter-targets button {
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.17);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: rgba(255, 255, 255, 0.035);
+  color: #e7e9e5;
+  cursor: pointer;
+}
+.hunter-targets button span {
+  color: #e48779;
+  font-variant-numeric: tabular-nums;
+}
+.hunter-targets button.is-selected {
+  border-color: #e48779;
+  background: rgba(228, 135, 121, 0.14);
+  color: #ffd7d0;
+}
+.hunter-targets button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.hunter-action-buttons {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.hunter-action-buttons button {
+  min-height: 48px;
+  border: 0;
+  background: #bd6659;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+.hunter-action-buttons button:last-child {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: #e7e9e5;
+}
+.hunter-action-buttons button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.hunter-action-result {
+  min-height: 52px;
+  border: 1px solid rgba(120, 191, 151, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  color: #a8daba;
+  text-align: center;
+}
+.ballot-result {
+  margin-top: 30px;
+  border-top: 1px solid #c9c8c1;
+}
+.ballot-result > div {
+  min-height: 54px;
+  border-bottom: 1px solid #d3d2cb;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.ballot-result span {
+  color: #818885;
+}
+.ballot-result b {
+  text-align: right;
+  color: #7b5e27;
+}
+.day-self-state {
+  margin-top: 28px !important;
+  padding-top: 17px;
+  border-top: 1px solid #d3d2cb;
+  text-align: center;
+  font-size: 12px;
+}
+.day-flow .public-player-roster,
+.role-reveal-state .public-player-roster,
+.dead-observer-screen .public-player-roster {
+  margin-top: 30px;
+  text-align: left;
+}
+.game-over-panel + .public-player-roster,
+.public-player-roster + .game-over-panel {
+  margin-top: 28px;
+}
+.dead-observer-screen h1 {
+  color: #e48779;
+}
+.game-over-panel {
+  padding: 24px;
+  border: 1px solid rgba(227, 184, 95, 0.35);
+  background: rgba(16, 21, 22, 0.93);
+  color: #f1efe8;
+}
+.player-shell .game-over-panel {
+  background: #171b1a;
+}
+.game-over-panel h2 {
+  margin: 6px 0 25px;
+  color: var(--amber);
+  font-size: clamp(38px, 8vw, 58px);
+}
+.revealed-roles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+.revealed-roles article {
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  display: grid;
+  gap: 5px;
+}
+.revealed-role-artwork {
+  width: 100%;
+}
+.revealed-roles span {
+  color: #b9bfbb;
+  font-size: 11px;
+}
+.revealed-roles strong {
+  color: #f0cf88;
+}
+.revealed-roles small {
+  color: #8f9893;
+}
+.game-records {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid rgba(227, 184, 95, 0.25);
+  background: rgba(7, 10, 10, 0.38);
+  text-align: left;
+}
+.game-records h3,
+.game-records p {
+  margin: 0;
+}
+.game-records p {
+  display: flex;
+  gap: 12px;
+  color: #b9bfbb;
+}
+.game-records p strong {
+  flex: 0 0 auto;
+  color: #f0cf88;
+}
+.game-over-actions {
+  margin-top: 20px;
+  display: flex;
+  gap: 9px;
+}
+.game-over-actions button {
+  min-height: 46px;
+  flex: 1;
+  border: 1px solid rgba(227, 184, 95, 0.4);
+  background: var(--amber);
+  color: #171b1a;
+  font-weight: 800;
+  cursor: pointer;
+}
+.game-over-actions button:last-child {
+  background: transparent;
+  color: #e4e6e2;
+}
+
