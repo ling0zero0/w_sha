@@ -7,7 +7,7 @@ import type { ServerConfig } from "./config.js";
 import type { GameRuntime } from "./runtime.js";
 import { registerAiAdminRoutes, type AiAdminServices } from "./ai/admin-ai-routes.js";
 
-const serviceVersion = "0.1.0";
+const serviceVersion = "0.2.0";
 
 export function createServiceStatus(now = new Date()) {
   return serviceStatusSchema.parse({
