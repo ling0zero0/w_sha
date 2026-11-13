@@ -28,6 +28,8 @@ import { QrCode } from "../shared/QrCode";
 import { ChatTimeline } from "../shared/ChatTimeline";
 import { BotBadge } from "../shared/BotBadge";
 import { HostBotControls } from "./HostBotControls";
+import { useScene } from "../shared/useScene";
+import { sceneNarration } from "../game/scene-map";
 
 export function HostScreen() {
   const {
@@ -58,6 +60,7 @@ export function HostScreen() {
   } = useHostLobby();
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
+  const scene = useScene(lobby?.phase, lobby?.gameResult);
 
   async function copyJoinUrl() {
     if (!lobby) return;
@@ -74,7 +77,7 @@ export function HostScreen() {
 
   return (
     <main className="host-shell">
-      <div className="lobby-scene" aria-hidden="true" />
+      <div key={scene} className="lobby-scene" data-scene={scene} aria-hidden="true" />
       <header className="topbar">
         <Brand />
         <HostConnectionStatus api={api} socket={socket} />
@@ -103,6 +106,7 @@ export function HostScreen() {
                               ? "对局结束"
                               : "夜间行动进行中"}
             </h1>
+            <p className="scene-narration">{sceneNarration(lobby?.phase)}</p>
           </div>
           {lobby ? (
             <div className="room-code-block">

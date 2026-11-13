@@ -142,6 +142,7 @@ test("touch and reduced motion preserve target selection, disabled controls and 
     }
     await expect(page.getByTestId("start-readiness")).toHaveText("配置就绪");
     await page.getByRole("button", { name: "开始游戏" }).click();
+    await expect.poll(() => page.evaluate(() => document.documentElement.dataset.scene)).toBe("deep-night");
     const roles = await Promise.all(
       players.map(async (player) => {
         await expect(player.getByTestId("private-role")).toBeVisible();
@@ -175,6 +176,7 @@ test("touch and reduced motion preserve target selection, disabled controls and 
     await expect(page.getByRole("heading", { name: "天亮了" })).toBeVisible();
     await page.getByRole("button", { name: "进入白天流程" }).click();
     await expect(villager.locator("main.day-shell")).toBeVisible();
+    await expect.poll(() => page.evaluate(() => document.documentElement.dataset.scene)).toBe("day-square");
     const dayBackground = await villager.locator("main.player-shell").evaluate((element) => getComputedStyle(element).backgroundImage);
     expect(dayBackground).not.toBe(nightBackground);
     // Freeze the phase while checking local card privacy; WebKit input can outlast a short test turn.

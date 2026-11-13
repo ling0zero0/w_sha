@@ -141,4 +141,27 @@
   --scene-ease: cubic-bezier(0.22, 0.8, 0.24, 1);
   --button-gold: linear-gradient(180deg, #e8bd79, #c9904b);
   --button-gold-hover: linear-gradient(180deg, #f4d9a4, #d9a15c);
+
+  /* 阶段场景：同一座村庄在不同光线下的画面，由 useScene 切换 */
+  --scene-image: image-set(url("/assets/scenes/waiting-hall-640.webp") 1x, url("/assets/scenes/waiting-hall-1280.webp") 2x);
+  --scene-scrim: linear-gradient(180deg, rgba(233, 238, 245, 0.78), rgba(219, 227, 237, 0.88));
+}
+
+:root[data-scene="waiting-hall"] {
+  --scene-image: image-set(url("/assets/scenes/waiting-hall-640.webp") 1x, url("/assets/scenes/waiting-hall-1280.webp") 2x);
+}
+:root[data-scene="deep-night"] {
+  --scene-image: image-set(url("/assets/scenes/deep-night-640.webp") 1x, url("/assets/scenes/deep-night-1280.webp") 2x);
+}
+:root[data-scene="dawn-village"] {
+  --scene-image: image-set(url("/assets/scenes/dawn-village-640.webp") 1x, url("/assets/scenes/dawn-village-1280.webp") 2x);
+}
+:root[data-scene="day-square"] {
+  --scene-image: image-set(url("/assets/scenes/day-square-640.webp") 1x, url("/assets/scenes/day-square-1280.webp") 2x);
+}
+:root[data-scene="good-victory"] {
+  --scene-image: image-set(url("/assets/scenes/good-victory-640.webp") 1x, url("/assets/scenes/good-victory-1280.webp") 2x);
+}
+:root[data-scene="wolf-victory"] {
+  --scene-image: image-set(url("/assets/scenes/wolf-victory-640.webp") 1x, url("/assets/scenes/wolf-victory-1280.webp") 2x);
 }

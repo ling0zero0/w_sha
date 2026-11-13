@@ -52,8 +52,8 @@
 - 不改 `.join-form` 的 `content-enter` 入场动画名与"不重播"行为。
 - 不引入远程字体、CDN、音效或第三方动画库；局域网离线可用。
 - 保持 44px 触控目标、`data-testid`、现有文案与身份隔离语义。
-- 未接入 `incoming-assets/` 的 8 张场景插画作为阶段背景或胜负大图（需先 WebP 化并放入 `public/assets/`，生产代码不得引用 `incoming-assets`）。
-- 未做常驻环境层（月雾呼吸）、Web Audio 音效层、View Transitions 跨阶段共享元素；这些留作下一阶段，需先实机测量 INP 与移动端耗电。
+- 场景插画已在后续的设计系统升级中接入：见 [design-system.md](design-system.md) 的「阶段场景：游戏的世界底色」。生产代码只引用 `/assets/scenes/` 的 WebP，不引用 `incoming-assets`。
+- 未做 Web Audio 音效层、View Transitions 跨阶段共享元素、法官叙事文案；这些留作下一阶段，需先实机测量 INP 与移动端耗电。毒药/解药道具图已生成但尚未接入女巫面板。
 
 ## 验证
 

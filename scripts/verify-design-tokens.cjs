@@ -45,7 +45,10 @@ function assert(condition, message) {
 function collectSignatures() {
   if (!fs.existsSync(tokenPath)) return null;
   const signatures = new Set();
-  const files = fs.readdirSync(stylesDir).filter((file) => file.endsWith(".css") && file !== tokenFileName).sort();
+  const files = fs
+    .readdirSync(stylesDir)
+    .filter((file) => file.endsWith(".css") && file !== tokenFileName)
+    .sort();
   for (const file of files) {
     const source = fs.readFileSync(path.join(stylesDir, file), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
     const declaration = new RegExp(`\\b(?:${checkedProperties.join("|")})\\s*:\\s*([^;}]+)`, "g");

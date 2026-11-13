@@ -89,6 +89,24 @@
 
 昼夜差异靠**色温**切换：夜晚深蓝夜幕，白天暖化月光纸，身份屏最深；不是换两套组件。
 
+### 阶段场景：游戏的世界底色
+
+UI 的"底色"不是色值，而是**画面里那座村庄**。素材是同一座广场/钟楼/水井在月夜、深夜、破晓、白天与两种结局下的不同光线（`apps/web/public/assets/scenes/`，由 `scripts/optimize-scene-assets.py` 从 `incoming-assets/` 生成 640/1280 两档 WebP）。生产代码只引用 `/assets/scenes/`，不引用 `incoming-assets/`。
+
+| 阶段 | 场景 | 画面 |
+| --- | --- | --- |
+| `lobby` | `waiting-hall` | 蓝月夜、暖窗灯 |
+| `role-reveal` / `first-night` | `deep-night` | 乌云遮月、村庄沉入黑暗 |
+| `dawn` | `dawn-village` | 冷蓝破晓 |
+| `last-words` / `day-speech` / `day-vote` / `exile-result` | `day-square` | 晴日广场 |
+| `game-over` 好人胜 / 狼人胜 / 终止 / 平局 | `good-victory` / `wolf-victory` / `deep-night` / `dawn-village` | 黎明解脱 / 永夜降临 |
+
+- `apps/web/src/game/scene-map.ts` 是纯函数映射，`scene-map.test.ts` 覆盖所有阶段与结局。
+- `apps/web/src/shared/useScene.ts` 把当前场景写到 `<html data-scene>`，CSS 用 `--scene-image` 消费；用根节点属性而非额外 DOM 层，避免层叠、命中与溢出问题。
+- 主机 `.lobby-scene` 是**整屏舞台**，每次阶段变化重挂载并淡入（620ms），另有极轻的月光呼吸层；玩家端用 `--scene-scrim` 把场景压在纸/夜幕之后，保证文字对比度。
+- 结算面板把当阶段的胜利图作为背景层，不再只是名单表格。
+- 所有新增动画只改 `opacity`，由 `motion.css` 的 `prefers-reduced-motion` 规则统一禁用；粗指针/窄屏不加载额外大图（`image-set` 由浏览器按 DPR 选档）。
+
 ## 7. 间距、层级、动效
 
 - 间距：4px 基准，`--space-1` … `--space-8`（4/8/12/16/24/32px）。
@@ -113,8 +131,8 @@
 
 ## 9. 迁移与验收
 
-- **已完成**：令牌单一真源、字号层级与工具类、形状系统、语义色、首屏面板包角与切角、月夜村庄遮罩放亮、卡牌铭牌排版、基线校验与单测。
+- **已完成**：令牌单一真源、字号层级与工具类、形状系统、语义色、首屏面板包角与切角、卡牌铭牌排版、基线校验与单测；以及**按阶段切换的整屏村庄场景**（含胜负结局图）与月光呼吸层。
 - **进行中**：`host.css` / `player.css` 里 52 条遗留裸写值按基线逐步迁移，每次迁移后基线数量应下降。
-- **待办**：v2 自带子集字体（需决策）、场景插画接入阶段背景与胜负大图、常驻月雾层、Web Audio 音效层、法官叙事文案、View Transitions 跨阶段共享元素。
+- **待办**：v2 自带子集字体（需决策）、毒药/解药道具图接入女巫面板、Web Audio 音效层、法官叙事文案、View Transitions 跨阶段共享元素。生成场景资源的 Python/Pillow 脚本仅供开发，不进入运行时。
 
 验收命令：`corepack pnpm check:all`、`corepack pnpm quality`、`corepack pnpm verify:design`、`corepack pnpm screenshots:readme`。任何 UI 改动都要重生成 `docs/screenshots/` 并复核窄屏 320px 与 `reduced-motion`。

@@ -9,6 +9,7 @@ import { PublicPlayerRoster } from "../shared/PublicPlayerRoster";
 import { ChatModeStatus, ConnectionBadge, DayFlowScreen } from "./DayFlowScreen";
 import { GuardActionPanel, WitchActionPanel, WolfChatPanel } from "./NightActionPanels";
 import { usePlayerLobby } from "./usePlayerLobby";
+import { useScene } from "../shared/useScene";
 
 function InvalidInvitation() {
   return (
@@ -66,6 +67,7 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
   } = usePlayerLobby(invitation);
   const [nickname, setNickname] = useState("");
   const nightPaused = game?.clock.status === "paused";
+  useScene(lobby?.phase, lobby?.gameResult);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

@@ -37,6 +37,7 @@ test("clipboard permission failure exposes a selectable complete invitation", as
   });
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "等待玩家加入" })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.scene)).toBe("waiting-hall");
   await page.getByTitle("复制加入链接").click();
   await expect(page.getByRole("status").filter({ hasText: "浏览器无法自动复制" })).toBeVisible();
   const fallback = page.getByLabel("完整加入链接");

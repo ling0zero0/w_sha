@@ -15,10 +15,25 @@
 
 /* 玩家端保持深色文字可读的"月光纸"底，仅替换色相与纹理。 */
 .player-shell {
+  position: relative;
+  isolation: isolate;
   background:
     radial-gradient(85% 55% at 50% -6%, rgba(120, 160, 215, 0.24), transparent 62%),
     repeating-linear-gradient(0deg, rgba(24, 38, 58, 0.012) 0 1px, transparent 1px 8px),
     linear-gradient(180deg, #e9eef5 0%, #dbe3ed 100%);
+}
+
+/* 场景层固定在视口，作为纸/夜幕背后的世界底色；伪元素不进入窄屏溢出审计。 */
+.player-shell::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--scene-scrim), var(--scene-image);
+  background-size: cover;
+  background-position: center, 68% 28%;
+  background-repeat: no-repeat;
 }
 .player-shell .player-header {
   border-bottom-color: rgba(139, 148, 156, 0.42);
@@ -55,6 +70,7 @@
 /* 夜晚身份屏：深蓝夜幕，与白天纸色形成明确昼夜差异。 */
 .player-shell.role-screen,
 .player-shell.dead-observer-screen {
+  --scene-scrim: linear-gradient(180deg, rgba(8, 14, 23, 0.52), rgba(8, 14, 23, 0.86));
   background:
     radial-gradient(80% 55% at 50% -8%, rgba(126, 166, 220, 0.2), transparent 60%),
     linear-gradient(180deg, var(--night-700) 0%, var(--night-900) 100%);
@@ -89,6 +105,7 @@
 
 /* 破晓 / 白天：暖化的纸色，与深夜区分。 */
 .player-shell.day-shell {
+  --scene-scrim: linear-gradient(180deg, rgba(240, 233, 221, 0.72), rgba(224, 226, 223, 0.88));
   background:
     radial-gradient(90% 60% at 50% -8%, rgba(217, 161, 92, 0.2), transparent 62%),
     repeating-linear-gradient(0deg, rgba(58, 44, 28, 0.012) 0 1px, transparent 1px 8px),
@@ -267,8 +284,12 @@
   border: 1px solid rgba(184, 196, 210, 0.28);
   border-radius: 10px;
   background:
-    radial-gradient(90% 50% at 50% 0%, rgba(120, 160, 215, 0.18), transparent 62%),
+    linear-gradient(180deg, rgba(8, 14, 23, 0.58), rgba(8, 14, 23, 0.94) 62%),
+    var(--scene-image),
     linear-gradient(180deg, var(--night-700), var(--night-900));
+  background-size: auto, cover, auto;
+  background-position: center, 68% 22%, center;
+  background-repeat: no-repeat;
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
 }
 :is(.player-shell, .host-shell) .game-over-panel h2 {
@@ -277,8 +298,12 @@
 }
 .game-over-panel[data-outcome="wolf-win"] {
   background:
-    radial-gradient(90% 50% at 50% 0%, rgba(176, 82, 74, 0.24), transparent 62%),
+    linear-gradient(180deg, rgba(34, 18, 26, 0.6), rgba(8, 14, 23, 0.95) 62%),
+    var(--scene-image),
     linear-gradient(180deg, #22121a, var(--night-900));
+  background-size: auto, cover, auto;
+  background-position: center, 68% 22%, center;
+  background-repeat: no-repeat;
 }
 .game-over-panel[data-outcome="wolf-win"] h2 {
   color: var(--blood-400);
@@ -298,7 +323,7 @@
   position: relative;
   border: 1px solid var(--edge-silver);
   border-radius: var(--shape-panel-radius);
-  background-color: rgba(12, 20, 30, 0.92);
+  background-color: rgba(12, 20, 30, 0.9);
   box-shadow:
     inset 0 0 0 1px var(--edge-inner),
     inset 0 1px rgba(232, 237, 242, 0.07),
@@ -337,6 +362,38 @@
     0 calc(100% - var(--shape-cut)),
     0 var(--shape-cut)
   );
+}
+
+/* 主机大屏作为舞台：大屏精细指针让村庄透过面板；窄屏/粗指针仍用实色保证可读。 */
+@media (hover: hover) and (pointer: fine) and (min-width: 851px) {
+  :is(.host-phase-panel, .role-configuration, .join-station, .roster) {
+    background-color: rgba(10, 18, 28, 0.62);
+  }
+}
+
+/* 阶段叙事：法官口吻，压在大标题下方，衬线 + 字距。 */
+.scene-narration {
+  margin: var(--space-2) 0 0;
+  font-family: var(--type-section-family);
+  font-size: var(--type-label-size);
+  line-height: var(--type-body-leading);
+  font-weight: var(--type-body-weight);
+  letter-spacing: var(--type-section-tracking);
+  color: var(--moon-300);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
+}
+
+/* 首屏月相徽记：呼应卡背的月与钟楼，纯 CSS 不新增素材。 */
+.lobby-heading .eyebrow::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: var(--space-2);
+  border-radius: 50%;
+  box-shadow: inset -3px 0 0 var(--candle-300);
+  transform: rotate(-25deg);
+  vertical-align: middle;
 }
 
 .phase-controls button,
@@ -472,7 +529,35 @@
 /* 让月夜村庄真正铺开：原遮罩左侧 0.96 不透明几乎盖死插画。 */
 .lobby-scene {
   background-image:
-    linear-gradient(90deg, rgba(8, 14, 23, 0.88) 0%, rgba(8, 14, 23, 0.52) 42%, rgba(8, 14, 23, 0.16) 100%),
-    linear-gradient(0deg, rgba(8, 14, 23, 0.7), rgba(8, 14, 23, 0.04) 58%),
-    image-set(url("/assets/lobby-1600.webp") 1x);
+    linear-gradient(90deg, rgba(8, 14, 23, 0.84) 0%, rgba(8, 14, 23, 0.44) 38%, rgba(8, 14, 23, 0.06) 100%),
+    linear-gradient(0deg, rgba(8, 14, 23, 0.7), rgba(8, 14, 23, 0.02) 58%),
+    var(--scene-image);
+  animation: scene-reveal var(--motion-ritual) var(--scene-ease) both;
+}
+/* 月光呼吸：极轻的常驻层，只改 opacity，减少动画时由 motion.css 禁用。 */
+.lobby-scene::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.7;
+  background: radial-gradient(45% 40% at 76% 16%, rgba(184, 205, 240, 0.18), transparent 70%);
+  animation: moon-breathe 12s ease-in-out infinite;
+}
+@keyframes scene-reveal {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes moon-breathe {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.85;
+  }
 }
