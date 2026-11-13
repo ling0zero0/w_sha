@@ -90,7 +90,7 @@ export function DayFlowScreen({
               </picture>
             </div>
             <div className="day-role-card-face day-role-card-front">
-              {lobby.privateRole ? <RoleArtwork role={lobby.privateRole.role} hidden={!roleVisible} /> : null}
+              {lobby.privateRole ? <RoleArtwork role={lobby.privateRole.role} hidden={!roleVisible} plate={roleVisible} /> : null}
             </div>
           </div>
         </div>

@@ -15,7 +15,7 @@ export function GameOverPanel({
   const replayMessages = publicMessages.filter((message) => message.channel === "day-public" || message.channel === "system");
 
   return (
-    <section className="game-over-panel">
+    <section className="game-over-panel" data-outcome={result.outcome}>
       <p className="eyebrow">对局结束</p>
       <h2>{outcomeLabels[result.outcome]}</h2>
       <div className="revealed-roles">

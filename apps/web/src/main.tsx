@@ -7,6 +7,7 @@ import "./styles/player.css";
 import "./styles/responsive.css";
 import "./styles/ai.css";
 import "./styles/motion.css";
+import "./styles/visuals.css";
 
 const root = document.getElementById("root");
 

@@ -164,7 +164,7 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
               </div>
             ) : null}
             <p className="eyebrow">{self ? `${self.number} 号 · ${self.nickname}` : `房间 ${lobby.roomCode}`}</p>
-            <RoleArtwork role={privateRole.role} className="role-artwork" />
+            <RoleArtwork role={privateRole.role} className="role-artwork" plate />
             <p>你的身份是</p>
             <h1 data-testid="private-role">{roleLabels[privateRole.role]}</h1>
             {privateRole.role === "wolf" ? (

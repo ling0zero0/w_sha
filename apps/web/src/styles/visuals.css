@@ -1,0 +1,300 @@
+/* 视觉层：月夜哥特主题、身份卡质感与仪式动效。
+   最后引入，用于覆盖基础域样式；不修改状态逻辑与组件结构。
+   约束：所有动画统一由 motion.css 的 prefers-reduced-motion 规则降级；
+   不改变按钮的 transform / background-image 反馈，不引入 backdrop-filter。 */
+
+/* ---------- 世界底色：取自角色插画与卡背 ---------- */
+:root {
+  background: var(--night-800);
+  --button-gold: linear-gradient(180deg, #e8bd79, #c9904b);
+  --button-gold-hover: linear-gradient(180deg, #f4d9a4, #d9a15c);
+}
+
+.host-shell {
+  background:
+    radial-gradient(100% 70% at 72% -10%, rgba(112, 156, 214, 0.2), transparent 62%),
+    linear-gradient(180deg, var(--night-700) 0%, var(--night-900) 100%);
+}
+.host-shell .eyebrow {
+  color: var(--candle-300);
+}
+
+/* 玩家端保持深色文字可读的"月光纸"底，仅替换色相与纹理。 */
+.player-shell {
+  background:
+    radial-gradient(85% 55% at 50% -6%, rgba(120, 160, 215, 0.24), transparent 62%),
+    repeating-linear-gradient(0deg, rgba(24, 38, 58, 0.012) 0 1px, transparent 1px 8px),
+    linear-gradient(180deg, #e9eef5 0%, #dbe3ed 100%);
+}
+.player-shell .player-header {
+  border-bottom-color: rgba(139, 148, 156, 0.42);
+  background: rgba(232, 237, 242, 0.52);
+}
+/* 夜晚屏顶栏保持深色玻璃，避免浅色纸卡规则盖过来。 */
+.player-shell.role-screen .player-header,
+.player-shell.dead-observer-screen .player-header {
+  border-bottom-color: rgba(184, 196, 210, 0.16);
+  background: rgba(5, 9, 16, 0.32);
+}
+.player-shell.role-screen .connection-pill,
+.player-shell.dead-observer-screen .connection-pill {
+  color: var(--moon-300);
+}
+.player-shell.role-screen .player-chat-mode,
+.player-shell.dead-observer-screen .player-chat-mode {
+  border-left-color: var(--candle-400);
+  background: rgba(17, 30, 45, 0.72);
+  color: var(--moon-100);
+}
+.player-shell.role-screen .player-chat-mode.mode-open,
+.player-shell.dead-observer-screen .player-chat-mode.mode-open {
+  border-left-color: var(--green);
+}
+.player-shell .join-intro h1,
+.player-shell .mobile-state h1 {
+  color: #1b2733;
+}
+.player-shell .eyebrow {
+  color: #8a6428;
+}
+
+/* 夜晚身份屏：深蓝夜幕，与白天纸色形成明确昼夜差异。 */
+.player-shell.role-screen,
+.player-shell.dead-observer-screen {
+  background:
+    radial-gradient(80% 55% at 50% -8%, rgba(126, 166, 220, 0.2), transparent 60%),
+    linear-gradient(180deg, var(--night-700) 0%, var(--night-900) 100%);
+  color: var(--moon-100);
+}
+.player-shell.role-screen .eyebrow,
+.player-shell.dead-observer-screen .eyebrow {
+  color: var(--silver-400);
+}
+.role-reveal-state > p {
+  color: var(--moon-300);
+}
+.role-reveal-state h1 {
+  color: var(--candle-300);
+  text-shadow: 0 0 26px rgba(217, 161, 92, 0.35);
+  animation: title-unfold 600ms var(--scene-ease) 60ms both;
+}
+.role-wolf .role-reveal-state h1 {
+  color: var(--blood-400);
+  text-shadow: 0 0 26px rgba(176, 82, 74, 0.42);
+}
+@keyframes title-unfold {
+  from {
+    opacity: 0.6;
+    letter-spacing: 0.24em;
+  }
+  to {
+    opacity: 1;
+    letter-spacing: 0.12em;
+  }
+}
+
+/* 破晓 / 白天：暖化的纸色，与深夜区分。 */
+.player-shell.day-shell {
+  background:
+    radial-gradient(90% 60% at 50% -8%, rgba(217, 161, 92, 0.2), transparent 62%),
+    repeating-linear-gradient(0deg, rgba(58, 44, 28, 0.012) 0 1px, transparent 1px 8px),
+    linear-gradient(180deg, #f0e9dd 0%, #e0e2df 100%);
+}
+
+/* ---------- 身份卡：复用卡背纹样做实体卡框 ---------- */
+.role-artwork-frame.has-card-frame {
+  position: relative;
+  padding: clamp(6px, 2vw, 10px);
+  border: 1px solid rgba(184, 196, 210, 0.38);
+  border-radius: 7px;
+  background: var(--night-900) url("/assets/roles/card-back-640.webp") center / cover no-repeat;
+  box-shadow:
+    inset 0 0 0 1px rgba(8, 12, 18, 0.85),
+    inset 0 2px 14px rgba(0, 0, 0, 0.65),
+    0 18px 42px rgba(0, 0, 0, 0.5);
+}
+.role-card-surface {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(232, 237, 242, 0.16);
+}
+.role-card-plate {
+  position: absolute;
+  inset: auto 0 0;
+  display: grid;
+  gap: 2px;
+  padding: clamp(10px, 3vw, 16px) 6px clamp(8px, 2vw, 12px);
+  background: linear-gradient(0deg, rgba(6, 10, 16, 0.96) 0%, rgba(6, 10, 16, 0.72) 55%, rgba(6, 10, 16, 0) 100%);
+  color: var(--moon-100);
+  text-align: center;
+  font-family: Georgia, "Songti SC", serif;
+}
+.role-card-plate strong {
+  font-size: clamp(15px, 4.6vw, 20px);
+  letter-spacing: 0.2em;
+  text-indent: 0.2em;
+  color: var(--candle-300);
+  text-shadow: 0 0 14px rgba(217, 161, 92, 0.55);
+}
+.role-card-plate small {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: var(--silver-400);
+}
+/* 光泽用伪元素实现：几何始终等于卡面，不参与窄屏溢出审计，也不进入 body * 遍历。 */
+.role-card-surface::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.9;
+  background: linear-gradient(105deg, transparent 34%, rgba(232, 237, 242, 0.16) 49%, transparent 64%);
+  transform: translateX(-130%);
+}
+@media (hover: hover) and (pointer: fine) {
+  .role-artwork-frame.has-card-frame:hover .role-card-surface::after {
+    transform: translateX(130%);
+    transition: transform 720ms ease;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .role-card-surface::after {
+    display: none;
+  }
+}
+
+/* 白天翻牌：正反面共用银纹卡框，翻面带光扫与角度阴影。 */
+.day-role-card-back {
+  border-color: rgba(184, 196, 210, 0.42);
+  border-radius: 7px;
+  box-shadow: inset 0 0 0 1px rgba(8, 12, 18, 0.7), 0 16px 36px rgba(0, 0, 0, 0.45);
+}
+.day-role-card-front {
+  border-color: transparent;
+  border-radius: 7px;
+  box-shadow: none;
+}
+.day-role-card-inner {
+  transition: transform 620ms var(--scene-ease);
+}
+.day-role-card.is-revealed .day-role-card-inner {
+  filter: drop-shadow(0 18px 24px rgba(8, 14, 23, 0.5));
+}
+.day-role-card-front::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(237, 198, 136, 0.3) 50%, transparent 65%);
+}
+.day-role-card.is-revealed .day-role-card-front::after {
+  animation: card-reveal-sheen 720ms var(--scene-ease) 120ms both;
+}
+@keyframes card-reveal-sheen {
+  0% {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+/* 身份揭示的聚光感 */
+.role-reveal-state > .role-artwork {
+  box-shadow:
+    0 0 0 1px rgba(237, 198, 136, 0.28),
+    0 26px 70px rgba(0, 0, 0, 0.6),
+    0 0 48px rgba(217, 161, 92, 0.18);
+}
+
+/* ---------- 阶段仪式节点 ---------- */
+/* 每次阶段挂载揭幕一次；reduce 下 animation 被禁用，默认 opacity 0 不遮挡内容。 */
+.player-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(120% 90% at 50% 0%, rgba(8, 14, 23, 0.5), rgba(8, 14, 23, 0.12) 70%);
+  animation: phase-veil 620ms var(--scene-ease) both;
+}
+@keyframes phase-veil {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.dawn-result {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(217, 161, 92, 0.32);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(237, 198, 136, 0.24), rgba(240, 233, 221, 0.9));
+}
+.dawn-result::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 236, 196, 0.65) 50%, transparent 70%);
+  animation: dawn-light 900ms var(--scene-ease) 100ms both;
+}
+@keyframes dawn-light {
+  0% {
+    opacity: 0;
+    transform: translateX(-40%);
+  }
+  45% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(40%);
+  }
+}
+
+/* 结算：按胜负给月银 / 血珀光晕 */
+:is(.player-shell, .host-shell) .game-over-panel {
+  position: relative;
+  border: 1px solid rgba(184, 196, 210, 0.28);
+  border-radius: 10px;
+  background:
+    radial-gradient(90% 50% at 50% 0%, rgba(120, 160, 215, 0.18), transparent 62%),
+    linear-gradient(180deg, var(--night-700), var(--night-900));
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+}
+:is(.player-shell, .host-shell) .game-over-panel h2 {
+  color: var(--moon-100);
+  text-shadow: 0 0 28px rgba(184, 196, 210, 0.45);
+}
+.game-over-panel[data-outcome="wolf-win"] {
+  background:
+    radial-gradient(90% 50% at 50% 0%, rgba(176, 82, 74, 0.24), transparent 62%),
+    linear-gradient(180deg, #22121a, var(--night-900));
+}
+.game-over-panel[data-outcome="wolf-win"] h2 {
+  color: var(--blood-400);
+  text-shadow: 0 0 28px rgba(176, 82, 74, 0.5);
+}
+.game-over-panel[data-outcome="good-win"]::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 160px;
+  pointer-events: none;
+  background: radial-gradient(60% 100% at 50% 0%, rgba(184, 196, 210, 0.16), transparent 70%);
+}

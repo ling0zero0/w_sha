@@ -146,6 +146,8 @@ test("touch and reduced motion preserve target selection, disabled controls and 
       players.map(async (player) => {
         await expect(player.getByTestId("private-role")).toBeVisible();
         const role = await player.getByTestId("private-role").textContent();
+        await expect(player.locator(".role-artwork-frame.has-card-frame")).toHaveCount(1);
+        await expect(player.locator(".role-card-plate")).toBeVisible();
         await player.getByRole("button", { name: "我已记住身份" }).tap();
         return role;
       })
@@ -153,6 +155,7 @@ test("touch and reduced motion preserve target selection, disabled controls and 
     const wolf = players[roles.indexOf("狼人")]!;
     const seer = players[roles.indexOf("预言家")]!;
     const villager = players[roles.indexOf("村民")]!;
+    const nightBackground = await villager.locator("main.player-shell").evaluate((element) => getComputedStyle(element).backgroundImage);
     const confirm = wolf.getByRole("button", { name: "确认本次选择" });
     await expect(confirm).toBeDisabled();
     await expect(confirm).toHaveCSS("transform", "none");
@@ -171,6 +174,9 @@ test("touch and reduced motion preserve target selection, disabled controls and 
     await seer.locator(".night-targets button").first().tap();
     await expect(page.getByRole("heading", { name: "天亮了" })).toBeVisible();
     await page.getByRole("button", { name: "进入白天流程" }).click();
+    await expect(villager.locator("main.day-shell")).toBeVisible();
+    const dayBackground = await villager.locator("main.player-shell").evaluate((element) => getComputedStyle(element).backgroundImage);
+    expect(dayBackground).not.toBe(nightBackground);
     // Freeze the phase while checking local card privacy; WebKit input can outlast a short test turn.
     await page.getByRole("button", { name: "暂停", exact: true }).click();
     await expect(page.getByRole("button", { name: "继续", exact: true })).toBeEnabled();
@@ -187,10 +193,12 @@ test("touch and reduced motion preserve target selection, disabled controls and 
     await expect(back).toBeHidden();
     await expect(villager.locator(".day-role-card-inner")).toHaveCSS("transform", "none");
     await expect(villager.getByAltText("村民身份牌")).toBeVisible();
+    await expect(villager.locator(".day-role-card-front .role-card-plate")).toBeVisible();
     await villager.getByRole("button", { name: "收起身份" }).tap();
     await expect(front).toBeHidden();
     await expect(back).toBeVisible();
     await expect(villager.getByAltText("村民身份牌")).toHaveCount(0);
+    await expect(villager.locator(".day-role-card-front .role-card-plate")).toHaveCount(0);
     await expectReducedMotion(villager);
   } finally {
     const terminate = page.getByRole("button", { name: "终止对局" });
