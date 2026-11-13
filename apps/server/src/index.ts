@@ -13,6 +13,8 @@ import { ProviderRegistry } from "./ai/provider-registry.js";
 import { createOpenAiCompatibleProvider } from "./ai/providers/openai-compatible.js";
 import { ActionLedger } from "./socket/action-ledger.js";
 
+let actionLedger: ActionLedger | undefined;
+
 function closeResources(): void {
   snapshotStore.close();
   chatStore.close();
@@ -44,7 +46,6 @@ const runtime = new GameRuntime(
     ? { localAddress, webPort: config.WEB_PORT, snapshot, chatPersistence: chatStore }
     : { localAddress, webPort: config.WEB_PORT, chatPersistence: chatStore }
 );
-let actionLedger: ActionLedger | undefined;
 try {
   actionLedger = new ActionLedger({
     databasePath: config.DATABASE_PATH,
@@ -63,17 +64,18 @@ const persistSnapshot = () => snapshotStore.schedule(runtime.createSnapshot());
 const testStageTiming =
   config.NODE_ENV === "test"
     ? ({
-        "role-reveal": { minimumMs: 50, maximumMs: 500 },
-        wolf: { minimumMs: 50, maximumMs: 500 },
-        seer: { minimumMs: 50, maximumMs: 500 },
-        guard: { minimumMs: 50, maximumMs: 500 },
-        witch: { minimumMs: 50, maximumMs: 500 },
-        hunter: { minimumMs: 50, maximumMs: 500 },
+        // UI-driven tests need time for real input; completed stages still advance after 50ms.
+        "role-reveal": { minimumMs: 50, maximumMs: 30_000 },
+        wolf: { minimumMs: 50, maximumMs: 30_000 },
+        seer: { minimumMs: 50, maximumMs: 30_000 },
+        guard: { minimumMs: 50, maximumMs: 30_000 },
+        witch: { minimumMs: 50, maximumMs: 30_000 },
+        hunter: { minimumMs: 50, maximumMs: 30_000 },
         dawn: { minimumMs: 5_000, maximumMs: 5_000 },
-        "last-words": { minimumMs: 50, maximumMs: 500 },
-        "day-speech": { minimumMs: 50, maximumMs: 500 },
-        "day-vote": { minimumMs: 50, maximumMs: 500 },
-        "exile-result": { minimumMs: 50, maximumMs: 500 }
+        "last-words": { minimumMs: 50, maximumMs: 30_000 },
+        "day-speech": { minimumMs: 50, maximumMs: 30_000 },
+        "day-vote": { minimumMs: 50, maximumMs: 30_000 },
+        "exile-result": { minimumMs: 50, maximumMs: 30_000 }
       } as const)
     : {};
 const additionalSocketOrigins = config.SOCKET_ALLOWED_ORIGINS?.split(",")
@@ -100,7 +102,7 @@ async function shutdown(signal: string) {
   app.log.info({ signal }, "shutting down");
   persistSnapshot();
   snapshotStore.flush();
-  io.close();
+  await io.close();
   await app.close();
   closeResources();
 }

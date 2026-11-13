@@ -95,6 +95,9 @@ export function attachSocketServer(options: AttachSocketServerOptions) {
     }
   });
   const offlineTimers = new Map<PlayerId, NodeJS.Timeout>();
+  const deferredOfflineSpeakers = new Map<PlayerId, string>();
+  let disposed = false;
+  let disposal: Promise<void> | null = null;
   const takeoverActionIds = new Map<string, ActionId>();
   const aiBudgetLedger = new BudgetLedger();
   let activeAiGameId = runtime.room.getGameSessionId();
@@ -110,6 +113,17 @@ export function attachSocketServer(options: AttachSocketServerOptions) {
 
   function schedulePhaseTimeout(): void {
     clearPhaseTimer();
+    if (disposed) return;
+    if (!runtime.isPhasePaused()) {
+      for (const [playerId, stageKey] of deferredOfflineSpeakers) {
+        deferredOfflineSpeakers.delete(playerId);
+        if (runtime.room.getTimedStageKey() !== stageKey || !runtime.room.isCurrentSpeaker(playerId)) continue;
+        if (runtime.room.getHostView().players.find((player) => player.id === playerId)?.connection !== "offline") continue;
+        runtime.room.skipCurrentDayStage();
+        syncPhaseClock();
+        return;
+      }
+    }
     const stage = runtime.room.getTimedStage();
     const stageKey = runtime.room.getTimedStageKey();
     const clock = runtime.phaseClock.view();
@@ -120,8 +134,9 @@ export function attachSocketServer(options: AttachSocketServerOptions) {
     const delayMs = completed ? Math.max(0, clock.remainingMs - minimumRemainingThreshold) : clock.remainingMs;
     phaseTimer = setTimeout(() => {
       phaseTimer = null;
-      if (runtime.room.getTimedStageKey() !== stageKey) return;
+      if (disposed || runtime.room.getTimedStageKey() !== stageKey) return;
       const currentClock = runtime.phaseClock.view();
+      if (currentClock.status !== "running") return;
       const minimumReached = currentClock.remainingMs <= minimumRemainingThreshold;
       if (runtime.room.isTimedStageComplete() && minimumReached) {
         runtime.room.advanceCompletedTimedStage();
@@ -139,6 +154,7 @@ export function attachSocketServer(options: AttachSocketServerOptions) {
   }
 
   function syncPhaseClock(): void {
+    if (disposed) return;
     const stage = runtime.room.getTimedStage();
     const stageKey = runtime.room.getTimedStageKey();
     if (!stage || !stageKey) {
@@ -168,6 +184,7 @@ export function attachSocketServer(options: AttachSocketServerOptions) {
     const timer = offlineTimers.get(playerId);
     if (timer) clearTimeout(timer);
     offlineTimers.delete(playerId);
+    deferredOfflineSpeakers.delete(playerId);
   }
 
   function emitLobbyViews(): void {
@@ -237,6 +254,7 @@ export function attachSocketServer(options: AttachSocketServerOptions) {
   botManager = new BotManager({
     room: runtime.room,
     execute: (playerId, intent, expectedRevision) => {
+      if (disposed) return false;
       const result = executeBotIntent(runtime.room, playerId, intent, expectedRevision, runtime.isPhasePaused());
       if (!result.accepted) return false;
       if (result.chatMessage) emitChatMessage(result.chatMessage);
@@ -271,8 +289,25 @@ export function attachSocketServer(options: AttachSocketServerOptions) {
     }
   });
   botManager.notify();
+  function dispose(): Promise<void> {
+    if (disposal) return disposal;
+    disposed = true;
+    clearPhaseTimer();
+    for (const timer of offlineTimers.values()) clearTimeout(timer);
+    offlineTimers.clear();
+    deferredOfflineSpeakers.clear();
+    takeoverActionIds.clear();
+    disposal = botManager?.dispose() ?? Promise.resolve();
+    if (!providedActionLedger) actionLedger.close();
+    return disposal;
+  }
+  const closeSocketServer = io.close.bind(io);
+  io.close = async (callback) => {
+    const cleanup = dispose();
+    await Promise.all([cleanup, closeSocketServer(callback)]);
+  };
   server.once("close", () => {
-    void botManager?.dispose();
+    void dispose();
   });
 
   io.on("connection", (socket) => {
@@ -321,6 +356,7 @@ export function attachSocketServer(options: AttachSocketServerOptions) {
     registerHostHandlers(socket, handlerContext);
 
     socket.on("disconnect", (reason) => {
+      if (disposed) return;
       const changedPlayer = runtime.room.setReconnecting(socket.id);
       const preservedTakeoverRequestId = socket.data.pendingTakeover?.requestId ?? null;
       const removedTakeoverRequest = runtime.room.cancelTakeoverRequests(socket.id, preservedTakeoverRequestId);
@@ -329,11 +365,17 @@ export function attachSocketServer(options: AttachSocketServerOptions) {
         clearOfflineTimer(changedPlayer);
         const timer = setTimeout(() => {
           offlineTimers.delete(changedPlayer);
+          if (disposed) return;
           if (runtime.room.setOffline(changedPlayer, socket.id)) {
             if (runtime.room.isCurrentSpeaker(changedPlayer)) {
-              runtime.room.skipCurrentDayStage();
-              syncPhaseClock();
-              emitPublicGameState();
+              const stageKey = runtime.room.getTimedStageKey();
+              if (runtime.isPhasePaused() && stageKey) {
+                deferredOfflineSpeakers.set(changedPlayer, stageKey);
+              } else {
+                runtime.room.skipCurrentDayStage();
+                syncPhaseClock();
+                emitPublicGameState();
+              }
             }
             emitLobbyViews();
           }

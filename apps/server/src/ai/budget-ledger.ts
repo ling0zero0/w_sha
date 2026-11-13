@@ -90,9 +90,7 @@ export class BudgetLedger {
   settle(reservationId: string, actualTokens: number): void {
     const reservation = this.requireReservation(reservationId);
     validateTokens(actualTokens, "actualTokens", true);
-    if (actualTokens > reservation.reservedTokens) {
-      throw new Error("actual tokens cannot exceed reserved tokens");
-    }
+    // Provider usage can exceed an estimate; retain the debt so later reservations fail.
 
     for (const key of reservationKeys(reservation)) {
       const usage = this.getUsage(key);

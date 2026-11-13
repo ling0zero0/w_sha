@@ -4,7 +4,7 @@
   "private": true,
   "packageManager": "pnpm@11.5.0",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13.0"
   },
   "scripts": {
     "dev": "concurrently -k -n server,web -c yellow,cyan \"corepack pnpm --filter @werewolf/server dev\" \"corepack pnpm --filter @werewolf/web dev\"",
@@ -18,9 +18,11 @@
     "verify:release": "node scripts/verify-release-artifacts.cjs",
     "verify:installer": "node scripts/smoke-installer.cjs",
     "quality": "corepack pnpm lint && corepack pnpm format:check && corepack pnpm security:check && corepack pnpm verify:repo",
-    "typecheck": "corepack pnpm --filter @werewolf/shared typecheck && corepack pnpm --filter @werewolf/server typecheck && corepack pnpm --filter @werewolf/web typecheck",
+    "typecheck": "corepack pnpm --filter @werewolf/shared typecheck && corepack pnpm --filter @werewolf/server typecheck && corepack pnpm --filter @werewolf/web typecheck && corepack pnpm typecheck:e2e",
+    "typecheck:e2e": "tsc -p tsconfig.e2e.json",
     "test": "corepack pnpm --filter @werewolf/shared test && corepack pnpm --filter @werewolf/server test && corepack pnpm --filter @werewolf/web test",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --project=desktop-chromium",
+    "test:e2e:cross": "playwright test",
     "screenshots:readme": "playwright test --config=playwright.screenshots.config.ts",
     "build": "corepack pnpm --filter @werewolf/shared build && corepack pnpm --filter @werewolf/server build && corepack pnpm --filter @werewolf/web build",
     "package:portable": "node scripts/package-portable.cjs",
@@ -30,6 +32,7 @@
     "clean": "node scripts/clean.cjs"
   },
   "devDependencies": {
+    "@types/node": "^24.10.0",
     "@biomejs/biome": "^2.5.6",
     "@playwright/test": "^1.61.1",
     "concurrently": "^9.2.1",

@@ -12,7 +12,14 @@ export default defineConfig({
     trace: "off"
   },
   webServer: {
-    command: "set NODE_ENV=test&& set PUBLIC_ADDRESS=192.168.50.10&& set PORT=3101&& set WEB_PORT=5274&& set DATABASE_PATH=:memory:&& corepack pnpm dev",
+    command: "corepack pnpm dev",
+    env: {
+      NODE_ENV: "test",
+      PUBLIC_ADDRESS: "192.168.50.10",
+      PORT: "3101",
+      WEB_PORT: "5274",
+      DATABASE_PATH: ":memory:"
+    },
     url: "http://127.0.0.1:5274",
     reuseExistingServer: false,
     timeout: 120_000
@@ -20,7 +27,7 @@ export default defineConfig({
   projects: [
     {
       name: "readme-chromium",
-      use: { ...devices["Desktop Chrome"], channel: "chrome" }
+      use: { ...devices["Desktop Chrome"] }
     }
   ]
 });

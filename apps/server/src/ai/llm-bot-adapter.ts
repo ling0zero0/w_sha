@@ -89,6 +89,7 @@ export class LlmBotAdapter implements BotAdapter {
   }
 
   async onView(view: PlayerLobbyView, context: BotTurnContext): Promise<BotIntent | null> {
+    if (context.signal.aborted) return null;
     const plan = planBotDecision({
       gameId: this.options.gameId(),
       view,
@@ -107,6 +108,9 @@ export class LlmBotAdapter implements BotAdapter {
       botProfile: resolved.profile,
       allowedIntentTypes: plan.allowedIntentTypes
     });
+    // Providers use different tokenizers. UTF-8 bytes including message framing
+    // provide a conservative input estimate without inspecting any extra game data.
+    const estimatedInputTokens = Buffer.byteLength(JSON.stringify(prompt.messages), "utf8");
     let lastModelErrorCode: AiProviderErrorCode | undefined;
 
     for (const model of resolved.models) {
@@ -137,7 +141,7 @@ export class LlmBotAdapter implements BotAdapter {
             gameId: this.options.gameId(),
             modelId: model.id,
             seatId: this.options.playerId,
-            tokens: model.maxOutputTokens,
+            tokens: estimatedInputTokens + model.maxOutputTokens,
             limits: {
               gameTokens: this.options.gameTokenBudget ?? model.gameTokenBudget,
               modelTokens: model.gameTokenBudget,
@@ -168,6 +172,7 @@ export class LlmBotAdapter implements BotAdapter {
           response = await provider.decide({ model, messages: prompt.messages }, context.signal);
         } catch {
           this.budgetLedger.release(reservation.id);
+          if (context.signal.aborted) return null;
           lastModelErrorCode = "PROVIDER_ERROR";
           const completedAt = new Date().toISOString();
           this.recordAttempt({
@@ -185,8 +190,12 @@ export class LlmBotAdapter implements BotAdapter {
         }
 
         if (response.ok) {
-          const used = Math.min(reservation.reservedTokens, response.usage.totalTokens ?? response.usage.outputTokens ?? reservation.reservedTokens);
+          const { inputTokens, outputTokens, totalTokens } = response.usage;
+          const used = totalTokens === null
+            ? (inputTokens ?? estimatedInputTokens) + (outputTokens ?? model.maxOutputTokens)
+            : Math.max(totalTokens, (inputTokens ?? 0) + (outputTokens ?? 0));
           this.budgetLedger.settle(reservation.id, used);
+          if (context.signal.aborted) return null;
           const parsed = botIntentSchema.safeParse(response.decision.intent);
           const allowed = parsed.success && plan.allowedIntentTypes.includes(parsed.data.type);
           const attemptId = this.recordAttempt({
@@ -212,6 +221,7 @@ export class LlmBotAdapter implements BotAdapter {
 
         lastModelErrorCode = response.error.code;
         this.budgetLedger.release(reservation.id);
+        if (context.signal.aborted) return null;
         this.recordAttempt({
           decisionKey: plan.decisionKey,
           context,

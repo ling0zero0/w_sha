@@ -1,4 +1,6 @@
-import { expect, test, devices, type Page } from "@playwright/test";
+import { expect, devices, type Page } from "@playwright/test";
+import { test } from "./fixtures";
+import { deviceOptions } from "./browser-context";
 
 async function getLocalJoinUrl(page: Page): Promise<string> {
   const joinUrl = await page.evaluate(async () => {
@@ -20,7 +22,7 @@ async function joinPlayer(player: Page, joinUrl: string, nickname: string): Prom
 async function removePlayer(page: Page, nickname: string): Promise<void> {
   const row = page.getByTestId("host-player").filter({ hasText: nickname });
   if ((await row.count()) === 0) return;
-  await row.getByTitle("移除玩家").click({ force: true });
+  await row.getByTitle("移除玩家").click();
   await expect(page.getByTestId("host-player").filter({ hasText: nickname })).toHaveCount(0);
 }
 
@@ -48,20 +50,23 @@ async function assertMobileLayout(page: Page): Promise<void> {
   expect(audit.scrollWidth, JSON.stringify(audit)).toBeLessThanOrEqual(audit.viewport + 1);
   expect(audit.overflowers, JSON.stringify(audit)).toEqual([]);
 
-  const undersized = await page.locator("button:visible, input:visible, textarea:visible, select:visible").evaluateAll((elements) =>
-    elements
-      .map((element) => {
-        const rect = element.getBoundingClientRect();
-        return {
-          tag: element.tagName.toLowerCase(),
-          name: element.getAttribute("aria-label") || element.textContent?.trim() || element.getAttribute("title") || "",
-          width: Math.round(rect.width),
-          height: Math.round(rect.height)
-        };
-      })
-      .filter(({ width, height }) => width < 44 || height < 44)
-  );
-  expect(undersized).toEqual([]);
+  await expect
+    .poll(() =>
+      page.locator("button:visible, input:visible, textarea:visible, select:visible").evaluateAll((elements) =>
+        elements
+          .map((element) => {
+            const rect = element.getBoundingClientRect();
+            return {
+              tag: element.tagName.toLowerCase(),
+              name: element.getAttribute("aria-label") || element.textContent?.trim() || element.getAttribute("title") || "",
+              width: Math.round(rect.width),
+              height: Math.round(rect.height)
+            };
+          })
+          .filter(({ width, height }) => width < 44 || height < 44)
+      )
+    )
+    .toEqual([]);
 }
 
 test("host and two mobile players complete the LAN lobby workflow", async ({ browser, page }) => {
@@ -91,10 +96,10 @@ test("host and two mobile players complete the LAN lobby workflow", async ({ bro
   await expect(page.getByText(`${invitation.hostname}:${invitation.port}`, { exact: true })).toBeVisible();
 
   const localJoinUrl = `${new URL(page.url()).origin}${invitation.pathname}${invitation.search}`;
-  const mobileOne = await browser.newContext({ ...devices["Pixel 7"] });
-  const mobileTwo = await browser.newContext({ ...devices["Pixel 7"] });
-  const mobileThree = await browser.newContext({ ...devices["Pixel 7"] });
-  const takeoverContext = await browser.newContext({ ...devices["Pixel 7"] });
+  const mobileOne = await browser.newContext(deviceOptions(browser, devices["Pixel 7"]));
+  const mobileTwo = await browser.newContext(deviceOptions(browser, devices["Pixel 7"]));
+  const mobileThree = await browser.newContext(deviceOptions(browser, devices["Pixel 7"]));
+  const takeoverContext = await browser.newContext(deviceOptions(browser, devices["Pixel 7"]));
   const playerOne = await mobileOne.newPage();
   const playerTwo = await mobileTwo.newPage();
   const playerThree = await mobileThree.newPage();
@@ -172,7 +177,7 @@ test("host and two mobile players complete the LAN lobby workflow", async ({ bro
     await expect(page.getByTestId("host-player")).toHaveCount(2);
 
     await page.getByRole("button", { name: "刷新二维码" }).click();
-    const staleContext = await browser.newContext({ ...devices["Pixel 7"] });
+    const staleContext = await browser.newContext(deviceOptions(browser, devices["Pixel 7"]));
     const stalePlayer = await staleContext.newPage();
     try {
       await stalePlayer.goto(localJoinUrl);
@@ -200,7 +205,7 @@ test("host and two mobile players complete the LAN lobby workflow", async ({ bro
 test("configures a guard and renders its role artwork", async ({ browser, page }) => {
   await page.goto("/");
   const joinUrl = await getLocalJoinUrl(page);
-  const contexts = await Promise.all([0, 1, 2].map(() => browser.newContext({ ...devices["Pixel 7"] })));
+  const contexts = await Promise.all([0, 1, 2].map(() => browser.newContext(deviceOptions(browser, devices["Pixel 7"]))));
   const players = await Promise.all(contexts.map((context) => context.newPage()));
 
   try {
@@ -326,7 +331,7 @@ test("three mobile players complete a full game and start a clean rematch", asyn
   const contexts = await Promise.all(
     Array.from({ length: 3 }, () =>
       browser.newContext({
-        ...devices["Pixel 7"],
+        ...deviceOptions(browser, devices["Pixel 7"]),
         viewport: { width: 320, height: 667 }
       })
     )
@@ -346,7 +351,7 @@ test("three mobile players complete a full game and start a clean rematch", asyn
     await page.getByLabel("白痴数量").fill("0");
     await expect(page.getByTestId("start-readiness")).toHaveText("配置就绪");
     await page.getByRole("radio", { name: "自由讨论" }).click();
-    await expect(page.getByRole("radio", { name: "自由讨论" })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("radio", { name: "自由讨论" })).toBeChecked();
 
     page.once("dialog", (dialog) => dialog.accept());
     await page.getByRole("button", { name: "开始游戏" }).click();
@@ -419,6 +424,14 @@ test("three mobile players complete a full game and start a clean rematch", asyn
           }
         }
 
+        const history = speaker.getByRole("log", { name: "聊天记录" });
+        await history.focus();
+        await expect(history).toBeFocused();
+        await speaker.keyboard.press("Tab");
+        await speaker.keyboard.press("Shift+Tab");
+        await expect(history).toBeFocused();
+        await expect(history).toHaveCSS("outline-style", "solid");
+        await speaker.keyboard.press("PageUp");
         await speaker.reload();
         await expect(speaker.getByLabel("公开发言内容")).toBeVisible();
         for (const text of publicChatTexts) {
@@ -427,9 +440,9 @@ test("three mobile players complete a full game and start a clean rematch", asyn
       }
 
       await speaker.getByRole("button", { name: "结束我的发言" }).click();
-      await expect(speaker.getByLabel("公开发言内容")).toBeVisible();
-      await expect(speaker.getByRole("button", { name: "结束我的发言" })).toHaveCount(0);
       if (index < players.length - 1) {
+        await expect(speaker.getByLabel("公开发言内容")).toBeVisible();
+        await expect(speaker.getByRole("button", { name: "结束我的发言" })).toHaveCount(0);
         await expect(currentHeading).not.toHaveText(currentText ?? "");
       }
     }

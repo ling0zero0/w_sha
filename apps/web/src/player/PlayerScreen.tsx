@@ -192,6 +192,7 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
                   <div className="night-targets">
                     {lobby.wolfAction.candidates.map((candidate) => (
                       <button
+                        aria-pressed={lobby.wolfAction?.target === candidate.id}
                         className={lobby.wolfAction?.target === candidate.id ? "is-selected" : ""}
                         type="button"
                         key={candidate.id}
@@ -203,6 +204,7 @@ function PlayerLobby({ invitation }: { invitation: NonNullable<ReturnType<typeof
                       </button>
                     ))}
                     <button
+                      aria-pressed={lobby.wolfAction.target === "no-kill"}
                       className={lobby.wolfAction.target === "no-kill" ? "is-selected" : ""}
                       type="button"
                       disabled={lobby.wolfAction.locked || nightPaused}

@@ -69,7 +69,7 @@
 环境要求：
 
 - Windows 10/11
-- Node.js 22 或更高版本
+- Node.js 22.13.0 或更高版本（需要无需实验开关的 `node:sqlite`）
 - Corepack
 
 在项目根目录执行：
@@ -93,8 +93,12 @@ corepack pnpm typecheck
 # 单元与集成测试
 corepack pnpm test
 
-# Playwright 端到端测试
+# Playwright 端到端测试（Chromium）
 corepack pnpm test:e2e
+
+# 安装并验证 Chromium / Firefox / WebKit
+corepack pnpm exec playwright install --with-deps chromium firefox webkit
+corepack pnpm test:e2e:cross
 
 # 重新生成 README 游戏截图
 corepack pnpm screenshots:readme
@@ -119,7 +123,7 @@ corepack pnpm check:all
 
 脚本会依次完成项目检查、便携版打包、成品自检和安装版编译。成功后会自动打开 `release/` 目录。
 
-首次打包前需要安装 Node.js 22 或更高版本、项目依赖以及 [Inno Setup 6](https://jrsoftware.org/isinfo.php)。
+首次打包前需要安装 Node.js 22.13.0 或更高版本、项目依赖以及 [Inno Setup 6](https://jrsoftware.org/isinfo.php)。
 
 也可以通过命令行分别执行：
 

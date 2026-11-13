@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import type { Role } from "@werewolf/shared";
 import { roleImages, roleLabels } from "./role-meta";
 
-export function RoleArtwork({ role, className = "", alt, hidden = false }: { role: Role; className?: string; alt?: string; hidden?: boolean }) {
+export function RoleArtwork({ role, className = "", alt, hidden = false, loading = "eager" }: { role: Role; className?: string; alt?: string; hidden?: boolean; loading?: "eager" | "lazy" }) {
   const image = roleImages[role];
   const [failed, setFailed] = useState(false);
 
@@ -24,7 +24,14 @@ export function RoleArtwork({ role, className = "", alt, hidden = false }: { rol
           </span>
         )
       ) : (
-        <img src={image} alt={alt ?? `${roleLabels[role]}身份牌`} onError={() => setFailed(true)} />
+        <picture>
+          <source
+            type="image/webp"
+            srcSet={`${image.replace(".png", "-320.webp")} 320w, ${image.replace(".png", "-640.webp")} 640w`}
+            sizes="(max-width: 390px) 72vw, 280px"
+          />
+          <img src={image} alt={alt ?? `${roleLabels[role]}身份牌`} decoding="async" loading={loading} onError={() => setFailed(true)} />
+        </picture>
       )}
     </div>
   );

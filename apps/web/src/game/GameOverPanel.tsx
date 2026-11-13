@@ -21,7 +21,7 @@ export function GameOverPanel({
       <div className="revealed-roles">
         {result.revealedPlayers.map((player) => (
           <article key={player.id}>
-            <RoleArtwork role={player.role} className="revealed-role-artwork" alt="" />
+            <RoleArtwork role={player.role} className="revealed-role-artwork" alt="" loading="lazy" />
             <span>
               {player.number} 号 · {player.nickname}
             </span>

@@ -679,7 +679,7 @@ export class LobbyRoom {
 
   shootAsHunter(playerId: PlayerId, targetId: PlayerId | null): RoomActionResult<PlayerLobbyView> {
     const player = findPlayer(this.state, playerId);
-    if (!player || this.state.pendingHunterResolution?.hunterId !== player.id || this.state.hunterActionSubmitted) {
+    if (this.state.phase === "game-over" || !player || this.state.pendingHunterResolution?.hunterId !== player.id || this.state.hunterActionSubmitted) {
       return failures.invalidNightAction();
     }
     let target: InternalPlayer | null = null;
@@ -850,6 +850,7 @@ export class LobbyRoom {
     if (this.state.phase === "lobby" || this.state.phase === "game-over") return failures.invalidPhaseControl();
     finishCurrentSession(this.state, "terminated", now);
     this.state.gameOutcome = "terminated";
+    this.state.pendingHunterResolution = null;
     this.state.phase = "game-over";
     this.state.revision += 1;
     return { ok: true, data: this.getHostView() };

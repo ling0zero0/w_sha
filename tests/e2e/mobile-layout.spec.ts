@@ -1,4 +1,6 @@
-import { devices, expect, test, type Page } from "@playwright/test";
+import { devices, expect, type Page } from "@playwright/test";
+import { test } from "./fixtures";
+import { deviceOptions } from "./browser-context";
 
 type Viewport = { width: number; height: number };
 
@@ -43,10 +45,11 @@ async function assertTouchTargets(page: Page): Promise<void> {
   const undersized = await page.locator("button:visible, input:visible, textarea:visible, select:visible").evaluateAll((elements) =>
     elements
       .map((element) => {
-        const rect = element.getBoundingClientRect();
+        const target = element instanceof HTMLInputElement && ["radio", "checkbox"].includes(element.type) ? (element.labels?.[0] ?? element) : element;
+        const rect = target.getBoundingClientRect();
         return {
           tag: element.tagName.toLowerCase(),
-          name: element.getAttribute("aria-label") || element.textContent?.trim() || element.getAttribute("title") || "",
+          name: element.getAttribute("aria-label") || target.textContent?.trim() || element.getAttribute("title") || "",
           width: Math.round(rect.width),
           height: Math.round(rect.height)
         };
@@ -93,7 +96,7 @@ test("host and player surfaces remain usable at narrow mobile sizes", async ({ b
   const invitation = new URL(joinUrl);
   const localJoinUrl = `${new URL(page.url()).origin}${invitation.pathname}${invitation.search}`;
   const context = await browser.newContext({
-    ...devices["Pixel 7"],
+    ...deviceOptions(browser, devices["Pixel 7"]),
     viewport: { width: 320, height: 667 }
   });
   const player = await context.newPage();
@@ -120,7 +123,7 @@ test("host and player surfaces remain usable at narrow mobile sizes", async ({ b
   }
 });
 
-test("player join layout remains usable in portrait, large text, and landscape viewports", async ({ browser, page }) => {
+test("player join layout remains usable in portrait and landscape viewports", async ({ browser, page }) => {
   await page.goto("/");
   const joinUrl = await getLocalJoinUrl(page);
   const invitation = new URL(joinUrl);
@@ -133,7 +136,7 @@ test("player join layout remains usable in portrait, large text, and landscape v
 
   for (const [index, viewport] of viewports.entries()) {
     const context = await browser.newContext({
-      ...devices["Pixel 7"],
+      ...deviceOptions(browser, devices["Pixel 7"]),
       viewport,
       extraHTTPHeaders: {
         "X-Test-Viewport": `${viewport.width}x${viewport.height}`
@@ -162,7 +165,7 @@ test("player join layout remains usable in portrait, large text, and landscape v
   }
 });
 
-test("Android Chrome, iPhone Safari, and WeChat browser profiles can join", async ({ browser, page }) => {
+test("mobile device and WeChat UA profiles can join on the selected browser engine", async ({ browser, page }) => {
   await page.goto("/");
   const joinUrl = await getLocalJoinUrl(page);
   const profiles = [
@@ -178,7 +181,7 @@ test("Android Chrome, iPhone Safari, and WeChat browser profiles can join", asyn
   ];
 
   for (const profile of profiles) {
-    const context = await browser.newContext(profile.device);
+    const context = await browser.newContext(deviceOptions(browser, profile.device));
     const player = await context.newPage();
 
     try {

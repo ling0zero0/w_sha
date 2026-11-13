@@ -14,9 +14,9 @@
     "@werewolf/shared": "workspace:*",
     "lucide-react": "^0.468.0",
     "qrcode": "^1.5.4",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "socket.io-client": "^4.8.3"
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "socket.io-client": "^4.8.4"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",

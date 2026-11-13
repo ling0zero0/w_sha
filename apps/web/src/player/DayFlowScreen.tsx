@@ -84,7 +84,10 @@ export function DayFlowScreen({
         <div className={`day-role-card ${roleVisible ? "is-revealed" : ""}`}>
           <div className="day-role-card-inner">
             <div className="day-role-card-face day-role-card-back">
-              <img src="/assets/roles/card-back.png" alt="身份牌背面" />
+              <picture>
+                <source type="image/webp" srcSet="/assets/roles/card-back-320.webp 320w, /assets/roles/card-back-640.webp 640w" sizes="150px" />
+                <img src="/assets/roles/card-back.png" alt="身份牌背面" decoding="async" />
+              </picture>
             </div>
             <div className="day-role-card-face day-role-card-front">
               {lobby.privateRole ? <RoleArtwork role={lobby.privateRole.role} hidden={!roleVisible} /> : null}
@@ -204,6 +207,7 @@ export function DayFlowScreen({
               <div className="day-vote-options">
                 {lobby.dayVote.candidates.map((candidate) => (
                   <button
+                    aria-pressed={lobby.dayVote?.target === candidate.id}
                     className={lobby.dayVote?.target === candidate.id ? "is-selected" : ""}
                     type="button"
                     key={candidate.id}
@@ -215,6 +219,7 @@ export function DayFlowScreen({
                   </button>
                 ))}
                 <button
+                  aria-pressed={lobby.dayVote.target === "abstain"}
                   className={lobby.dayVote.target === "abstain" ? "is-selected" : ""}
                   type="button"
                   disabled={lobby.dayVote.confirmed}

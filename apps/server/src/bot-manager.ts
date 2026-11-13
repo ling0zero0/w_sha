@@ -125,7 +125,13 @@ export class BotManager {
 
   private async runTurn(playerId: PlayerId, bot: ManagedBot, view: PlayerLobbyView, controller: AbortController, generation: number): Promise<void> {
     let timeout: NodeJS.Timeout | null = null;
+    let onAbort: (() => void) | null = null;
     try {
+      if (this.disposed || controller.signal.aborted) return;
+      const cancelled = new Promise<{ kind: "cancelled" }>((resolve) => {
+        onAbort = () => resolve({ kind: "cancelled" });
+        controller.signal.addEventListener("abort", onAbort, { once: true });
+      });
       const turnTimeoutMs = bot.adapter.turnTimeoutMs ?? this.timeoutMs;
       const decision = Promise.resolve(
         bot.adapter.onView(view, {
@@ -142,8 +148,9 @@ export class BotManager {
         timeout = setTimeout(() => resolve({ kind: "timeout" }), turnTimeoutMs);
         timeout.unref();
       });
-      const result = await Promise.race([decision, timedOut]);
+      const result = await Promise.race([decision, timedOut, cancelled]);
 
+      if (result.kind === "cancelled") return;
       if (result.kind === "timeout") {
         controller.abort();
         return;
@@ -165,6 +172,7 @@ export class BotManager {
       }
       this.execute(playerId, parsed.data, view.revision);
     } finally {
+      if (onAbort) controller.signal.removeEventListener("abort", onAbort);
       if (timeout) clearTimeout(timeout);
       if (bot.task?.generation === generation) bot.task = null;
       if (!this.disposed) this.schedule(playerId);

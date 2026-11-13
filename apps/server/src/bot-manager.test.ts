@@ -260,6 +260,35 @@ describe("BotManager", () => {
     await manager.dispose();
   });
 
+  it.each([false, true])("cancels queued and active turns on disposal (started=%s)", async (started) => {
+    vi.useFakeTimers();
+    const room = createRoom();
+    addBots(room, 1);
+    const onView = vi.fn(async () => new Promise<BotIntent | null>(() => undefined));
+    const execute = vi.fn(() => true);
+    const manager = new BotManager({
+      room,
+      adapterFactory: () => ({ kind: "deterministic", onView, dispose: async () => undefined }),
+      execute
+    });
+    try {
+      manager.notify();
+      if (started) {
+        await Promise.resolve();
+        expect(onView).toHaveBeenCalledOnce();
+        expect(vi.getTimerCount()).toBe(1);
+      }
+      await manager.dispose();
+      await Promise.resolve();
+      expect(vi.getTimerCount()).toBe(0);
+      expect(onView).toHaveBeenCalledTimes(started ? 1 : 0);
+      expect(execute).not.toHaveBeenCalled();
+    } finally {
+      await manager.dispose();
+      vi.useRealTimers();
+    }
+  });
+
   it("retries the same room revision after a paused execution is resumed", async () => {
     const room = createRoom();
     const playerIds = addBots(room, 3);

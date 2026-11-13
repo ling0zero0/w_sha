@@ -213,17 +213,21 @@
   cursor: pointer;
   font-size: 12px;
 }
-.phase-controls button:hover:not(:disabled) {
-  border-color: rgba(227, 184, 95, 0.55);
-  color: var(--amber);
+@media (hover: hover) and (pointer: fine) {
+  .phase-controls button:hover:not(:disabled) {
+    border-color: rgba(227, 184, 95, 0.55);
+    color: var(--amber);
+  }
 }
 .phase-controls button:disabled {
   opacity: 0.3;
   cursor: default;
 }
-.phase-controls .force-end-control:hover:not(:disabled) {
-  border-color: rgba(223, 119, 106, 0.6);
-  color: #ef9b91;
+@media (hover: hover) and (pointer: fine) {
+  .phase-controls .force-end-control:hover:not(:disabled) {
+    border-color: rgba(223, 119, 106, 0.6);
+    color: #ef9b91;
+  }
 }
 .intervention-notice {
   min-width: 0;
@@ -620,10 +624,12 @@
   cursor: pointer;
   font-size: 12px;
 }
-.icon-command:hover {
-  border-color: rgba(227, 184, 95, 0.56);
-  color: var(--amber);
-  background: rgba(227, 184, 95, 0.06);
+@media (hover: hover) and (pointer: fine) {
+  .icon-command:hover {
+    border-color: rgba(227, 184, 95, 0.56);
+    color: var(--amber);
+    background: rgba(227, 184, 95, 0.06);
+  }
 }
 
 .roster {
@@ -693,13 +699,17 @@
   color: #d3d7d4;
   cursor: pointer;
 }
-.takeover-request button:hover {
-  color: #ef9b91;
-  border-color: rgba(223, 119, 106, 0.6);
+@media (hover: hover) and (pointer: fine) {
+  .takeover-request button:hover {
+    color: #ef9b91;
+    border-color: rgba(223, 119, 106, 0.6);
+  }
 }
-.takeover-request .approve-button:hover {
-  color: #9ed4b4;
-  border-color: rgba(102, 189, 142, 0.6);
+@media (hover: hover) and (pointer: fine) {
+  .takeover-request .approve-button:hover {
+    color: #9ed4b4;
+    border-color: rgba(102, 189, 142, 0.6);
+  }
 }
 .bot-add-form {
   min-height: 72px;
@@ -757,9 +767,11 @@
   font-size: 12px;
   font-weight: 750;
 }
-.bot-add-form button:hover:not(:disabled) {
-  border-color: #8fcfa9;
-  background: rgba(102, 189, 142, 0.17);
+@media (hover: hover) and (pointer: fine) {
+  .bot-add-form button:hover:not(:disabled) {
+    border-color: #8fcfa9;
+    background: rgba(102, 189, 142, 0.17);
+  }
 }
 .bot-add-form input:disabled,
 .bot-add-form button:disabled {
@@ -794,8 +806,10 @@
   gap: 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.085);
 }
-.roster-row:hover {
-  background: rgba(255, 255, 255, 0.025);
+@media (hover: hover) and (pointer: fine) {
+  .roster-row:hover {
+    background: rgba(255, 255, 255, 0.025);
+  }
 }
 .seat-number {
   color: var(--amber);
@@ -892,17 +906,21 @@
   color: #bbc1be;
   cursor: pointer;
 }
-.row-actions button:hover:not(:disabled) {
-  border-color: rgba(227, 184, 95, 0.52);
-  color: var(--amber);
+@media (hover: hover) and (pointer: fine) {
+  .row-actions button:hover:not(:disabled) {
+    border-color: rgba(227, 184, 95, 0.52);
+    color: var(--amber);
+  }
 }
 .row-actions button:disabled {
   opacity: 0.27;
   cursor: default;
 }
-.row-actions .danger-button:hover:not(:disabled) {
-  border-color: rgba(223, 119, 106, 0.6);
-  color: #ef9b91;
+@media (hover: hover) and (pointer: fine) {
+  .row-actions .danger-button:hover:not(:disabled) {
+    border-color: rgba(223, 119, 106, 0.6);
+    color: #ef9b91;
+  }
 }
 .row-actions .life-correction-button {
   color: #8fd7a8;

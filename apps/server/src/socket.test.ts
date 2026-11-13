@@ -1,7 +1,7 @@
 import type { ChatMessage, ClientToServerEvents, HostLobbyView, PlayerLobbyView, PlayerSession, PublicGameState, ServerToClientEvents } from "@werewolf/shared";
 import type { AddressInfo } from "node:net";
 import { io as createClient, type Socket } from "socket.io-client";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildServer } from "./app.js";
 import { ChatStore } from "./chat-store.js";
 import type { ServerConfig } from "./config.js";
@@ -23,6 +23,7 @@ const clients: TestSocket[] = [];
 const cleanups: Array<() => Promise<void>> = [];
 
 afterEach(async () => {
+  vi.useRealTimers();
   clients.splice(0).forEach((client) => {
     client.disconnect();
   });
@@ -129,14 +130,92 @@ async function startRuntime(automaticPhaseProgression = false, stageTimingOverri
   await app.listen({ host: "127.0.0.1", port: 0 });
   const address = app.server.address() as AddressInfo;
   cleanups.push(async () => {
-    io.close();
+    await io.close();
     await app.close();
     chatStore.close();
   });
-  return { runtime, url: `http://127.0.0.1:${address.port}` };
+  return { runtime, io, url: `http://127.0.0.1:${address.port}` };
+}
+
+async function startSpeakingRuntime() {
+  const setup = await startRuntime();
+  const host = connect(setup.url, { hostSession: "zyxwvutsrqponmlkjihgfedcba654321" });
+  await waitForHostState(host);
+  const players = [connect(setup.url), connect(setup.url), connect(setup.url)];
+  const sessions: PlayerSession[] = [];
+  for (const [index, player] of players.entries()) {
+    const joined = await player.emitWithAck("player:join", {
+      roomCode: "123456", joinToken: "abcdefghijklmnopqrstuvwxyz123456", nickname: `Speaker ${index}`
+    });
+    if (!joined.ok) throw new Error("test setup failed");
+    sessions.push(joined.data);
+  }
+  expect(setup.runtime.room.updateRoleConfiguration({ wolf: 1, villager: 1, seer: 0, witch: 0, hunter: 1 })).toMatchObject({ ok: true });
+  expect(setup.runtime.room.startGame()).toMatchObject({ ok: true });
+  for (const session of sessions) setup.runtime.room.confirmRole(session.lobby.selfId);
+  expect(setup.runtime.room.skipCurrentNightStage()).toMatchObject({ ok: true, data: { phase: "dawn" } });
+  expect(await host.emitWithAck("host:continue-from-dawn")).toMatchObject({ ok: true, data: { phase: "day-speech" } });
+  const speakerId = setup.runtime.room.getHostView().dayState!.currentSpeaker!.id;
+  const speakerIndex = sessions.findIndex((session) => session.lobby.selfId === speakerId);
+  return { ...setup, host, players, sessions, speakerId, speakerIndex };
 }
 
 describe("lobby socket integration", () => {
+  it.each([false, true])("keeps an offline speaker paused and handles reconnect=%s before resuming", async (reconnect) => {
+    const { runtime, url, host, players, sessions, speakerId, speakerIndex } = await startSpeakingRuntime();
+    expect(await host.emitWithAck("host:pause-phase")).toMatchObject({ ok: true });
+    const pausedClock = runtime.phaseClock.view();
+    const stageKey = runtime.room.getTimedStageKey();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"], shouldClearNativeTimers: true });
+    const disconnected = waitForHostState(host);
+    players[speakerIndex]!.disconnect();
+    await disconnected;
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(runtime.room.getHostView().players.find((player) => player.id === speakerId)?.connection).toBe("offline");
+    expect(runtime.room.getTimedStageKey()).toBe(stageKey);
+    expect(runtime.phaseClock.view()).toEqual(pausedClock);
+
+    if (reconnect) {
+      const replacement = connect(url);
+      expect(await replacement.emitWithAck("player:reconnect", sessions[speakerIndex]!.credentials)).toMatchObject({ ok: true });
+      expect(runtime.phaseClock.view()).toEqual(pausedClock);
+    }
+    expect(await host.emitWithAck("host:resume-phase")).toMatchObject({ ok: true });
+    expect(runtime.phaseClock.view().status).toBe("running");
+    expect(runtime.room.isCurrentSpeaker(speakerId)).toBe(reconnect);
+  });
+
+  it("discards a deferred offline skip when the host has moved to another speaker", async () => {
+    const { runtime, host, players, speakerId, speakerIndex } = await startSpeakingRuntime();
+    await host.emitWithAck("host:pause-phase");
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"], shouldClearNativeTimers: true });
+    const disconnected = waitForHostState(host);
+    players[speakerIndex]!.disconnect();
+    await disconnected;
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(runtime.room.isCurrentSpeaker(speakerId)).toBe(true);
+    expect(await host.emitWithAck("host:skip-day-phase")).toMatchObject({ ok: true });
+    const nextStageKey = runtime.room.getTimedStageKey();
+    expect(nextStageKey).not.toContain(speakerId);
+    await host.emitWithAck("host:pause-phase");
+    await host.emitWithAck("host:resume-phase");
+    expect(runtime.room.getTimedStageKey()).toBe(nextStageKey);
+  });
+
+  it("clears phase and offline timers before closing sockets", async () => {
+    const { runtime, io, host, players, speakerIndex } = await startSpeakingRuntime();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"], shouldClearNativeTimers: true });
+    // Replace the phase timer with one owned by the fake clock.
+    await host.emitWithAck("host:adjust-phase-time", { deltaMs: 1_000 });
+    const disconnected = waitForHostState(host);
+    players[speakerIndex]!.disconnect();
+    await disconnected;
+    const snapshot = runtime.createSnapshot(0);
+    await io.close();
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(runtime.createSnapshot(0)).toEqual(snapshot);
+  });
+
   it("enforces the browser origin allowlist at the handshake", async () => {
     const { url } = await startRuntime();
     const allowed = connectWithOrigin(url, "http://192.168.1.20:5173");

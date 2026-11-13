@@ -1,5 +1,5 @@
 import { Bot, Cpu, LoaderCircle, RefreshCw, Server, ShieldCheck } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { BotProfilePanel } from "./BotProfilePanel";
 import { ModelPanel } from "./ModelPanel";
 import { ProviderPanel } from "./ProviderPanel";
@@ -15,6 +15,7 @@ const tabs = [
 
 export function AiManagementScreen() {
   const [tab, setTab] = useState<AiTab>("providers");
+  const tabRefs = useRef<Partial<Record<AiTab, HTMLButtonElement | null>>>({});
   const { client, configuration, loadState, loadError, reload } = useAiConfiguration();
 
   return (
@@ -47,7 +48,29 @@ export function AiManagementScreen() {
 
         <div className="ai-tab-list" role="tablist" aria-label="AI 配置类别">
           {tabs.map(({ id, label, icon: Icon }) => (
-            <button key={id} type="button" role="tab" aria-selected={tab === id} className={tab === id ? "is-selected" : ""} onClick={() => setTab(id)}>
+            <button
+              key={id}
+              id={`ai-tab-${id}`}
+              ref={(element) => { tabRefs.current[id] = element; }}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              aria-controls="ai-tab-panel"
+              tabIndex={tab === id ? 0 : -1}
+              className={tab === id ? "is-selected" : ""}
+              onClick={() => setTab(id)}
+              onKeyDown={(event) => {
+                const index = tabs.findIndex((item) => item.id === id);
+                const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1
+                  : event.key === "ArrowRight" ? (index + 1) % tabs.length
+                    : event.key === "ArrowLeft" ? (index + tabs.length - 1) % tabs.length : null;
+                if (next === null) return;
+                event.preventDefault();
+                const nextId = tabs[next]!.id;
+                setTab(nextId);
+                tabRefs.current[nextId]?.focus();
+              }}
+            >
               <Icon size={18} aria-hidden="true" />
               {label}
               <span>
@@ -57,6 +80,7 @@ export function AiManagementScreen() {
           ))}
         </div>
 
+        <section id="ai-tab-panel" className="ai-tab-panel" role="tabpanel" aria-labelledby={`ai-tab-${tab}`}>
         {loadState === "loading" ? (
           <div className="ai-load-state" role="status">
             <LoaderCircle className="ai-spin" size={24} aria-hidden="true" />
@@ -71,7 +95,7 @@ export function AiManagementScreen() {
             </button>
           </div>
         ) : (
-          <section className="ai-tab-panel" role="tabpanel">
+          <>
             {tab === "providers" ? (
               <ProviderPanel providers={configuration.providers} client={client} onChanged={reload} />
             ) : tab === "models" ? (
@@ -79,8 +103,9 @@ export function AiManagementScreen() {
             ) : (
               <BotProfilePanel profiles={configuration.botProfiles} models={configuration.models} client={client} onChanged={reload} />
             )}
-          </section>
+          </>
         )}
+        </section>
       </section>
     </main>
   );

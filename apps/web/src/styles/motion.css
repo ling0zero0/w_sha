@@ -1,0 +1,304 @@
+/* 最后引入：交互层次、仅挂载时入场，以及输入能力与动态效果降级。 */
+.role-artwork-frame picture,
+.day-role-card-face picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.bot-profile-help {
+  grid-column: 1 / -1;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.bot-profile-help a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  color: var(--amber);
+}
+.copy-fallback {
+  min-width: 0;
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.copy-fallback p {
+  line-height: 1.6;
+}
+.copy-fallback input {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 8px;
+  background: #101416;
+  color: var(--paper);
+}
+.chat-timeline:focus-visible {
+  outline: 3px solid #a67c2f;
+  outline-offset: -3px;
+}
+.chat-latest-button {
+  display: block;
+  max-width: 100%;
+  margin: 8px auto;
+  padding: 8px 14px;
+  border: 1px solid #98752d;
+  background: #ead8ae;
+  color: #272219;
+}
+
+:root {
+  --motion-quick: 140ms;
+  --motion-enter: 240ms;
+  --motion-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --button-gold: linear-gradient(180deg, #edcc85, #d6aa53);
+  --button-gold-hover: linear-gradient(180deg, #f4d99f, #e3b85f);
+}
+
+button {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 4px;
+  touch-action: manipulation;
+  transition:
+    transform var(--motion-quick) var(--motion-ease),
+    background-color var(--motion-quick) ease,
+    border-color var(--motion-quick) ease,
+    color var(--motion-quick) ease,
+    box-shadow var(--motion-quick) ease;
+}
+button:disabled {
+  cursor: default;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid #a67c2f;
+  outline-offset: 3px;
+}
+:is(.host-shell, .role-screen, .hunter-action-panel, .game-over-panel, .ai-topbar) :is(button, a):focus-visible {
+  outline-color: #f0cf88;
+}
+.chat-mode-segments label:focus-within,
+.ai-strategy-field label:focus-within {
+  position: relative;
+  z-index: 1;
+  outline: 3px solid #a67c2f;
+  outline-offset: -3px;
+}
+.chat-mode-segments label:focus-within {
+  outline-color: #fff1cc;
+}
+.ai-secret-control:focus-within {
+  border-color: #98752d;
+  outline: 3px solid rgba(152, 117, 45, 0.4);
+  outline-offset: 2px;
+}
+
+:is(.phase-controls, .row-actions, .takeover-request) button,
+.icon-command,
+.night-secondary-button {
+  background: linear-gradient(180deg, #272e2d, #1a201f);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.06), 0 2px 5px rgba(0, 0, 0, 0.16);
+}
+.start-game-button,
+.host-continue-button,
+.join-form button:not(.takeover-button),
+.confirm-role-button:not(.poison-submit),
+.witch-tools button:not(.secondary-night-action),
+.game-over-actions button:first-child {
+  background: var(--button-gold);
+  color: #191d1b;
+  box-shadow: inset 0 1px rgba(255, 247, 219, 0.5), 0 3px 10px rgba(0, 0, 0, 0.22);
+}
+.confirm-role-button.poison-submit,
+.hunter-action-buttons button:first-child {
+  background: linear-gradient(180deg, #ce7d6e, #ac574b);
+  box-shadow: inset 0 1px rgba(255, 230, 218, 0.22), 0 3px 10px rgba(0, 0, 0, 0.2);
+}
+
+/* 选中强调采用内描边，不改变尺寸或挤动相邻目标。 */
+:is(.night-targets, .hunter-targets, .day-vote-options) button {
+  --target-accent: #e48779;
+}
+.guard-action-panel .night-targets button {
+  --target-accent: #78bf97;
+}
+.day-vote-options button {
+  --target-accent: #98752d;
+}
+:is(.night-targets, .hunter-targets, .day-vote-options) button.is-selected {
+  box-shadow: inset 0 0 0 2px var(--target-accent);
+  font-weight: 800;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  button:enabled:hover {
+    transform: translateY(-1px);
+  }
+  .start-game-button:enabled:hover,
+  .host-continue-button:enabled:hover,
+  .join-form button:not(.takeover-button):enabled:hover,
+  .confirm-role-button:not(.poison-submit):enabled:hover,
+  .witch-tools button:not(.secondary-night-action):enabled:hover,
+  .game-over-actions button:first-child:enabled:hover {
+    background: var(--button-gold-hover);
+    box-shadow: inset 0 1px rgba(255, 247, 219, 0.65), 0 5px 14px rgba(0, 0, 0, 0.25);
+  }
+  :is(.night-targets, .hunter-targets, .day-vote-options) button:enabled:hover {
+    border-color: var(--target-accent);
+  }
+}
+button:enabled:active {
+  transform: translateY(1px);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.24);
+}
+:is(.night-targets, .hunter-targets, .day-vote-options) button.is-selected:enabled:active {
+  box-shadow: inset 0 0 0 2px var(--target-accent), inset 0 2px 5px rgba(0, 0, 0, 0.24);
+}
+
+/* 不绑定倒计时、聊天消息、名单行或持续复用的大容器。 */
+.join-intro,
+.join-form,
+.waiting-heading,
+.role-reveal-state > .role-artwork,
+.role-configuration,
+.role-confirmation-panel,
+.wolf-action-panel,
+.night-role-panel,
+.hunter-action-panel,
+.day-vote-panel,
+.ballot-result,
+.dawn-result,
+.inspection-result,
+.game-over-panel,
+.ai-page-heading {
+  animation: content-enter var(--motion-enter) var(--motion-ease);
+}
+@keyframes content-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 补足桌面图标控件与窄屏控件的实际点击区域。 */
+.row-actions {
+  width: 144px;
+  grid-template-columns: repeat(3, 44px);
+}
+.row-actions button,
+.takeover-request button,
+.ai-icon-button {
+  width: 44px;
+  height: 44px;
+}
+.roster-row {
+  grid-template-columns: 52px minmax(100px, 1fr) 74px 144px;
+}
+.takeover-request {
+  grid-template-columns: 30px minmax(0, 1fr) 44px 44px;
+}
+.ai-secret-control {
+  grid-template-columns: 39px minmax(0, 1fr) 44px;
+}
+.ai-secret-control .ai-icon-button {
+  width: 44px;
+  height: 44px;
+}
+.ai-form-grid :is(input:not([type="radio"]), select),
+.ai-secret-control input {
+  min-height: 44px;
+}
+.ai-text-command,
+.ai-toggle-row,
+.brand,
+.not-found-screen a {
+  min-height: 44px;
+}
+
+:is(.host-shell, .player-shell, .ai-shell) {
+  padding-top: env(safe-area-inset-top);
+}
+.host-footer {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+:is(.join-layout, .mobile-state, .ai-workspace, .lobby-workspace) {
+  padding-bottom: max(40px, calc(env(safe-area-inset-bottom) + 24px));
+}
+.ai-topbar {
+  padding-left: max(clamp(20px, 4vw, 64px), env(safe-area-inset-left));
+  padding-right: max(clamp(20px, 4vw, 64px), env(safe-area-inset-right));
+}
+@media (max-width: 850px) {
+  .lobby-workspace,
+  .ai-workspace {
+    width: min(620px, calc(100% - 2 * max(18px, env(safe-area-inset-left), env(safe-area-inset-right))));
+  }
+}
+@media (max-width: 560px) {
+  .lobby-workspace,
+  .ai-workspace {
+    width: calc(100% - 2 * max(14px, env(safe-area-inset-left), env(safe-area-inset-right)));
+  }
+  .roster-row {
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+  }
+  .row-actions {
+    width: 100%;
+    grid-template-columns: repeat(4, 44px);
+  }
+}
+.join-layout,
+.mobile-state {
+  width: min(470px, calc(100% - 2 * max(18px, env(safe-area-inset-left), env(safe-area-inset-right))));
+}
+
+/* 触控设备和窄屏取消大面积背景采样，以实色保证可读性。 */
+@media (pointer: coarse), (max-width: 850px) {
+  .host-phase-panel,
+  .role-configuration,
+  .join-station,
+  .roster {
+    backdrop-filter: none;
+    background: #151b1c;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+  button,
+  a {
+    transform: none !important;
+  }
+  /* 无翻转动画时直接切换可见面，隐藏的身份牌仍不可见。 */
+  .day-role-card {
+    perspective: none;
+  }
+  .day-role-card-inner,
+  .day-role-card-face {
+    transform: none !important;
+  }
+  .day-role-card-front,
+  .day-role-card.is-revealed .day-role-card-back {
+    visibility: hidden;
+  }
+  .day-role-card-back,
+  .day-role-card.is-revealed .day-role-card-front {
+    visibility: visible;
+  }
+}

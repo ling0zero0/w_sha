@@ -57,15 +57,18 @@ export function HostScreen() {
     returnToLobby
   } = useHostLobby();
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
 
   async function copyJoinUrl() {
     if (!lobby) return;
     try {
       await navigator.clipboard.writeText(lobby.joinUrl);
       setCopied(true);
+      setCopyFailed(false);
       window.setTimeout(() => setCopied(false), 1600);
     } catch {
       setCopied(false);
+      setCopyFailed(true);
     }
   }
 
@@ -316,6 +319,13 @@ export function HostScreen() {
                     <span>刷新二维码</span>
                   </button>
                 </div>
+                {copyFailed ? (
+                  <div className="copy-fallback">
+                    <p role="status">浏览器无法自动复制，请选中下方完整链接后手动复制。</p>
+                    <label htmlFor="manual-join-url">完整加入链接</label>
+                    <input id="manual-join-url" readOnly value={lobby.joinUrl} onFocus={(event) => event.currentTarget.select()} />
+                  </div>
+                ) : null}
               </section>
             ) : null}
 

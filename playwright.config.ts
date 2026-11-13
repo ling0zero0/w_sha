@@ -1,6 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const apiPort = process.env.E2E_API_PORT ?? "3100";
+const webPort = process.env.E2E_WEB_PORT ?? "5273";
+
 export default defineConfig({
+  timeout: 90_000,
   testDir: "./tests/e2e",
   fullyParallel: false,
   workers: 1,
@@ -8,19 +12,34 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: "html",
   use: {
-    baseURL: "http://127.0.0.1:5273",
+    baseURL: `http://127.0.0.1:${webPort}`,
     trace: "on-first-retry"
   },
   webServer: {
-    command: "set NODE_ENV=test&& set PUBLIC_ADDRESS=192.168.50.10&& set PORT=3100&& set WEB_PORT=5273&& set DATABASE_PATH=:memory:&& corepack pnpm dev",
-    url: "http://127.0.0.1:5273",
+    command: "corepack pnpm dev",
+    env: {
+      NODE_ENV: "test",
+      PUBLIC_ADDRESS: "192.168.50.10",
+      PORT: apiPort,
+      WEB_PORT: webPort,
+      DATABASE_PATH: ":memory:"
+    },
+    url: `http://127.0.0.1:${webPort}`,
     reuseExistingServer: false,
     timeout: 120_000
   },
   projects: [
     {
       name: "desktop-chromium",
-      use: { ...devices["Desktop Chrome"], channel: "chrome" }
+      use: { ...devices["Desktop Chrome"] }
+    },
+    {
+      name: "desktop-webkit",
+      use: { ...devices["Desktop Safari"] }
+    },
+    {
+      name: "desktop-firefox",
+      use: { ...devices["Desktop Firefox"] }
     }
   ]
 });

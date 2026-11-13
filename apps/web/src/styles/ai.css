@@ -32,8 +32,10 @@
   font-size: 13px;
   font-weight: 700;
 }
-.ai-host-nav a:hover {
-  color: #f2f0e9;
+@media (hover: hover) and (pointer: fine) {
+  .ai-host-nav a:hover {
+    color: #f2f0e9;
+  }
 }
 .ai-host-nav a[aria-current="page"] {
   border-bottom-color: var(--amber);
@@ -78,11 +80,13 @@
   font-size: 13px;
   font-weight: 750;
 }
-.ai-refresh-button:hover:not(:disabled),
-.ai-secondary-button:hover:not(:disabled) {
-  border-color: #8b713d;
-  color: #745820;
-  background: #f5eddb;
+@media (hover: hover) and (pointer: fine) {
+  .ai-refresh-button:hover:not(:disabled),
+  .ai-secondary-button:hover:not(:disabled) {
+    border-color: #8b713d;
+    color: #745820;
+    background: #f5eddb;
+  }
 }
 .ai-refresh-button:disabled,
 .ai-primary-button:disabled,
@@ -111,9 +115,11 @@
   cursor: pointer;
   font-weight: 750;
 }
-.ai-tab-list button:hover {
-  color: #303735;
-  background: rgba(255, 255, 255, 0.46);
+@media (hover: hover) and (pointer: fine) {
+  .ai-tab-list button:hover {
+    color: #303735;
+    background: rgba(255, 255, 255, 0.46);
+  }
 }
 .ai-tab-list button.is-selected {
   border-bottom-color: #98752d;
@@ -186,19 +192,23 @@
   color: #56605d;
   cursor: pointer;
 }
-.ai-icon-button:hover:not(:disabled) {
-  border-color: #8b713d;
-  color: #745820;
-  background: #f5eddb;
+@media (hover: hover) and (pointer: fine) {
+  .ai-icon-button:hover:not(:disabled) {
+    border-color: #8b713d;
+    color: #745820;
+    background: #f5eddb;
+  }
 }
 .ai-icon-button:disabled {
   opacity: 0.4;
   cursor: default;
 }
-.ai-delete-button:hover:not(:disabled) {
-  border-color: #b96d64;
-  color: #a5483f;
-  background: #f5e4e1;
+@media (hover: hover) and (pointer: fine) {
+  .ai-delete-button:hover:not(:disabled) {
+    border-color: #b96d64;
+    color: #a5483f;
+    background: #f5e4e1;
+  }
 }
 .ai-list-item {
   width: 100%;
@@ -215,8 +225,10 @@
   text-align: left;
   cursor: pointer;
 }
-.ai-list-item:hover {
-  background: #f1f2ef;
+@media (hover: hover) and (pointer: fine) {
+  .ai-list-item:hover {
+    background: #f1f2ef;
+  }
 }
 .ai-list-item.is-selected {
   border-left: 4px solid #98752d;
@@ -422,9 +434,11 @@
   background: #98752d;
   color: #fff;
 }
-.ai-primary-button:hover:not(:disabled) {
-  border-color: #72551d;
-  background: #72551d;
+@media (hover: hover) and (pointer: fine) {
+  .ai-primary-button:hover:not(:disabled) {
+    border-color: #72551d;
+    background: #72551d;
+  }
 }
 .ai-form-status {
   min-height: 40px;

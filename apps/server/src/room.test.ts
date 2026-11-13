@@ -519,6 +519,31 @@ describe("lobby room", () => {
     });
   });
 
+  it("clears a pending hunter shot on termination and preserves the final result", () => {
+    const { room, views } = startConfiguredRoom({ wolf: 1, villager: 2, seer: 0, witch: 0, hunter: 1 }, ["林野", "阿岚", "青禾", "南星"]);
+    const wolf = views.find((view) => view.privateRole?.role === "wolf")!;
+    const hunter = views.find((view) => view.privateRole?.role === "hunter")!;
+    room.selectWolfTarget(wolf.selfId, hunter.selfId);
+    room.confirmWolfVote(wolf.selfId, true);
+    expect(room.getHostView().dayState?.hunterPending).toBe(true);
+    const pendingHunterResolution = room.createSnapshot().pendingHunterResolution!;
+
+    expect(room.terminateGame()).toMatchObject({ ok: true, data: { phase: "game-over", gameResult: { outcome: "terminated" } } });
+    const finalSnapshot = room.createSnapshot();
+    expect(finalSnapshot.pendingHunterResolution).toBeNull();
+    expect(room.shootAsHunter(hunter.selfId, wolf.selfId)).toMatchObject({ ok: false, code: "INVALID_NIGHT_ACTION" });
+    expect(room.shootAsHunter(hunter.selfId, null)).toMatchObject({ ok: false, code: "INVALID_NIGHT_ACTION" });
+    expect(room.createSnapshot()).toEqual(finalSnapshot);
+
+    const restored = new LobbyRoom({
+      localAddress: "192.168.1.20", webPort: 5173,
+      snapshot: { ...finalSnapshot, pendingHunterResolution }
+    });
+    const restoredSnapshot = restored.createSnapshot();
+    expect(restored.shootAsHunter(hunter.selfId, wolf.selfId)).toMatchObject({ ok: false, code: "INVALID_NIGHT_ACTION" });
+    expect(restored.createSnapshot()).toEqual(restoredSnapshot);
+  });
+
   it("does not let a poisoned hunter shoot", () => {
     const { room, views } = startConfiguredRoom({ wolf: 1, villager: 2, seer: 0, witch: 1, hunter: 1 }, ["林野", "阿岚", "青禾", "南星", "石川"]);
     const wolf = views.find((view) => view.privateRole?.role === "wolf")!;

@@ -119,7 +119,7 @@ describe("AI budget ledger", () => {
     ).toThrowError(expect.objectContaining({ scope: "model" }));
   });
 
-  it("rejects duplicate completion and over-settlement", () => {
+  it("settles usage beyond the reservation and rejects duplicate completion", () => {
     const ledger = new BudgetLedger();
     const reservation = ledger.reserve({
       gameId: "game-1",
@@ -129,9 +129,14 @@ describe("AI budget ledger", () => {
       limits
     });
 
-    expect(() => ledger.settle(reservation.id, 101)).toThrow("actual tokens cannot exceed reserved tokens");
-    expect(ledger.getGameUsage("game-1").reservedTokens).toBe(100);
-    ledger.settle(reservation.id, 100);
+    ledger.settle(reservation.id, 1_100);
+    expect(ledger.getGameUsage("game-1")).toEqual({ settledTokens: 1_100, reservedTokens: 0 });
+    expect(ledger.getModelUsage("game-1", "model-1")).toEqual({ settledTokens: 1_100, reservedTokens: 0 });
+    expect(ledger.getSeatUsage("game-1", "seat-1")).toEqual({ settledTokens: 1_100, reservedTokens: 0 });
+    expect(() => ledger.reserve({
+      gameId: "game-1", modelId: "model-2", seatId: "seat-2", tokens: 1, limits
+    })).toThrowError(expect.objectContaining({ scope: "game" }));
+    expect(() => ledger.settle(reservation.id, 1)).toThrow("budget reservation is not active");
     expect(() => ledger.release(reservation.id)).toThrow("budget reservation is not active");
   });
 

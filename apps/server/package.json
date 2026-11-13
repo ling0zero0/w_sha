@@ -11,11 +11,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@fastify/static": "^10.1.2",
+    "@fastify/static": "^10.1.10",
     "@werewolf/shared": "workspace:*",
-    "fastify": "^5.11.0",
-    "socket.io": "^4.8.3",
-    "zod": "^4.4.3"
+    "fastify": "^5.12.8",
+    "socket.io": "^4.8.4",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",

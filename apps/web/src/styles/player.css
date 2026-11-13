@@ -99,8 +99,10 @@
   font-weight: 800;
   cursor: pointer;
 }
-.join-form button:hover:not(:disabled) {
-  background: #e3b85f;
+@media (hover: hover) and (pointer: fine) {
+  .join-form button:hover:not(:disabled) {
+    background: #e3b85f;
+  }
 }
 .join-form button:disabled {
   opacity: 0.58;
@@ -112,8 +114,10 @@
   background: transparent;
   color: #5d4a22;
 }
-.join-form .takeover-button:hover:not(:disabled) {
-  background: #eee7d5;
+@media (hover: hover) and (pointer: fine) {
+  .join-form .takeover-button:hover:not(:disabled) {
+    background: #eee7d5;
+  }
 }
 .form-message {
   margin: 14px 0 0;
@@ -755,9 +759,11 @@
   font-weight: 750;
   cursor: pointer;
 }
-.day-role-toggle:hover:not(:disabled) {
-  border-color: #8c7444;
-  color: #725822;
+@media (hover: hover) and (pointer: fine) {
+  .day-role-toggle:hover:not(:disabled) {
+    border-color: #8c7444;
+    color: #725822;
+  }
 }
 .day-role-toggle:disabled {
   opacity: 0.4;

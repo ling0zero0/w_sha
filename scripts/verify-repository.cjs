@@ -53,11 +53,12 @@ for (const relativePath of requiredPaths) {
 }
 
 assert(/^pnpm@\d+\.\d+\.\d+$/.test(packageJson.packageManager ?? ""), "packageManager must pin a pnpm version");
-assert(packageJson.engines?.node === ">=22", "Node.js engine must remain >=22");
+assert(packageJson.engines?.node === ">=22.13.0", "Node.js engine must require unflagged node:sqlite (>=22.13.0)");
 for (const script of ["check", "check:all", "security:check", "verify:repo", "verify:package:ui", "verify:release"]) {
   assert(typeof packageJson.scripts?.[script] === "string", `missing package script: ${script}`);
 }
-assert(Number(process.versions.node.split(".")[0]) >= 22, `Node.js 22 or newer is required (found ${process.version})`);
+const [nodeMajor, nodeMinor] = process.versions.node.split(".").map(Number);
+assert(nodeMajor > 22 || (nodeMajor === 22 && nodeMinor >= 13), `Node.js 22.13.0 or newer is required (found ${process.version})`);
 
 const gitFiles = spawnSync("git", ["ls-files", "-z"], {
   cwd: projectRoot,

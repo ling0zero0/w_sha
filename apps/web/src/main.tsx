@@ -6,6 +6,7 @@ import "./styles/host.css";
 import "./styles/player.css";
 import "./styles/responsive.css";
 import "./styles/ai.css";
+import "./styles/motion.css";
 
 const root = document.getElementById("root");
 

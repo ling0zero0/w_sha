@@ -37,9 +37,10 @@ export function GuardActionPanel({
             {action.candidates.map((candidate) => (
               <button
                 className={target === candidate.id ? "is-selected" : ""}
+                aria-pressed={target === candidate.id}
                 type="button"
                 key={candidate.id}
-                disabled={paused || !action.active}
+                disabled={!connected || paused || !action.active}
                 onClick={() => setTarget(candidate.id)}
               >
                 <span>{String(candidate.number).padStart(2, "0")}</span>
@@ -98,6 +99,7 @@ export function HunterActionPanel({
             {action.candidates.map((candidate) => (
               <button
                 className={target === candidate.id ? "is-selected" : ""}
+                aria-pressed={target === candidate.id}
                 type="button"
                 key={candidate.id}
                 disabled={!connected || paused || !action.active}
@@ -151,6 +153,7 @@ export function WitchActionPanel({
           <div className="night-targets">
             {action.poisonCandidates.map((candidate) => (
               <button
+                aria-pressed={poisonTarget === candidate.id}
                 className={poisonTarget === candidate.id ? "is-selected" : ""}
                 type="button"
                 key={candidate.id}
