@@ -52,14 +52,6 @@
   color: #272219;
 }
 
-:root {
-  --motion-quick: 140ms;
-  --motion-enter: 240ms;
-  --motion-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --button-gold: linear-gradient(180deg, #edcc85, #d6aa53);
-  --button-gold-hover: linear-gradient(180deg, #f4d99f, #e3b85f);
-}
-
 button {
   min-width: 44px;
   min-height: 44px;

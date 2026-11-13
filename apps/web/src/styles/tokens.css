@@ -1,0 +1,144 @@
+/* 设计令牌：本项目唯一允许定义具体视觉数值的文件。
+   其它样式文件必须引用这里的变量，由 scripts/verify-design-tokens.cjs 校验。
+   风格：月夜铭文（Moonlit Inscription）—— 从角色插画与卡背提取的哥特卡牌语言。 */
+
+:root {
+  /* 基础 */
+  font-family: var(--font-body);
+  color: var(--moon-100);
+  background: var(--night-800);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  letter-spacing: 0;
+
+  /* 字体族：离线可用，不加载远程字体 */
+  --font-display: Georgia, "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", "SimSun", serif;
+  --font-body: "Segoe UI", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --font-number: Georgia, "Times New Roman", serif;
+  --font-mono: Consolas, "Courier New", monospace;
+
+  /* 世界色 */
+  --ink: #151919;
+  --paper: #f3f1eb;
+  --muted: #aeb7b3;
+  --line: rgba(255, 255, 255, 0.14);
+  --amber: #e3b85f;
+  --green: #66bd8e;
+  --red: #df776a;
+  --night-900: #080e17;
+  --night-800: #0b1420;
+  --night-700: #111e2d;
+  --night-600: #1a2b3d;
+  --moon-100: #e8edf2;
+  --moon-300: #b8c4d2;
+  --silver-400: #8b949c;
+  --candle-400: #d9a15c;
+  --candle-300: #edc688;
+  --blood-500: #8e3b3b;
+  --blood-400: #b0524a;
+
+  /* 语义色：业务样式只允许引用这一层 */
+  --text-primary: var(--moon-100);
+  --text-secondary: var(--moon-300);
+  --text-on-paper: #1b2733;
+  --text-muted-on-paper: #68716e;
+  --surface-night: rgba(16, 21, 26, 0.9);
+  --surface-paper: rgba(233, 238, 245, 0.96);
+  --edge-silver: rgba(184, 196, 210, 0.38);
+  --edge-inner: rgba(8, 12, 18, 0.85);
+  --edge-gold: rgba(237, 198, 136, 0.55);
+  --accent: var(--candle-400);
+  --danger: var(--blood-400);
+
+  /* 形状：切角金属牌 / 卡牌 / 控件 */
+  --shape-cut: 10px;
+  --shape-panel-radius: 3px;
+  --shape-card-radius: 7px;
+  --shape-control-radius: 2px;
+  --shape-surface-radius: 3px;
+  --shape-pill-radius: 999px;
+  --shape-corner-size: 18px;
+  --shape-corner-weight: 1px;
+
+  /* 排版层级：size / leading / weight / tracking / family */
+  --type-display-size: clamp(36px, 4.2vw, 58px);
+  --type-display-leading: 1.05;
+  --type-display-weight: 700;
+  --type-display-tracking: 0.02em;
+  --type-display-family: var(--font-display);
+
+  --type-title-size: clamp(30px, 3vw, 44px);
+  --type-title-leading: 1.12;
+  --type-title-weight: 700;
+  --type-title-tracking: 0.04em;
+  --type-title-family: var(--font-display);
+
+  --type-role-size: clamp(48px, 14vw, 78px);
+  --type-role-leading: 1;
+  --type-role-weight: 800;
+  --type-role-tracking: 0.12em;
+  --type-role-family: var(--font-display);
+
+  --type-section-size: 20px;
+  --type-section-leading: 1.3;
+  --type-section-weight: 700;
+  --type-section-tracking: 0.08em;
+  --type-section-family: var(--font-display);
+
+  --type-body-size: 15px;
+  --type-body-leading: 1.65;
+  --type-body-weight: 400;
+  --type-body-tracking: 0;
+  --type-body-family: var(--font-body);
+
+  --type-label-size: 13px;
+  --type-label-leading: 1.4;
+  --type-label-weight: 700;
+  --type-label-tracking: 0.06em;
+  --type-label-family: var(--font-body);
+
+  --type-caption-size: 11px;
+  --type-caption-leading: 1.4;
+  --type-caption-weight: 800;
+  --type-caption-tracking: 0.18em;
+  --type-caption-family: var(--font-body);
+
+  --type-number-size: clamp(28px, 3vw, 43px);
+  --type-number-leading: 1;
+  --type-number-weight: 700;
+  --type-number-tracking: 0.06em;
+  --type-number-family: var(--font-number);
+
+  --type-plate-size: clamp(15px, 4.6vw, 20px);
+  --type-plate-leading: 1.2;
+  --type-plate-weight: 700;
+  --type-plate-tracking: 0.2em;
+  --type-plate-family: var(--font-display);
+
+  /* 间距基准（4px 网格） */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* 层级与投影 */
+  --elevation-1: 0 2px 8px rgba(0, 0, 0, 0.28);
+  --elevation-2: 0 18px 42px rgba(0, 0, 0, 0.5);
+  --elevation-3: 0 24px 70px rgba(0, 0, 0, 0.55);
+  --z-scene: 0;
+  --z-content: 1;
+  --z-veil: 2;
+  --z-overlay: 10;
+
+  /* 动效 */
+  --motion-quick: 140ms;
+  --motion-enter: 240ms;
+  --motion-ritual: 620ms;
+  --motion-sheen: 720ms;
+  --motion-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --scene-ease: cubic-bezier(0.22, 0.8, 0.24, 1);
+  --button-gold: linear-gradient(180deg, #e8bd79, #c9904b);
+  --button-gold-hover: linear-gradient(180deg, #f4d9a4, #d9a15c);
+}

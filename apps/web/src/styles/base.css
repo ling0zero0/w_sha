@@ -1,34 +1,4 @@
-/* 设计令牌、全局重置与基础元素样式。 */
-:root {
-  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-  color: #f4f2ec;
-  background: #101416;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  letter-spacing: 0;
-  --ink: #151919;
-  --paper: #f3f1eb;
-  --muted: #aeb7b3;
-  --line: rgba(255, 255, 255, 0.14);
-  --amber: #e3b85f;
-  --green: #66bd8e;
-  --red: #df776a;
-
-  /* 月夜哥特视觉层：取自角色插画与卡背的世界色 */
-  --night-900: #080e17;
-  --night-800: #0b1420;
-  --night-700: #111e2d;
-  --night-600: #1a2b3d;
-  --moon-100: #e8edf2;
-  --moon-300: #b8c4d2;
-  --silver-400: #8b949c;
-  --candle-400: #d9a15c;
-  --candle-300: #edc688;
-  --blood-500: #8e3b3b;
-  --blood-400: #b0524a;
-  --scene-ease: cubic-bezier(0.22, 0.8, 0.24, 1);
-}
-
+/* 全局重置与基础元素样式。所有视觉数值的唯一真源见 tokens.css。 */
 * {
   box-sizing: border-box;
 }
@@ -60,4 +30,3 @@ a {
   color: inherit;
   text-decoration: none;
 }
-

@@ -4,12 +4,6 @@
    不改变按钮的 transform / background-image 反馈，不引入 backdrop-filter。 */
 
 /* ---------- 世界底色：取自角色插画与卡背 ---------- */
-:root {
-  background: var(--night-800);
-  --button-gold: linear-gradient(180deg, #e8bd79, #c9904b);
-  --button-gold-hover: linear-gradient(180deg, #f4d9a4, #d9a15c);
-}
-
 .host-shell {
   background:
     radial-gradient(100% 70% at 72% -10%, rgba(112, 156, 214, 0.2), transparent 62%),
@@ -297,4 +291,188 @@
   height: 160px;
   pointer-events: none;
   background: radial-gradient(60% 100% at 50% 0%, rgba(184, 196, 210, 0.16), transparent 70%);
+}
+
+/* ---------- 形状系统：金属牌双层边 + 四角包角 + 切角 ---------- */
+:is(.host-phase-panel, .role-configuration, .join-station, .roster) {
+  position: relative;
+  border: 1px solid var(--edge-silver);
+  border-radius: var(--shape-panel-radius);
+  background-color: rgba(12, 20, 30, 0.92);
+  box-shadow:
+    inset 0 0 0 1px var(--edge-inner),
+    inset 0 1px rgba(232, 237, 242, 0.07),
+    var(--elevation-1);
+}
+
+/* 四角包角：纯 CSS 多重渐变，复用卡背的金属件语言，不新增素材。 */
+:is(.host-phase-panel, .role-configuration, .roster)::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  pointer-events: none;
+  border-radius: var(--shape-panel-radius);
+  opacity: 0.9;
+  background:
+    linear-gradient(var(--edge-gold), var(--edge-gold)) left top / var(--shape-corner-size) var(--shape-corner-weight) no-repeat,
+    linear-gradient(var(--edge-gold), var(--edge-gold)) left top / var(--shape-corner-weight) var(--shape-corner-size) no-repeat,
+    linear-gradient(var(--edge-gold), var(--edge-gold)) right top / var(--shape-corner-size) var(--shape-corner-weight) no-repeat,
+    linear-gradient(var(--edge-gold), var(--edge-gold)) right top / var(--shape-corner-weight) var(--shape-corner-size) no-repeat,
+    linear-gradient(var(--edge-silver), var(--edge-silver)) left bottom / var(--shape-corner-size) var(--shape-corner-weight) no-repeat,
+    linear-gradient(var(--edge-silver), var(--edge-silver)) left bottom / var(--shape-corner-weight) var(--shape-corner-size) no-repeat,
+    linear-gradient(var(--edge-silver), var(--edge-silver)) right bottom / var(--shape-corner-size) var(--shape-corner-weight) no-repeat,
+    linear-gradient(var(--edge-silver), var(--edge-silver)) right bottom / var(--shape-corner-weight) var(--shape-corner-size) no-repeat;
+}
+
+/* 切角轮廓。注意 clip-path 会裁掉外阴影，需要外层 wrapper 用 drop-shadow。 */
+.shape-chamfer,
+.join-station {
+  clip-path: polygon(
+    var(--shape-cut) 0,
+    calc(100% - var(--shape-cut)) 0,
+    100% var(--shape-cut),
+    100% calc(100% - var(--shape-cut)),
+    calc(100% - var(--shape-cut)) 100%,
+    var(--shape-cut) 100%,
+    0 calc(100% - var(--shape-cut)),
+    0 var(--shape-cut)
+  );
+}
+
+.phase-controls button,
+.chat-mode-segments label,
+.role-configuration input {
+  border-radius: var(--shape-control-radius);
+}
+.phase-controls button {
+  border-color: rgba(184, 196, 210, 0.22);
+  box-shadow: inset 0 1px rgba(232, 237, 242, 0.06);
+}
+.role-configuration input {
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+/* ---------- 排版层级：业务样式只引用 tokens.css 的 --type-* ---------- */
+.type-display {
+  font-family: var(--type-display-family);
+  font-size: var(--type-display-size);
+  line-height: var(--type-display-leading);
+  font-weight: var(--type-display-weight);
+  letter-spacing: var(--type-display-tracking);
+}
+.type-title {
+  font-family: var(--type-title-family);
+  font-size: var(--type-title-size);
+  line-height: var(--type-title-leading);
+  font-weight: var(--type-title-weight);
+  letter-spacing: var(--type-title-tracking);
+}
+.type-role {
+  font-family: var(--type-role-family);
+  font-size: var(--type-role-size);
+  line-height: var(--type-role-leading);
+  font-weight: var(--type-role-weight);
+  letter-spacing: var(--type-role-tracking);
+}
+.type-section {
+  font-family: var(--type-section-family);
+  font-size: var(--type-section-size);
+  line-height: var(--type-section-leading);
+  font-weight: var(--type-section-weight);
+  letter-spacing: var(--type-section-tracking);
+}
+.type-body {
+  font-family: var(--type-body-family);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-leading);
+  font-weight: var(--type-body-weight);
+  letter-spacing: var(--type-body-tracking);
+}
+.type-label {
+  font-family: var(--type-label-family);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-leading);
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-tracking);
+}
+.type-caption {
+  font-family: var(--type-caption-family);
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-leading);
+  font-weight: var(--type-caption-weight);
+  letter-spacing: var(--type-caption-tracking);
+}
+.type-number {
+  font-family: var(--type-number-family);
+  font-size: var(--type-number-size);
+  line-height: var(--type-number-leading);
+  font-weight: var(--type-number-weight);
+  letter-spacing: var(--type-number-tracking);
+  font-variant-numeric: tabular-nums;
+}
+.type-plate {
+  font-family: var(--type-plate-family);
+  font-size: var(--type-plate-size);
+  line-height: var(--type-plate-leading);
+  font-weight: var(--type-plate-weight);
+  letter-spacing: var(--type-plate-tracking);
+}
+
+.lobby-heading h1 {
+  font-family: var(--type-display-family);
+  font-size: var(--type-display-size);
+  line-height: var(--type-display-leading);
+  font-weight: var(--type-display-weight);
+  letter-spacing: var(--type-display-tracking);
+}
+.eyebrow {
+  font-family: var(--type-caption-family);
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-leading);
+  font-weight: var(--type-caption-weight);
+  letter-spacing: var(--type-caption-tracking);
+}
+.room-code-block strong {
+  font-family: var(--type-number-family);
+  font-size: var(--type-number-size);
+  line-height: var(--type-number-leading);
+  font-weight: var(--type-number-weight);
+  letter-spacing: var(--type-number-tracking);
+  font-variant-numeric: tabular-nums;
+  color: var(--candle-300);
+  text-shadow: 0 0 22px rgba(217, 161, 92, 0.35);
+}
+.role-configuration-heading h2 {
+  font-family: var(--type-section-family);
+  font-size: var(--type-section-size);
+  line-height: var(--type-section-leading);
+  font-weight: var(--type-section-weight);
+  letter-spacing: var(--type-section-tracking);
+}
+.role-reveal-state h1 {
+  font-family: var(--type-role-family);
+  font-size: var(--type-role-size);
+  line-height: var(--type-role-leading);
+  font-weight: var(--type-role-weight);
+  letter-spacing: var(--type-role-tracking);
+}
+.role-card-plate strong {
+  font-family: var(--type-plate-family);
+  font-size: var(--type-plate-size);
+  line-height: var(--type-plate-leading);
+  font-weight: var(--type-plate-weight);
+  letter-spacing: var(--type-plate-tracking);
+}
+.role-card-plate small {
+  font-family: var(--type-caption-family);
+  font-size: var(--type-caption-size);
+  letter-spacing: var(--type-caption-tracking);
+}
+
+/* 让月夜村庄真正铺开：原遮罩左侧 0.96 不透明几乎盖死插画。 */
+.lobby-scene {
+  background-image:
+    linear-gradient(90deg, rgba(8, 14, 23, 0.88) 0%, rgba(8, 14, 23, 0.52) 42%, rgba(8, 14, 23, 0.16) 100%),
+    linear-gradient(0deg, rgba(8, 14, 23, 0.7), rgba(8, 14, 23, 0.04) 58%),
+    image-set(url("/assets/lobby-1600.webp") 1x);
 }
